@@ -591,6 +591,49 @@ describe('usePlayStore', () => {
     expect(usePlayStore.getState().session?.step).toBe('answer');
   });
 
+  it('skips rumble wait to the next stage checkpoint until the round ends', () => {
+    const question = createQuestion({
+      id: 'q-rumble-skip',
+      canonicalKey: 'science:200:rumble-skip',
+      rumbleFirstTeamId: 'team_1',
+      rumbleSecondTeamId: 'team_2',
+    });
+
+    // Keep wall clock fixed so each skip only advances the synthetic elapsed time.
+    jest.spyOn(Date, 'now').mockReturnValue(2_000_000);
+    usePlayStore.setState({
+      session: createSession({
+        mode: 'rumble',
+        currentQuestion: question,
+        board: [question],
+        step: 'question',
+        phase: 'questionReveal',
+        timerStartedAt: 2_000_000,
+      }),
+    });
+
+    // 0s → 31s (team 1)
+    expect(usePlayStore.getState().skipRumbleWait()).toEqual({ ok: true });
+    expect(usePlayStore.getState().session?.timerStartedAt).toBe(2_000_000 - 31_000);
+
+    // 31s → 61s (lock team 1)
+    expect(usePlayStore.getState().skipRumbleWait()).toEqual({ ok: true });
+    expect(usePlayStore.getState().session?.timerStartedAt).toBe(2_000_000 - 61_000);
+
+    // 61s → 76s (team 2)
+    expect(usePlayStore.getState().skipRumbleWait()).toEqual({ ok: true });
+    expect(usePlayStore.getState().session?.timerStartedAt).toBe(2_000_000 - 76_000);
+
+    // 76s → 90s (lock team 2 / end)
+    expect(usePlayStore.getState().skipRumbleWait()).toEqual({ ok: true });
+    expect(usePlayStore.getState().session?.timerStartedAt).toBe(2_000_000 - 90_000);
+
+    expect(usePlayStore.getState().skipRumbleWait()).toEqual({
+      ok: false,
+      error: 'No more Rumble checkpoints to skip.',
+    });
+  });
+
   it('rejects rumble board start when the team count is unsupported', () => {
     usePlayStore.setState({ session: null, tokens: 20, rapidFire: null });
     const store = usePlayStore.getState();
@@ -816,6 +859,8 @@ describe('usePlayStore', () => {
 
   it('charges quick play based on the selected topic count', () => {
     for (const [topicCount, expectedTokens] of [
+      [1, 18],
+      [2, 16],
       [3, 15],
       [4, 13],
       [5, 12],

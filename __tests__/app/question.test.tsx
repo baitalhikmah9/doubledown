@@ -3,8 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import type { GameConfig, GameSessionState, QuestionCard } from '@/features/shared';
 
+import { StyleSheet } from 'react-native';
 import PlayQuestionScreen, { getQuestionTextSafeWidth } from '@/app/(app)/play/question';
+import { PALETTES } from '@/constants/theme';
 import { usePlayStore } from '@/store/play';
+import { useThemeStore } from '@/store/theme';
 
 const mockReplace = jest.fn();
 
@@ -50,6 +53,7 @@ jest.mock('@/lib/i18n/useI18n', () => ({
         'play.rumbleChipAnswering': 'Answering',
         'play.rumbleChipLocked': 'Locked',
         'play.rumbleChipHiddenName': '?',
+        'play.rumbleSkipWait': 'Skip wait',
         'play.showAnswer': 'Show Answer',
         'play.timeUpTitle': "Time's up",
         'play.timeUpBody': 'The question expired. The answer is revealed and no points are awarded.',
@@ -173,6 +177,30 @@ describe('PlayQuestionScreen', () => {
   afterEach(() => {
     jest.useRealTimers();
     jest.restoreAllMocks();
+    act(() => {
+      useThemeStore.setState({ paletteId: 'default' });
+    });
+  });
+
+  it('keeps a dark canvas (no white flash) when currentQuestion is cleared mid next-turn', () => {
+    act(() => {
+      useThemeStore.setState({ paletteId: 'dark' });
+      usePlayStore.setState({
+        session: createSession({
+          mode: 'classic',
+          currentQuestion: undefined,
+          board: [createQuestion({ id: 'q-empty', canonicalKey: 'science:200:empty' })],
+        }),
+      });
+    });
+
+    render(<PlayQuestionScreen />);
+
+    const canvas = screen.getByTestId('question-turn-transition-canvas');
+    const flat = StyleSheet.flatten(canvas.props.style);
+    expect(flat.backgroundColor).toBe(PALETTES.dark.background);
+    expect(flat.backgroundColor).not.toBe('#FFFFFF');
+    expect(flat.backgroundColor).not.toBe('#FAF9F6');
   });
 
   it('uses dual party chips for rumble reveals and restores the timing guide across windows', () => {
@@ -196,6 +224,8 @@ describe('PlayQuestionScreen', () => {
     expect(screen.getByLabelText('Back to question board')).toBeTruthy();
     expect(screen.getByText('TOPIC: SCIENCE | 200 POINTS')).toBeTruthy();
     expect(screen.getByTestId('rumble-party-chips')).toBeTruthy();
+    expect(screen.getByTestId('rumble-skip-wait')).toBeTruthy();
+    expect(screen.getByText('Skip wait')).toBeTruthy();
     expect(screen.getByLabelText('First team locked')).toBeTruthy();
     expect(screen.getByLabelText('Second team locked')).toBeTruthy();
     expect(screen.queryByText('Beta')).toBeNull();
@@ -217,6 +247,7 @@ describe('PlayQuestionScreen', () => {
     expect(screen.queryByText('Gamma')).toBeNull();
     expect(screen.getByText('BETA ANSWERS BY 60S.')).toBeTruthy();
     expect(screen.getByText('TOPIC: SCIENCE | 200 POINTS')).toBeTruthy();
+    expect(screen.getByTestId('rumble-skip-wait')).toBeTruthy();
 
     jest.spyOn(Date, 'now').mockReturnValue(1_061_000);
     act(() => {
@@ -247,6 +278,52 @@ describe('PlayQuestionScreen', () => {
     expect(screen.getByLabelText('First team: Beta')).toBeTruthy();
     expect(screen.getByLabelText('Second team: Gamma')).toBeTruthy();
     expect(screen.getByText('ROUND ENDED.')).toBeTruthy();
+    expect(screen.queryByTestId('rumble-skip-wait')).toBeNull();
+  });
+
+  it('skips rumble wait stages from the Skip wait control', () => {
+    const question = createQuestion({
+      id: 'q-rumble-skip-ui',
+      canonicalKey: 'science:200:rumble-skip-ui',
+      rumbleFirstTeamId: 'team_2',
+      rumbleSecondTeamId: 'team_3',
+    });
+
+    usePlayStore.setState({
+      session: createSession({
+        currentQuestion: question,
+        board: [question],
+      }),
+    });
+
+    render(<PlayQuestionScreen />);
+
+    expect(screen.getByLabelText('First team locked')).toBeTruthy();
+    expect(screen.getByLabelText('Second team locked')).toBeTruthy();
+
+    act(() => {
+      fireEvent.press(screen.getByTestId('rumble-skip-wait'));
+    });
+    expect(screen.getByLabelText('First team answering: Beta')).toBeTruthy();
+    expect(screen.getByText('BETA ANSWERS BY 60S.')).toBeTruthy();
+
+    act(() => {
+      fireEvent.press(screen.getByTestId('rumble-skip-wait'));
+    });
+    expect(screen.getByLabelText('First team: Beta')).toBeTruthy();
+    expect(screen.getByText('NEXT TEAM APPEARS AT 01:16.')).toBeTruthy();
+
+    act(() => {
+      fireEvent.press(screen.getByTestId('rumble-skip-wait'));
+    });
+    expect(screen.getByLabelText('Second team answering: Gamma')).toBeTruthy();
+    expect(screen.getByText('GAMMA ANSWERS NOW. ROUND ENDS AT 01:30.')).toBeTruthy();
+
+    act(() => {
+      fireEvent.press(screen.getByTestId('rumble-skip-wait'));
+    });
+    expect(screen.getByText('ROUND ENDED.')).toBeTruthy();
+    expect(screen.queryByTestId('rumble-skip-wait')).toBeNull();
   });
 
   it('keeps show answer unavailable until the second rumble team is revealed and keeps it available after 90 seconds', () => {

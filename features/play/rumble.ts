@@ -5,6 +5,14 @@ export const RUMBLE_TRANSITION_SECONDS = 61;
 export const RUMBLE_SECOND_TEAM_REVEAL_SECONDS = 76;
 export const RUMBLE_ROUND_END_SECONDS = 90;
 
+/** Stage boundaries used by "Skip wait": team 1 → lock 1 → team 2 → lock 2 / end. */
+export const RUMBLE_SKIP_CHECKPOINTS = [
+  RUMBLE_FIRST_TEAM_REVEAL_SECONDS,
+  RUMBLE_TRANSITION_SECONDS,
+  RUMBLE_SECOND_TEAM_REVEAL_SECONDS,
+  RUMBLE_ROUND_END_SECONDS,
+] as const;
+
 export const RUMBLE_VALUE_BUCKETS = [100, 200, 300] as const;
 export type RumbleValueBucket = (typeof RUMBLE_VALUE_BUCKETS)[number];
 
@@ -60,6 +68,18 @@ export function getRumblePartyPhase(elapsedSeconds: number): RumblePartyPhase {
   if (sec >= RUMBLE_TRANSITION_SECONDS) return 'transition';
   if (sec >= RUMBLE_FIRST_TEAM_REVEAL_SECONDS) return 'firstAnswering';
   return 'waiting';
+}
+
+/**
+ * Next skip-wait target elapsed seconds, or null when the round has already ended.
+ * Jumps land on official phase boundaries (31 / 61 / 76 / 90).
+ */
+export function getNextRumbleCheckpointSeconds(elapsedSeconds: number): number | null {
+  const sec = Number.isFinite(elapsedSeconds) ? Math.max(0, Math.floor(elapsedSeconds)) : 0;
+  for (const checkpoint of RUMBLE_SKIP_CHECKPOINTS) {
+    if (sec < checkpoint) return checkpoint;
+  }
+  return null;
 }
 
 export function getRumblePartySlots(elapsedSeconds: number): RumblePartySlots {

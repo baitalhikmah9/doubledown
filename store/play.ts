@@ -17,6 +17,7 @@ import {
 import {
   RUMBLE_SECOND_TEAM_REVEAL_SECONDS,
   canRevealRumbleAnswer,
+  getNextRumbleCheckpointSeconds,
   getRumbleElapsedSeconds,
   groupRumbleQuestionsByValueBucket,
 } from '@/features/play/rumble';
@@ -602,6 +603,8 @@ interface PlayStore {
   selectQuestion: (question: QuestionCard) => void;
   reviewBoardQuestion: (question: QuestionCard) => void;
   cancelCurrentQuestion: () => void;
+  /** Jump the Rumble timer to the next stage checkpoint (team reveal / lock-in). */
+  skipRumbleWait: () => { ok: boolean; error?: string };
   revealAnswer: () => { ok: boolean; error?: string };
   expireCurrentQuestionForTimeout: () => void;
   awardStandardQuestion: (teamId: string | null) => void;
@@ -1097,6 +1100,38 @@ function createPlayStore() {
           };
         }),
 
+      skipRumbleWait: () => {
+        const session = get().session;
+        if (!session) return { ok: false, error: 'No session found.' };
+        if (session.mode !== 'rumble') {
+          return { ok: false, error: 'Skip wait is only available in Rumble.' };
+        }
+        if (session.step !== 'question' || !session.currentQuestion) {
+          return { ok: false, error: 'No active Rumble question.' };
+        }
+        if (session.timerStartedAt === undefined) {
+          return { ok: false, error: 'Rumble timer has not started.' };
+        }
+
+        const now = Date.now();
+        const elapsedSeconds = getRumbleElapsedSeconds(session.timerStartedAt, now);
+        const nextCheckpoint = getNextRumbleCheckpointSeconds(elapsedSeconds);
+        if (nextCheckpoint === null) {
+          return { ok: false, error: 'No more Rumble checkpoints to skip.' };
+        }
+
+        set((state) => {
+          if (!state.session) return state;
+          return {
+            session: {
+              ...state.session,
+              timerStartedAt: now - nextCheckpoint * 1000,
+            },
+          };
+        });
+        return { ok: true };
+      },
+
       revealAnswer: () => {
         const session = get().session;
         if (!session) return { ok: false, error: 'No session found.' };
@@ -1578,7 +1613,7 @@ const existingPlayStore = playStoreSingletonHolder.__DOUBLEPLAY_USE_PLAY_STORE__
 export const usePlayStore =
   // Check the newest store method so a stale cached instance from before a code
   // update is discarded instead of reused across Fast Refresh.
-  existingPlayStore && typeof existingPlayStore.getState().loadDebugWinnerSession === 'function'
+  existingPlayStore && typeof existingPlayStore.getState().skipRumbleWait === 'function'
     ? existingPlayStore
     : (playStoreSingletonHolder.__DOUBLEPLAY_USE_PLAY_STORE__ = createPlayStore());
 

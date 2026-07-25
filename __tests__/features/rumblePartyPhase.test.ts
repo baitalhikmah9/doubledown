@@ -1,5 +1,10 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+  RUMBLE_FIRST_TEAM_REVEAL_SECONDS,
+  RUMBLE_ROUND_END_SECONDS,
+  RUMBLE_SECOND_TEAM_REVEAL_SECONDS,
+  RUMBLE_TRANSITION_SECONDS,
+  getNextRumbleCheckpointSeconds,
   getRumblePartyPhase,
   getRumblePartySlots,
 } from '@/features/play/rumble';
@@ -44,5 +49,23 @@ describe('getRumblePartyPhase / getRumblePartySlots', () => {
       secondRevealed: true,
       activeSlot: null,
     });
+  });
+});
+
+describe('getNextRumbleCheckpointSeconds', () => {
+  it('returns the next stage boundary used by Skip wait', () => {
+    expect(getNextRumbleCheckpointSeconds(0)).toBe(RUMBLE_FIRST_TEAM_REVEAL_SECONDS);
+    expect(getNextRumbleCheckpointSeconds(30)).toBe(RUMBLE_FIRST_TEAM_REVEAL_SECONDS);
+    expect(getNextRumbleCheckpointSeconds(31)).toBe(RUMBLE_TRANSITION_SECONDS);
+    expect(getNextRumbleCheckpointSeconds(60)).toBe(RUMBLE_TRANSITION_SECONDS);
+    expect(getNextRumbleCheckpointSeconds(61)).toBe(RUMBLE_SECOND_TEAM_REVEAL_SECONDS);
+    expect(getNextRumbleCheckpointSeconds(75)).toBe(RUMBLE_SECOND_TEAM_REVEAL_SECONDS);
+    expect(getNextRumbleCheckpointSeconds(76)).toBe(RUMBLE_ROUND_END_SECONDS);
+    expect(getNextRumbleCheckpointSeconds(89)).toBe(RUMBLE_ROUND_END_SECONDS);
+  });
+
+  it('returns null once the round has ended', () => {
+    expect(getNextRumbleCheckpointSeconds(90)).toBeNull();
+    expect(getNextRumbleCheckpointSeconds(120)).toBeNull();
   });
 });

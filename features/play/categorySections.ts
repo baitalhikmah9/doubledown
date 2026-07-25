@@ -36,7 +36,7 @@ const TOPICS: Record<CategorySectionId, string[]> = {
   ],
   gaming: [
     'ARK: Survival Evolved', 'Dota', 'League of Legends', 'Minecraft', 'Overwatch',
-    'Pokémon', 'Red Dead Redemption', 'Super Mario Bros.', 'The Legend of Zelda',
+    'Red Dead Redemption', 'Super Mario Bros.', 'The Legend of Zelda',
   ],
 };
 

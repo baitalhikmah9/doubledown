@@ -47,6 +47,10 @@ jest.mock('@/lib/i18n/useI18n', () => ({
         'common.tokens': 'Tokens',
         'play.quickLengthTitle': 'Set Quick Play Length',
         'play.quickLengthSubtitle': 'Choose how many topics Quick Play should use before team setup.',
+        'play.quickLength.option1': '1 Topic',
+        'play.quickLength.option1Copy': 'Shortest match — one topic board.',
+        'play.quickLength.option2': '2 Topics',
+        'play.quickLength.option2Copy': 'Very short setup and board.',
         'play.quickLength.option3': '3 Topics',
         'play.quickLength.option3Copy': 'Balanced quick-play experience.',
         'play.quickLength.option4': '4 Topics',
@@ -63,6 +67,10 @@ jest.mock('@expo/vector-icons', () => ({
   Ionicons: 'Ionicons',
 }));
 
+jest.mock('@clerk/clerk-expo', () => ({
+  useAuth: jest.fn(() => ({ isLoaded: true, isSignedIn: true })),
+}));
+
 describe('QuickLengthScreen', () => {
   beforeEach(() => {
     mockPush.mockClear();
@@ -72,9 +80,13 @@ describe('QuickLengthScreen', () => {
     useThemeStore.setState({ paletteId: 'default' });
   });
 
-  it('shows quick play topic choices with their token costs', () => {
+  it('shows quick play topic choices 1–5 left to right with their token costs', () => {
     render(<QuickLengthScreen />);
 
+    expect(screen.getByText('1 Topic')).toBeTruthy();
+    expect(screen.getByTestId('quick-length-token-cost-1')).toHaveTextContent('2 TOKENS');
+    expect(screen.getByText('2 Topics')).toBeTruthy();
+    expect(screen.getByTestId('quick-length-token-cost-2')).toHaveTextContent('4 TOKENS');
     expect(screen.getByText('3 Topics')).toBeTruthy();
     expect(screen.getByTestId('quick-length-token-cost-3')).toHaveTextContent('5 TOKENS');
     expect(screen.getByText('4 Topics')).toBeTruthy();

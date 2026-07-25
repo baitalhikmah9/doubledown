@@ -37,8 +37,8 @@ import type { GameSessionState, TeamState } from '@/features/shared';
 import { getRowDirection } from '@/lib/i18n/direction';
 import { usePlayTextScale } from '@/store/display';
 
-/** Same QR payload for Android / iOS / Web promo tiles on the match-end screen. */
-const PROMO_SITE_URL = 'playbackfire.com';
+/** Display label under the Web promo tile only (Android / iOS omit the URL). */
+const PROMO_WEB_URL_LABEL = 'PlaybackFire.com';
 const PROMO_QR_SOURCE = require('../../../assets/final-match/web-qr.png');
 
 const TEAM_COLORS = ['#CFF1C5', '#FFE8A8', '#FFD2A5', '#F7BFC4'];
@@ -344,8 +344,8 @@ export default function PlayEndScreen() {
     );
   }
 
-  // QR tiles share vertical room with scoreboard + slogan + tall actions.
-  // iOS phone landscape uses a larger share so codes fill the flex promo band.
+  // QR tiles + slogan share the flex band between scoreboard and actions.
+  // Phone landscape uses a large share so codes fill that band without dead cream.
   const promoWidth = promoLayout.promoWidth;
   const promoGap = promoLayout.promoGap;
   const actionLabelSize = getWinnerActionLabelSize({
@@ -354,6 +354,7 @@ export default function PlayEndScreen() {
     tiny,
     textScale,
   });
+  const sloganSize = Math.round((tiny ? 18 : compact ? 22 : 30) * textScale);
   const handleHome = () => {
     void consumeCurrentEntry().then(() => {
       resetSession();
@@ -384,21 +385,19 @@ export default function PlayEndScreen() {
           <View style={[styles.promoRow, { gap: promoGap }]}>
             <PromoCard
               platform="Android"
-              url={PROMO_SITE_URL}
               source={PROMO_QR_SOURCE}
               compact={compact}
               width={promoWidth}
             />
             <PromoCard
               platform="iOS"
-              url={PROMO_SITE_URL}
               source={PROMO_QR_SOURCE}
               compact={compact}
               width={promoWidth}
             />
             <PromoCard
               platform="Web"
-              url={PROMO_SITE_URL}
+              url={PROMO_WEB_URL_LABEL}
               source={PROMO_QR_SOURCE}
               compact={compact}
               width={promoWidth}
@@ -413,8 +412,8 @@ export default function PlayEndScreen() {
             tiny && styles.sloganTiny,
             {
               color: HOME_SOFT_UI.colors.textPrimary,
-              fontSize: Math.round((tiny ? 15 : compact ? 18 : 26) * textScale),
-              lineHeight: Math.round((tiny ? 18 : compact ? 22 : 32) * textScale),
+              fontSize: sloganSize,
+              lineHeight: Math.round(sloganSize * 1.2),
             },
           ]}
         >
@@ -502,15 +501,18 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     minHeight: 0,
     justifyContent: 'flex-start',
+    // Aesthetic gap between scoreboard / promo layer / action buttons.
     gap: SPACING.sm,
-    // Bottom viewport pad is owned by PlayScaffold chromeColumnStyle (matches top edgePad).
-    paddingBottom: 0,
+    // Keep buttons off the screen/cutout edge (scaffold already has a hairline pad).
+    paddingBottom: SPACING.sm,
   },
   endColumnCompact: {
     gap: 6,
+    paddingBottom: SPACING.sm,
   },
   endColumnTiny: {
     gap: 4,
+    paddingBottom: SPACING.sm,
   },
   promoBlock: {
     flex: 1,
@@ -659,24 +661,23 @@ const styles = StyleSheet.create({
   },
   slogan: {
     fontFamily: FONTS.displayBold,
-    fontSize: 26,
-    lineHeight: 32,
+    fontSize: 30,
+    lineHeight: 36,
     textAlign: 'center',
     flexShrink: 0,
-    marginTop: SPACING.xs,
+    // Sits directly above the action buttons.
+    marginTop: 0,
     marginBottom: SPACING.xs,
   },
   sloganCompact: {
-    fontSize: 18,
-    lineHeight: 22,
-    marginTop: 4,
-    marginBottom: 6,
+    fontSize: 22,
+    lineHeight: 26,
+    marginBottom: 4,
   },
   sloganTiny: {
-    fontSize: 15,
-    lineHeight: 18,
-    marginTop: 2,
-    marginBottom: 4,
+    fontSize: 18,
+    lineHeight: 22,
+    marginBottom: 2,
   },
   actions: {
     width: '100%',

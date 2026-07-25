@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import { immersiveStatusBarScreenOptions } from '@/lib/navigation/statusBar';
+import { HOME_SOFT_UI } from '@/themes';
 
 const webSafeStack: NativeStackNavigationOptions =
   Platform.OS === 'web'
@@ -9,6 +10,10 @@ const webSafeStack: NativeStackNavigationOptions =
         animation: 'fade',
       }
     : {
+        /**
+         * Fade matches root stack. Pair with themed `contentStyle` — the native
+         * stack defaults to white under fades, which flashes every board↔question turn.
+         */
         animation: 'fade',
         gestureDirection: 'horizontal',
         fullScreenGestureEnabled: true,
@@ -17,12 +22,30 @@ const webSafeStack: NativeStackNavigationOptions =
 /**
  * Native stack defaults for a landscape-only app: card transitions and horizontal
  * swipe-back only (no modal slide-from-bottom).
+ *
+ * Always paint `contentStyle` with the soft-UI canvas (cream / dark). Fade
+ * animations otherwise show the RNScreens default white container between screens.
  */
-export const landscapeStackScreenOptions: NativeStackNavigationOptions = {
-  headerShown: false,
-  presentation: 'card',
-  // Omit statusBarHidden in Expo Go — RNScreens redboxes without VC-based status bar plist.
-  // Standalone/dev-client: keep system bar hidden on every native-stack push.
-  ...immersiveStatusBarScreenOptions(),
-  ...webSafeStack,
-};
+export function getLandscapeStackScreenOptions(
+  backgroundColor: string = HOME_SOFT_UI.colors.canvas
+): NativeStackNavigationOptions {
+  return {
+    headerShown: false,
+    presentation: 'card',
+    // Omit statusBarHidden in Expo Go — RNScreens redboxes without VC-based status bar plist.
+    // Standalone/dev-client: keep system bar hidden on every native-stack push.
+    ...immersiveStatusBarScreenOptions(),
+    ...webSafeStack,
+    contentStyle: {
+      flex: 1,
+      backgroundColor,
+    },
+  };
+}
+
+/**
+ * Static defaults. Prefer `getLandscapeStackScreenOptions(canvas)` in layouts that
+ * re-render on palette change so dark mode stays in sync.
+ */
+export const landscapeStackScreenOptions: NativeStackNavigationOptions =
+  getLandscapeStackScreenOptions();

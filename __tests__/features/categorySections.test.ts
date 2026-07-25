@@ -3,7 +3,7 @@ import { getCategorySectionId, getLeadingTeamId, groupCategoriesBySection } from
 import { getPlayableCategories } from '@/features/play/data';
 
 describe('category sections', () => {
-  it('uses the requested section and topic order, including shared Pokémon', () => {
+  it('uses the requested section and topic order; Pokémon is pop culture only', () => {
     const categories = [
       { id: 'g7', slug: 'minecraft', title: 'Minecraft', questionCount: 10 },
       { id: 'pc17', slug: 'pokemon', title: 'Pokemon', questionCount: 10 },
@@ -19,12 +19,12 @@ describe('category sections', () => {
     ]);
     expect(sections[0]?.categories.map((category) => category.title)).toEqual(['Corporations']);
     expect(sections[2]?.categories.map((category) => category.title)).toEqual(['Pokémon']);
-    expect(sections[4]?.categories.map((category) => category.title)).toEqual(['Minecraft', 'Pokémon']);
+    expect(sections[4]?.categories.map((category) => category.title)).toEqual(['Minecraft']);
   });
 
   it('finds every requested topic in the shipped question data', () => {
     const sections = groupCategoriesBySection(getPlayableCategories());
-    expect(sections.map((section) => section.categories.length)).toEqual([20, 14, 28, 8, 9]);
+    expect(sections.map((section) => section.categories.length)).toEqual([20, 14, 28, 8, 8]);
     expect(sections.flatMap((section) => section.categories).map((category) => category.title)).not.toContain('Guess the Flag');
   });
 

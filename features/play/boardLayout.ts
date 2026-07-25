@@ -7,7 +7,7 @@
  * bands. Stacked topic rows keep a modest inter-row gap.
  */
 
-/** Alignment policy for the board topic grid (quick play 3/4/5, classic 6). */
+/** Alignment policy for the board topic grid (quick play 1–5, classic 6). */
 export type BoardTopicGridAlignment = {
   /** Vertically center topic rows when content is shorter than the viewport. */
   contentJustifyContent: 'center';
@@ -154,6 +154,126 @@ export type BoardVerticalLayout = {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(value, max));
+}
+
+/**
+ * Tallest row content when 100/200/300 controls stay square and grow with the
+ * row. Square side = (R - railChrome) / qRows must fit beside the art:
+ *   2*tileSide + 2*artGap + artWidth(R) <= cellWidth
+ * where artWidth ≈ (R - title - gap) / artHeightRatio.
+ *
+ * Phone landscape is short enough that this rarely binds. Tall desktop windows
+ * bind hard — use {@link maxRowHeightForFixedRailTiles} on web instead so free
+ * height becomes larger cards rather than cream dead space.
+ */
+export function maxRowHeightForSquareTiles(input: {
+  cellWidth: number;
+  artGap: number;
+  railChrome: number;
+  maxQuestionRows: number;
+  titleHeight: number;
+  centerBlockGap: number;
+  topicArtHeightRatio: number;
+  /** Rounding slack subtracted from cell width (default 2). */
+  widthSlack?: number;
+}): number {
+  const qRows = Math.max(1, Math.floor(input.maxQuestionRows));
+  const ratio = Math.max(0.5, input.topicArtHeightRatio);
+  const artGap = Math.max(0, input.artGap);
+  const railChrome = Math.max(0, input.railChrome);
+  const titleBlock = Math.max(0, input.titleHeight) + Math.max(0, input.centerBlockGap);
+  const slack = input.widthSlack ?? 2;
+  const numerator =
+    Math.max(0, input.cellWidth) -
+    slack -
+    2 * artGap +
+    (2 * railChrome) / qRows +
+    titleBlock / ratio;
+  const denominator = 2 / qRows + 1 / ratio;
+  return Math.max(railChrome + qRows * 24, numerator / denominator);
+}
+
+/**
+ * Tallest row content when point rails keep a fixed width (web desktop fill).
+ * Tiles may become taller-than-wide rectangles so the board can use window
+ * height; art width is whatever remains in the cell after the two rails.
+ *
+ * Optional maxArtAspect (height/width) soft-caps extreme portrait frames so
+ * contain-fit illustrations do not become skyscrapers on ultrawide+tall monitors.
+ */
+export function maxRowHeightForFixedRailTiles(input: {
+  cellWidth: number;
+  railWidth: number;
+  artGap: number;
+  titleHeight: number;
+  centerBlockGap: number;
+  /** Soft cap on art frame height/width. Omit or Infinity for uncapped fill. */
+  maxArtAspect?: number;
+}): number {
+  const rail = Math.max(1, input.railWidth);
+  const artGap = Math.max(0, input.artGap);
+  const titleBlock = Math.max(0, input.titleHeight) + Math.max(0, input.centerBlockGap);
+  const maxArtW = Math.max(48, Math.max(0, input.cellWidth) - 2 * rail - 2 * artGap);
+  const maxArtAspect =
+    input.maxArtAspect == null || !Number.isFinite(input.maxArtAspect)
+      ? Number.POSITIVE_INFINITY
+      : Math.max(0.5, input.maxArtAspect);
+  if (!Number.isFinite(maxArtAspect)) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return maxArtW * maxArtAspect + titleBlock;
+}
+
+/**
+ * Point control size for a resolved pill height and rail width.
+ * Native keeps squares (side = pill height, rail grows). Web keeps the rail
+ * width fixed and allows taller-than-wide tiles so rows can fill the window.
+ */
+export function getBoardPointTileBox(input: {
+  pillHeight: number;
+  railWidth: number;
+  /** When true, tile is square and rail must be at least the side length. */
+  squareTiles: boolean;
+}): { width: number; height: number; railWidth: number } {
+  const height = Math.max(1, input.pillHeight);
+  if (input.squareTiles) {
+    return {
+      width: height,
+      height,
+      railWidth: Math.max(input.railWidth, Math.ceil(height)),
+    };
+  }
+  const width = Math.max(1, Math.min(height, Math.max(1, input.railWidth)));
+  return {
+    width,
+    height,
+    railWidth: Math.max(1, input.railWidth),
+  };
+}
+
+/**
+ * Horizontal max width for the play board center column on large viewports.
+ * Web gets a modest bump over the phone-landscape column so topics read larger
+ * without stretching edge-to-edge on desktop monitors.
+ */
+export function getBoardContentMaxWidth(input: {
+  platform: string;
+  windowWidth: number;
+  innerWidth: number;
+  wideBreakpoint: number;
+  playMaxWidth: number;
+  playWideMaxWidth: number;
+}): number {
+  const inner = Math.max(0, input.innerWidth);
+  if (input.windowWidth < input.wideBreakpoint) {
+    return Math.floor(inner * 0.94);
+  }
+  if (input.platform === 'web') {
+    // Between playMaxWidth and a soft desktop cap — not full-bleed.
+    const webSoftCap = Math.min(input.playWideMaxWidth, Math.round(input.playMaxWidth * 1.08));
+    return Math.min(inner, webSoftCap);
+  }
+  return Math.min(inner, input.playMaxWidth);
 }
 
 /**

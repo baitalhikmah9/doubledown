@@ -20,9 +20,13 @@ import {
 import {
   computeBoardVerticalLayout,
   getBoardBodyHeight,
+  getBoardContentMaxWidth,
   getBoardGridBottomPadding,
+  getBoardPointTileBox,
   getBoardTopicCellBox,
   getBoardTopicGridAlignment,
+  maxRowHeightForFixedRailTiles,
+  maxRowHeightForSquareTiles,
 } from '@/features/play/boardLayout';
 import { getRandomRemainingQuestion } from '@/features/play/data';
 import {
@@ -446,20 +450,21 @@ export default function PlayBoardScreen() {
   const grouped = useMemo(() => (session ? groupBoardTrivia(session) : []), [session]);
   const responsiveFontSizes = useResponsivePlayFontSizes();
   const playTextScale = usePlayTextScale();
+  const isWebBoard = Platform.OS === 'web' && width >= BREAKPOINTS.wide;
+  /** Web: fixed rail width + rectangular tiles so row height can fill the window. */
+  const useFixedRailTiles = isWebBoard;
   const metrics = useMemo(() => {
     const baseMetrics = getBoardMetrics(height, width);
-    const isWebBoard = Platform.OS === 'web' && width >= BREAKPOINTS.wide;
-    // Cap roomy/tall desktop inflation so web board density tracks phone landscape.
-    // Web: allow larger preferred art tokens; vertical layout grows them further to fill height.
+    // Web: slightly denser than roomy desktop defaults, without ballooning.
     const webDense = isWebBoard
       ? {
           gridGap: Math.min(baseMetrics.gridGap, 16),
-          topicImageSize: Math.min(Math.max(baseMetrics.topicImageSize, 168), 200),
+          topicImageSize: Math.min(Math.max(baseMetrics.topicImageSize, 168), 220),
           topicArtGap: Math.min(baseMetrics.topicArtGap, 12),
           pointRailGap: Math.min(baseMetrics.pointRailGap, 12),
           pointRailClipBleed: Math.min(baseMetrics.pointRailClipBleed, 6),
-          tileFont: Math.min(baseMetrics.tileFont, 17),
-          topicTitleFont: Math.min(baseMetrics.topicTitleFont, 15),
+          tileFont: Math.min(baseMetrics.tileFont, 18),
+          topicTitleFont: Math.min(baseMetrics.topicTitleFont, 16),
         }
       : null;
     const topicTitleFont = Math.round((isWebBoard
@@ -469,19 +474,25 @@ export default function PlayBoardScreen() {
       ...baseMetrics,
       ...webDense,
       tileFont: isWebBoard
-        ? Math.round(scaleFont(15, 13, 17, width, height) * playTextScale)
+        ? Math.round(scaleFont(15, 13, 18, width, height) * playTextScale)
         : responsiveFontSizes.pointValue,
       topicTitleFont,
       scoreFont: responsiveFontSizes.scoreValue,
     };
-  }, [height, playTextScale, responsiveFontSizes, width]);
+  }, [height, isWebBoard, playTextScale, responsiveFontSizes, width]);
   const topicArtHeightRatio = useMemo(() => getTopicArtHeightRatio(height), [height]);
   const bodyPadLeft = Math.max(insets.left, LAYOUT.screenGutter);
   const bodyPadRight = Math.max(insets.right, LAYOUT.screenGutter);
   const padX = bodyPadLeft + bodyPadRight;
   const innerWidth = Math.max(0, width - padX);
-  const centeredContentMaxWidth =
-    width >= BREAKPOINTS.wide ? LAYOUT.playMaxWidth : Math.floor(innerWidth * 0.94);
+  const centeredContentMaxWidth = getBoardContentMaxWidth({
+    platform: Platform.OS,
+    windowWidth: width,
+    innerWidth,
+    wideBreakpoint: BREAKPOINTS.wide,
+    playMaxWidth: LAYOUT.playMaxWidth,
+    playWideMaxWidth: LAYOUT.playWideMaxWidth,
+  });
   const boardLayoutWidth = Math.max(0, Math.min(innerWidth, centeredContentMaxWidth));
   const preferredGridCols = useMemo(
     () => getGridColumnCount(session?.mode ?? 'classic', grouped.length),
@@ -489,11 +500,11 @@ export default function PlayBoardScreen() {
   );
   const gridColumnCount = useMemo(() => {
     if (grouped.length === 0) return preferredGridCols;
-    if (Platform.OS === 'web' && width >= BREAKPOINTS.wide && grouped.length >= 6) {
+    if (isWebBoard && grouped.length >= 6) {
       return Math.min(3, grouped.length);
     }
     return clampGridColumns(preferredGridCols, boardLayoutWidth, metrics.gridGap, grouped.length);
-  }, [preferredGridCols, boardLayoutWidth, metrics.gridGap, grouped.length, width]);
+  }, [preferredGridCols, boardLayoutWidth, isWebBoard, metrics.gridGap, grouped.length]);
   const gridRows = useMemo(() => chunkColumns(grouped, gridColumnCount), [grouped, gridColumnCount]);
   const topicFit = useMemo(
     () => computeTopicFit(boardLayoutWidth, metrics, gridColumnCount, width),
@@ -512,21 +523,38 @@ export default function PlayBoardScreen() {
   const maxQuestionRows = Math.max(1, ...grouped.map((column) => column.rows.length));
   /** Matches topicCenterBlock gap so pill rail targets image + title stack. */
   const topicCenterBlockGap = 2;
-  /** Solve the tallest row content that still fits the cell width:
-   *   2*tileSide + 2*artGap + artWidth <= cellWidth
-   * where tileSide = (R - railChrome) / qRows and artWidth = (R - title - gap) / ratio.
-   * Without this, tall web viewports grow square tiles past the rails and overlap art. */
+  /**
+   * Width cap on row content height.
+   * Native: square tiles grow with R — must stay inside the cell.
+   * Web: fixed rails + rectangular tiles — only soft-cap extreme art aspect so
+   * tall browser windows fill with larger cards instead of cream dead space.
+   */
   const railChrome =
     metrics.pointRailGap * Math.max(0, maxQuestionRows - 1) + metrics.pointRailClipBleed;
-  const maxRowContentHeight = Math.max(
-    railChrome + maxQuestionRows * 24,
-    (topicFit.cellWidth -
-      2 - // rounding slack (ceil'd rail width)
-      2 * topicFit.artGap +
-      (2 * railChrome) / maxQuestionRows +
-      (topicFit.titleHeight + topicCenterBlockGap) / topicArtHeightRatio) /
-      (2 / maxQuestionRows + 1 / topicArtHeightRatio)
-  );
+  const squareRowCap = maxRowHeightForSquareTiles({
+    cellWidth: topicFit.cellWidth,
+    artGap: topicFit.artGap,
+    railChrome,
+    maxQuestionRows,
+    titleHeight: topicFit.titleHeight,
+    centerBlockGap: topicCenterBlockGap,
+    topicArtHeightRatio,
+  });
+  // Web: grow past square-tile geometry a bit so 3-topic boards are not tiny,
+  // but keep a modest art aspect so the board does not eat the whole window.
+  const maxRowContentHeight = useFixedRailTiles
+    ? Math.max(
+        squareRowCap,
+        maxRowHeightForFixedRailTiles({
+          cellWidth: topicFit.cellWidth,
+          railWidth: topicFit.railWidth,
+          artGap: topicFit.artGap,
+          titleHeight: topicFit.titleHeight,
+          centerBlockGap: topicCenterBlockGap,
+          maxArtAspect: 1.55,
+        })
+      )
+    : squareRowCap;
   /**
    * Fixed body height under the match header. Prefer window math over onLayout:
    * the edge-to-edge scaffold often measures content height only, which zeros out
@@ -572,22 +600,38 @@ export default function PlayBoardScreen() {
     ]
   );
   const fittedBoardRowHeight = verticalLayout.boardRowHeight;
-  /** Side length of each 100/200/300 control - rounded square, not a capsule. */
-  const pointTileSize = verticalLayout.pointPillHeight;
   const topicRowGap = verticalLayout.topicRowGap;
   const topicGridAlignment = getBoardTopicGridAlignment();
   const topicCellBox = getBoardTopicCellBox(topicFit.cellWidth, fittedBoardRowHeight);
-  /** Rails must be at least as wide as the square tiles. */
-  const pointRailWidth = Math.max(topicFit.railWidth, Math.ceil(pointTileSize));
-  /** Actual rendered art width - group and title track it so rails hug the art like phone. */
-  const topicArtWidth = Math.max(
-    48,
-    Math.min(topicFit.centerWidth, Math.floor(verticalLayout.topicImageHeight / topicArtHeightRatio))
-  );
+  /** 100/200/300 control box — square on native; fixed-rail rectangles on web. */
+  const pointTileBox = getBoardPointTileBox({
+    pillHeight: verticalLayout.pointPillHeight,
+    railWidth: topicFit.railWidth,
+    squareTiles: !useFixedRailTiles,
+  });
+  const pointTileWidth = pointTileBox.width;
+  const pointTileHeight = pointTileBox.height;
+  const pointRailWidth = pointTileBox.railWidth;
+  /**
+   * Art width: web fills the cell center (rails fixed) so columns scale with the
+   * window; native still tracks preferred portrait art width under square tiles.
+   */
+  const topicArtWidth = useFixedRailTiles
+    ? Math.max(48, topicFit.centerWidth)
+    : Math.max(
+        48,
+        Math.min(
+          topicFit.centerWidth,
+          Math.floor(verticalLayout.topicImageHeight / topicArtHeightRatio)
+        )
+      );
   const topicGroupWidth = 2 * (pointRailWidth + topicFit.artGap) + topicArtWidth;
   const topicTitleWidth = Math.min(topicFit.titleWidth, Math.max(topicArtWidth, 120));
   /** Squircle corners (~14pt), never height/2 (that makes a pill). */
-  const pointTileRadius = Math.min(14, Math.max(8, Math.round(pointTileSize * 0.18)));
+  const pointTileRadius = Math.min(
+    14,
+    Math.max(8, Math.round(Math.min(pointTileWidth, pointTileHeight) * 0.18))
+  );
   const handleGridLayout = (event: LayoutChangeEvent) => {
     const { width: nextWidth, height: nextHeight } = event.nativeEvent.layout;
     setGridViewport((current) =>
@@ -688,8 +732,8 @@ export default function PlayBoardScreen() {
           softSurfaceLift(),
           {
             backgroundColor: isGreenHighlight ? RANDOM_FLASH_GREEN : surfaceColors.tileBackground,
-            width: pointTileSize,
-            height: pointTileSize,
+            width: pointTileWidth,
+            height: pointTileHeight,
             minHeight: 0,
             minWidth: 0,
             borderRadius: pointTileRadius,
@@ -730,8 +774,16 @@ export default function PlayBoardScreen() {
           style={[
             styles.topicPointTileText,
             {
-              fontSize: Math.min(metrics.tileFont, Math.max(6, pointTileSize * 0.42)),
-              lineHeight: Math.round(Math.min(metrics.tileFont, Math.max(6, pointTileSize * 0.42)) * 1.1),
+              fontSize: Math.min(
+                metrics.tileFont,
+                Math.max(6, Math.min(pointTileWidth, pointTileHeight) * 0.42)
+              ),
+              lineHeight: Math.round(
+                Math.min(
+                  metrics.tileFont,
+                  Math.max(6, Math.min(pointTileWidth, pointTileHeight) * 0.42)
+                ) * 1.1
+              ),
               color: isGreenHighlight ? RANDOM_FLASH_GREEN_TEXT : used ? textMuted : T.colors.textPrimary,
               textDecorationLine: used ? 'line-through' : 'none',
               opacity: used && !isGreenHighlight ? 0.55 : 1,
@@ -1347,14 +1399,14 @@ const styles = StyleSheet.create({
   },
   boardCenterContainer: {
     width: '100%',
-    maxWidth: 1200,
+    maxWidth: LAYOUT.playMaxWidth,
     alignSelf: 'center',
     flexGrow: 0,
     flexShrink: 0,
   },
   headerCenterWrap: {
     width: '100%',
-    maxWidth: 1200,
+    maxWidth: LAYOUT.playMaxWidth,
     alignSelf: 'center',
     overflow: 'visible',
   },
@@ -1390,7 +1442,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: 1,
   },
-  /** Point value control - rounded square (squircle corners), not a capsule pill. */
+  /** Point value control - squircle; square on native, may be tall on web fill. */
   topicPointTile: {
     alignSelf: 'center',
     alignItems: 'center',

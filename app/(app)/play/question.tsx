@@ -19,6 +19,7 @@ import { SHOW_HOT_SEAT_UI } from '@/constants/featureFlags';
 import { SOFT_SURFACE_STYLES } from '@/features/play/styles/softSurface';
 import {
   RUMBLE_SECOND_TEAM_REVEAL_SECONDS,
+  getNextRumbleCheckpointSeconds,
   getRumblePartyPhase,
   getRumblePartySlots,
 } from '@/features/play/rumble';
@@ -234,6 +235,7 @@ export default function PlayQuestionScreen() {
   };
   const session = usePlayStore((state) => state.session);
   const cancelCurrentQuestion = usePlayStore((state) => state.cancelCurrentQuestion);
+  const skipRumbleWait = usePlayStore((state) => state.skipRumbleWait);
   const revealAnswer = usePlayStore((state) => state.revealAnswer);
   const expireCurrentQuestionForTimeout = usePlayStore((state) => state.expireCurrentQuestionForTimeout);
   const initiateWager = usePlayStore((state) => state.initiateWager);
@@ -391,10 +393,13 @@ export default function PlayQuestionScreen() {
   }, [isAnswerPhase, isCompactHeader, playTextScale, promptLayoutWidth, session?.phase]);
 
   if (!session?.currentQuestion) {
+    // After "Next Turn", store clears currentQuestion before the fade to board finishes.
+    // Keep the live canvas color (not StyleSheet-frozen cream) so dark mode never flashes white.
     return (
-      <View style={[styles.canvas, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ color: BRAND.charcoal }}>{t('common.loading')}</Text>
-      </View>
+      <View
+        testID="question-turn-transition-canvas"
+        style={[styles.canvas, { backgroundColor: surfaceColors.canvas }]}
+      />
     );
   }
 
@@ -429,6 +434,10 @@ export default function PlayQuestionScreen() {
     !hasTimedOut &&
     (!isRumbleQuestion ||
       elapsedSeconds >= RUMBLE_SECOND_TEAM_REVEAL_SECONDS);
+  const canSkipRumbleWait =
+    isRumbleQuestion &&
+    session.step === 'question' &&
+    getNextRumbleCheckpointSeconds(elapsedSeconds) !== null;
   const hotSeatNames = hotSeatChallenge?.participants
     .map((participant) => participant.playerName)
     .join(' vs ');
@@ -517,26 +526,64 @@ export default function PlayQuestionScreen() {
 
   const rumblePartyChips = isRumbleQuestion ? (
     <View
-      testID="rumble-party-chips"
-      style={styles.rumblePartyRow}
+      testID="rumble-party-status-row"
+      style={styles.rumblePartyStatusRow}
       accessibilityRole="summary"
     >
-      <RumblePartyChip
-        role="first"
-        teamName={rumblePartySlots.firstRevealed ? rumbleFirstTeam?.name ?? null : null}
-        active={rumblePartySlots.activeSlot === 'first'}
-        locked={!rumblePartySlots.firstRevealed}
-        compact={isCompactHeader}
-        t={t}
-      />
-      <RumblePartyChip
-        role="second"
-        teamName={rumblePartySlots.secondRevealed ? rumbleSecondTeam?.name ?? null : null}
-        active={rumblePartySlots.activeSlot === 'second'}
-        locked={!rumblePartySlots.secondRevealed}
-        compact={isCompactHeader}
-        t={t}
-      />
+      <View testID="rumble-party-chips" style={styles.rumblePartyRow}>
+        <RumblePartyChip
+          role="first"
+          teamName={rumblePartySlots.firstRevealed ? rumbleFirstTeam?.name ?? null : null}
+          active={rumblePartySlots.activeSlot === 'first'}
+          locked={!rumblePartySlots.firstRevealed}
+          compact={isCompactHeader}
+          t={t}
+        />
+        <RumblePartyChip
+          role="second"
+          teamName={rumblePartySlots.secondRevealed ? rumbleSecondTeam?.name ?? null : null}
+          active={rumblePartySlots.activeSlot === 'second'}
+          locked={!rumblePartySlots.secondRevealed}
+          compact={isCompactHeader}
+          t={t}
+        />
+      </View>
+      {canSkipRumbleWait ? (
+        <Pressable
+          testID="rumble-skip-wait"
+          accessibilityRole="button"
+          accessibilityLabel={t('play.rumbleSkipWait')}
+          onPress={() => {
+            skipRumbleWait?.();
+          }}
+          style={({ pressed }) => [
+            styles.rumbleSkipWaitButton,
+            isCompactHeader && styles.rumbleSkipWaitButtonCompact,
+            SOFT_SURFACE_STYLES.face,
+            darkModeFlatTop,
+            SOFT_SURFACE_STYLES.raised,
+            {
+              backgroundColor: theme.cardBackground,
+              borderColor: theme.border,
+              opacity: pressed ? 0.92 : 1,
+              transform: [{ scale: pressed ? 0.98 : 1 }],
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.rumbleSkipWaitText,
+              isCompactHeader && styles.rumbleSkipWaitTextCompact,
+              { color: theme.textOnBackground },
+            ]}
+            numberOfLines={2}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
+            {t('play.rumbleSkipWait')}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   ) : null;
 
@@ -933,15 +980,59 @@ const styles = StyleSheet.create({
     opacity: 0.72,
     paddingHorizontal: SPACING.md,
   },
-  rumblePartyRow: {
+  rumblePartyStatusRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
     justifyContent: 'center',
     alignSelf: 'center',
     width: '100%',
-    maxWidth: 420,
+    maxWidth: 520,
     gap: SPACING.sm,
     paddingTop: 2,
+    paddingHorizontal: SPACING.xs,
+  },
+  rumblePartyRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    justifyContent: 'center',
+    minWidth: 0,
+    maxWidth: 420,
+    gap: SPACING.sm,
+  },
+  rumbleSkipWaitButton: {
+    flexShrink: 0,
+    alignSelf: 'center',
+    minWidth: 72,
+    maxWidth: 96,
+    minHeight: 44,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    paddingVertical: 6,
+    paddingHorizontal: SPACING.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: T.surface,
+    borderColor: 'rgba(15, 23, 42, 0.08)',
+  },
+  rumbleSkipWaitButtonCompact: {
+    minWidth: 64,
+    maxWidth: 84,
+    minHeight: 40,
+    borderRadius: 14,
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+  },
+  rumbleSkipWaitText: {
+    fontFamily: FONTS.uiBold,
+    fontSize: 11,
+    lineHeight: 13,
+    letterSpacing: 0.2,
+    textAlign: 'center',
+  },
+  rumbleSkipWaitTextCompact: {
+    fontSize: 10,
+    lineHeight: 12,
   },
   rumblePartyChip: {
     flex: 1,

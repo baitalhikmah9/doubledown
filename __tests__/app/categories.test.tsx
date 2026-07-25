@@ -83,13 +83,26 @@ function hasAbsolutePositionedAncestor(node: ReturnType<typeof screen.getByText>
   return false;
 }
 
-function getResolvedStyle(node: ReturnType<typeof screen.getByLabelText>) {
+function getResolvedStyle(node: ReturnType<typeof screen.getByLabelText> | ReactTestInstance) {
   const style =
     typeof node.props.style === 'function'
       ? node.props.style({ pressed: false, hovered: false, focused: false })
       : node.props.style;
 
-  return StyleSheet.flatten(style);
+  return StyleSheet.flatten(style) ?? {};
+}
+
+/** Outer selected-topic pill chrome (View wrapping sibling jump + remove buttons). */
+function findSelectedPillChrome(jumpNode: ReactTestInstance): ReactTestInstance {
+  let current: ReactTestInstance | null = jumpNode.parent;
+  while (current) {
+    const style = getResolvedStyle(current);
+    if (style.flexDirection === 'row' && typeof style.width === 'number') {
+      return current;
+    }
+    current = current.parent;
+  }
+  throw new Error('Selected topic pill chrome not found');
 }
 
 function hasMinHeightZeroInAncestorChain(node: ReactTestInstance, maxDepth = 4): boolean {
@@ -315,11 +328,18 @@ describe('CategorySelectionScreen', () => {
     expect(categories).toHaveLength(2);
 
     fireEvent.press(screen.getByLabelText(`Select ${categories[0]!.title}`));
-    const onePillStyle = getResolvedStyle(screen.getByLabelText(`Jump to ${categories[0]!.title}`));
+    // Width lives on the outer pill View; jump/remove are sibling press targets (no nested buttons).
+    const onePillStyle = getResolvedStyle(
+      findSelectedPillChrome(screen.getByLabelText(`Jump to ${categories[0]!.title}`))
+    );
 
     fireEvent.press(screen.getByLabelText(`Select ${categories[1]!.title}`));
-    const firstPillStyle = getResolvedStyle(screen.getByLabelText(`Jump to ${categories[0]!.title}`));
-    const secondPillStyle = getResolvedStyle(screen.getByLabelText(`Jump to ${categories[1]!.title}`));
+    const firstPillStyle = getResolvedStyle(
+      findSelectedPillChrome(screen.getByLabelText(`Jump to ${categories[0]!.title}`))
+    );
+    const secondPillStyle = getResolvedStyle(
+      findSelectedPillChrome(screen.getByLabelText(`Jump to ${categories[1]!.title}`))
+    );
 
     expect(typeof firstPillStyle.width).toBe('number');
     expect(firstPillStyle.width).toBe(secondPillStyle.width);
@@ -334,9 +354,11 @@ describe('CategorySelectionScreen', () => {
 
     fireEvent.press(screen.getByLabelText(`Select ${category!.title}`));
 
-    const pill = screen.getByLabelText(`Jump to ${category!.title}`);
+    const jump = screen.getByLabelText(`Jump to ${category!.title}`);
+    const pill = findSelectedPillChrome(jump);
     const pillStyle = getResolvedStyle(pill);
-    // Grid card + selected pill both show the title; pick the one inside the jump pill.
+    const jumpStyle = getResolvedStyle(jump);
+    // Grid card + selected pill both show the title; pick the one inside the jump control.
     const pillTitle = screen.getAllByText(category!.title.toUpperCase()).find((node) => {
       let current: typeof node | null = node;
       while (current) {
@@ -352,14 +374,14 @@ describe('CategorySelectionScreen', () => {
     const remove = screen.getByLabelText(`Remove ${category!.title}`);
     const removeStyle = getResolvedStyle(remove);
 
-    // Left-aligned row; fixed pill height + centered X control (no asymmetric face borders).
+    // Outer pill is the chrome row; jump + remove are sibling buttons (valid on web).
     expect(pillStyle.flexDirection).toBe('row');
     expect(pillStyle.justifyContent).toBe('flex-start');
     expect(pillStyle.alignItems).toBe('center');
     expect(pillStyle.height).toBe(44);
     expect(pillStyle.borderTopWidth ?? 0).toBe(0);
     expect(titleStyle.textAlign).toBe('left');
-    expect(titleStyle.flex).toBe(1);
+    expect(jumpStyle.flex).toBe(1);
     // Icon-sized close control so right inset matches left text inset (paddingHorizontal).
     expect(removeStyle.width).toBe(16);
     expect(removeStyle.height).toBe(16);

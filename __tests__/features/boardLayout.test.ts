@@ -2,11 +2,15 @@ import { describe, expect, it } from '@jest/globals';
 import {
   computeBoardVerticalLayout,
   getBoardBodyHeight,
+  getBoardContentMaxWidth,
   getBoardGridBottomPadding,
   getBoardGridRowSpacerCount,
   getBoardGridVerticalInsets,
+  getBoardPointTileBox,
   getBoardTopicCellBox,
   getBoardTopicGridAlignment,
+  maxRowHeightForFixedRailTiles,
+  maxRowHeightForSquareTiles,
 } from '@/features/play/boardLayout';
 
 describe('board topic grid alignment', () => {
@@ -285,5 +289,141 @@ describe('computeBoardVerticalLayout', () => {
     expect(layout.boardRowHeight).toBeGreaterThanOrEqual(1);
     expect(layout.pointPillHeight).toBeGreaterThanOrEqual(1);
     expect(layout.topicImageHeight).toBeLessThan(180 * 1.2);
+  });
+
+  it('lets fixed-rail web tiles grow much taller than square-tile geometry allows', () => {
+    // Desktop cell for 3 topics in a ~1400px column.
+    const cellWidth = 448;
+    const artGap = 6;
+    const railChrome = 12 * 2 + 6;
+    const titleHeight = 36;
+    const centerBlockGap = 2;
+    const ratio = 1.18;
+
+    const squareMax = maxRowHeightForSquareTiles({
+      cellWidth,
+      artGap,
+      railChrome,
+      maxQuestionRows: 3,
+      titleHeight,
+      centerBlockGap,
+      topicArtHeightRatio: ratio,
+    });
+    const fixedRailMax = maxRowHeightForFixedRailTiles({
+      cellWidth,
+      railWidth: 54,
+      artGap,
+      titleHeight,
+      centerBlockGap,
+      maxArtAspect: 1.55,
+    });
+
+    // Fixed rails grow past square geometry without consuming the full desktop window.
+    expect(squareMax).toBeLessThan(340);
+    expect(fixedRailMax).toBeGreaterThan(squareMax);
+    expect(fixedRailMax).toBeGreaterThan(400);
+    expect(fixedRailMax).toBeLessThan(600);
+  });
+
+  it('grows a single-row board past square-tile geometry without filling the whole window', () => {
+    const viewportHeight = 792;
+    const gridVerticalPadding = 12;
+    const squareMax = maxRowHeightForSquareTiles({
+      cellWidth: 448,
+      artGap: 6,
+      railChrome: 12 * 2 + 6,
+      maxQuestionRows: 3,
+      titleHeight: 36,
+      centerBlockGap: 2,
+      topicArtHeightRatio: 1.18,
+    });
+    const maxR = Math.max(
+      squareMax,
+      maxRowHeightForFixedRailTiles({
+        cellWidth: 448,
+        railWidth: 54,
+        artGap: 6,
+        titleHeight: 36,
+        centerBlockGap: 2,
+        maxArtAspect: 1.55,
+      })
+    );
+    const layout = computeBoardVerticalLayout({
+      ...base,
+      viewportHeight,
+      gridVerticalPadding,
+      gridRowCount: 1,
+      maxQuestionRows: 3,
+      topicImageSize: 200,
+      topicArtHeightRatio: 1.18,
+      titleHeightBudget: 40,
+      maxRowContentHeight: maxR,
+    });
+
+    const usable = viewportHeight - gridVerticalPadding;
+    // Larger than the old square-tile island, but not edge-to-edge on a tall window.
+    expect(layout.boardRowHeight).toBeGreaterThan(squareMax * 0.95);
+    expect(layout.boardRowHeight).toBeLessThan(usable * 0.75);
+  });
+});
+
+describe('getBoardPointTileBox', () => {
+  it('keeps native tiles square and expands the rail to the side length', () => {
+    expect(
+      getBoardPointTileBox({ pillHeight: 72, railWidth: 54, squareTiles: true })
+    ).toEqual({ width: 72, height: 72, railWidth: 72 });
+  });
+
+  it('keeps web rail width fixed and allows taller-than-wide tiles', () => {
+    expect(
+      getBoardPointTileBox({ pillHeight: 220, railWidth: 54, squareTiles: false })
+    ).toEqual({ width: 54, height: 220, railWidth: 54 });
+    // Short pills stay nearly square within the rail.
+    expect(
+      getBoardPointTileBox({ pillHeight: 48, railWidth: 54, squareTiles: false })
+    ).toEqual({ width: 48, height: 48, railWidth: 54 });
+  });
+});
+
+describe('getBoardContentMaxWidth', () => {
+  it('gives web a modest bump over playMaxWidth without full-bleed', () => {
+    const web = getBoardContentMaxWidth({
+      platform: 'web',
+      windowWidth: 1440,
+      innerWidth: 1408,
+      wideBreakpoint: 900,
+      playMaxWidth: 1120,
+      playWideMaxWidth: 1400,
+    });
+    // playMaxWidth * 1.08 = 1209.6 → 1210
+    expect(web).toBe(1210);
+    expect(web).toBeGreaterThan(1120);
+    expect(web).toBeLessThan(1400);
+  });
+
+  it('still respects the window when it is narrower than the soft cap', () => {
+    expect(
+      getBoardContentMaxWidth({
+        platform: 'web',
+        windowWidth: 1000,
+        innerWidth: 968,
+        wideBreakpoint: 900,
+        playMaxWidth: 1120,
+        playWideMaxWidth: 1400,
+      })
+    ).toBe(968);
+  });
+
+  it('keeps native wide boards on playMaxWidth', () => {
+    expect(
+      getBoardContentMaxWidth({
+        platform: 'ios',
+        windowWidth: 1024,
+        innerWidth: 992,
+        wideBreakpoint: 900,
+        playMaxWidth: 1120,
+        playWideMaxWidth: 1400,
+      })
+    ).toBe(992);
   });
 });

@@ -1,9 +1,10 @@
+import { useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
 import { Redirect, Stack } from 'expo-router';
 import { getPlaySurfaceColors } from '@/features/play/playSurfaceColors';
 import { isAuthDisabled } from '@/lib/authMode';
-import { landscapeStackScreenOptions } from '@/lib/navigation/landscapeStack';
+import { getLandscapeStackScreenOptions } from '@/lib/navigation/landscapeStack';
 import { useThemeStore } from '@/store/theme';
 
 export default function PlayLayout() {
@@ -11,6 +12,11 @@ export default function PlayLayout() {
   const authDisabled = isAuthDisabled();
   useThemeStore((state) => state.paletteId);
   const surfaceColors = getPlaySurfaceColors();
+  // Themed stack chrome — fade between board/question must not reveal white RNScreens default.
+  const stackScreenOptions = useMemo(
+    () => getLandscapeStackScreenOptions(surfaceColors.canvas),
+    [surfaceColors.canvas]
+  );
 
   if (!isSignedIn && !authDisabled && isLoaded) {
     return <Redirect href="/(auth)/sign-in" />;
@@ -22,7 +28,7 @@ export default function PlayLayout() {
    */
   return (
     <View style={[styles.stackRoot, { backgroundColor: surfaceColors.canvas }]}>
-      <Stack screenOptions={landscapeStackScreenOptions}>
+      <Stack screenOptions={stackScreenOptions}>
         <Stack.Screen name="index" />
         <Stack.Screen name="mode" />
         <Stack.Screen name="quick-length" />

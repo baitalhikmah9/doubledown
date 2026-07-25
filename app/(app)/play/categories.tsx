@@ -58,6 +58,14 @@ const NATIVE_COMPACT_GRID_GAP = 8;
 const WEB_GRID_INNER_PAD = 40; // padding inside the max-width container
 const WEB_CARD_HEIGHT = 190;
 const NATIVE_CARD_ASPECT = 0.82; // Taller cards preserve artwork size across five columns.
+/** Artwork share of the base card height; residual was too short for two-line titles. */
+const TOPIC_IMAGE_AREA_RATIO = 0.78;
+/** Vertical padding inside the white topic label bar (top + bottom each). */
+const TOPIC_TITLE_BAR_PAD_V = 2;
+const TOPIC_TITLE_BAR_BORDER = 1;
+/** Tiny breathing room beyond a strict two-line fit so descenders aren't tight. */
+const TOPIC_TITLE_BAR_EXTRA = 2;
+const TOPIC_TITLE_LINE_HEIGHT_RATIO = 1.18;
 const COLS = 5;
 const ANDROID_LIST_IMAGE_TRANSITION = 0;
 const WEB_LIST_IMAGE_TRANSITION = 200;
@@ -262,7 +270,7 @@ const CategoryCard = memo(function CategoryCard({
             {
               color: topicLabelText,
               fontSize: topicTitleSize,
-              lineHeight: Math.round(topicTitleSize * 1.18),
+              lineHeight: Math.round(topicTitleSize * TOPIC_TITLE_LINE_HEIGHT_RATIO),
             },
           ]}
           numberOfLines={2}
@@ -375,11 +383,9 @@ export default function CategorySelectionScreen() {
     Math.min(320, Math.floor((innerW - gridGap * (COLS - 1)) / COLS))
   );
 
-  const cardH = useWebLayout
+  const baseCardH = useWebLayout
     ? WEB_CARD_HEIGHT
     : Math.floor(cardW * NATIVE_CARD_ASPECT);
-  const imageAreaH = Math.floor(cardH * 0.78);
-  const titleBarH = cardH - imageAreaH;
 
   // ── Handlers ─────────────────────────────────────────────────────────
 
@@ -461,14 +467,25 @@ export default function CategorySelectionScreen() {
       section.categories.map((category) => category.title.length)
     )
   );
+  // Size type from width first, then size the label bar to fit two full lines.
+  // (Previously the bar was a fixed ~22% of the card and clipped "Countries and Capitals".)
   const topicTitleSize = Math.max(
     5,
     Math.min(
       fontSizes.topicTitle,
-      Math.floor((titleBarH - 4) / (2 * 1.18)),
       Math.floor(((cardW - 12) * 2) / (longestTopicTitleLength * 0.6))
     )
   );
+  const topicTitleLineHeight = Math.round(topicTitleSize * TOPIC_TITLE_LINE_HEIGHT_RATIO);
+  const titleBarH =
+    topicTitleLineHeight * 2 +
+    TOPIC_TITLE_BAR_PAD_V * 2 +
+    TOPIC_TITLE_BAR_BORDER +
+    TOPIC_TITLE_BAR_EXTRA;
+  const minImageAreaH = Math.floor(baseCardH * TOPIC_IMAGE_AREA_RATIO);
+  // Grow the card only when the two-line label needs more than the old residual.
+  const cardH = Math.max(baseCardH, minImageAreaH + titleBarH);
+  const imageAreaH = cardH - titleBarH;
   const sectionTitleHeight = Math.round(fontSizes.subtitle * 1.2);
   const { categoryListRows, categoryItemLayouts, categorySlugToIndex } = useMemo(() => {
     if (!categorySections.length) {
@@ -775,38 +792,46 @@ export default function CategorySelectionScreen() {
                 ]}
               >
                 {selectedCategories.map((category) => (
-                  <Pressable
+                  // Sibling press targets (not nested) — RN Web maps Pressable → <button>,
+                  // and nested buttons are invalid HTML / console errors.
+                  <View
                     key={category.slug}
-                    onPress={() => scrollToCategory(category.slug)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Jump to ${category.title}`}
-                    style={({ pressed }) => [
+                    style={[
                       styles.selectedTopicPill,
                       compactHeader && styles.selectedTopicPillCompact,
                       SOFT_SURFACE_STYLES.raised,
                       {
                         backgroundColor: controlBackground,
-                        opacity: pressed ? 0.85 : 1,
                         width: selectedPillWidth,
                       },
                       isVeryDense && styles.selectedPillVeryDense,
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.selectedPillText,
-                        isVeryDense && styles.selectedPillTextDense,
-                        {
-                          color: textPrimary,
-                          fontSize: fontSizes.headerButton,
-                          lineHeight: Math.round(fontSizes.headerButton * 1.2),
-                        },
+                    <Pressable
+                      onPress={() => scrollToCategory(category.slug)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Jump to ${category.title}`}
+                      style={({ pressed }) => [
+                        styles.selectedPillLabelHit,
+                        { opacity: pressed ? 0.85 : 1 },
                       ]}
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
                     >
-                      {category.title.toUpperCase()}
-                    </Text>
+                      <Text
+                        style={[
+                          styles.selectedPillText,
+                          isVeryDense && styles.selectedPillTextDense,
+                          {
+                            color: textPrimary,
+                            fontSize: fontSizes.headerButton,
+                            lineHeight: Math.round(fontSizes.headerButton * 1.2),
+                          },
+                        ]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {category.title.toUpperCase()}
+                      </Text>
+                    </Pressable>
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel={`Remove ${category.title}`}
@@ -824,7 +849,7 @@ export default function CategorySelectionScreen() {
                         color={textPrimary}
                       />
                     </Pressable>
-                  </Pressable>
+                  </View>
                 ))}
               </View>
             </View>
@@ -1101,12 +1126,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     gap: 3,
   },
+  /** Label hit target shares the pill row with the remove control (siblings, not nested). */
+  selectedPillLabelHit: {
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
+    height: '100%',
+    justifyContent: 'center',
+  },
   selectedPillText: {
     fontFamily: FONTS.uiBold,
     fontSize: 12,
     letterSpacing: 0.3,
     textAlign: 'left',
-    flex: 1,
     flexShrink: 1,
     minWidth: 0,
     // Android: avoid extra font padding that unbalances row centering.
@@ -1206,8 +1238,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderTopWidth: 1,
+    paddingVertical: TOPIC_TITLE_BAR_PAD_V,
+    borderTopWidth: TOPIC_TITLE_BAR_BORDER,
   },
   cardTitle: {
     alignSelf: 'center',

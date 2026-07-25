@@ -272,8 +272,12 @@ export function PlayMatchTopBar({
     const isActive = highlightTeamId === team.id;
     const dense = multiTeamDensePills;
     const teamCount = session.teams.length;
+    /** Six equal pills leave little room — prefer score digits over name width. */
+    const ultraDense = teamCount >= 6;
     // With many equal-width pills, shrink the name before ellipsizing so labels stay readable.
-    const nameMinFontScale = teamCount >= 6 ? 0.55 : teamCount >= 4 ? 0.65 : 0.75;
+    const nameMinFontScale = ultraDense ? 0.5 : teamCount >= 4 ? 0.65 : 0.75;
+    // Score must never clip: allow aggressive shrink for multi-digit totals on 6-team boards.
+    const scoreMinFontScale = ultraDense ? 0.42 : dense ? 0.55 : 0.7;
 
     const onFace = isActive ? surfaceColors.activeTurnOnFace : surfaceColors.textPrimary;
     const nestedFill = isActive
@@ -290,6 +294,7 @@ export function PlayMatchTopBar({
             borderColor: isActive ? FIRE.flame : surfaceColors.hairlineBorder,
           },
           dense && styles.logoScorePillDense,
+          ultraDense && styles.logoScorePillUltraDense,
           isRumble && styles.logoScorePillRumble,
           isActive && styles.logoScorePillActive,
         ]}
@@ -302,6 +307,7 @@ export function PlayMatchTopBar({
             styles.logoScoreAdjust,
             { backgroundColor: nestedFill },
             dense && styles.logoScoreAdjustDense,
+            ultraDense && styles.logoScoreAdjustUltraDense,
             pressed && styles.logoScoreAdjustPressed,
           ]}
         >
@@ -310,6 +316,7 @@ export function PlayMatchTopBar({
               styles.logoScoreAdjustText,
               { color: onFace },
               dense && styles.logoScoreAdjustTextDense,
+              ultraDense && styles.logoScoreAdjustTextUltraDense,
             ]}
           >
             −
@@ -321,6 +328,7 @@ export function PlayMatchTopBar({
               styles.logoScoreName,
               { color: isActive ? surfaceColors.activeTurnOnFace : surfaceColors.textMuted },
               dense && styles.logoScoreNameDense,
+              ultraDense && styles.logoScoreNameUltraDense,
               // Rumble pills share width equally — drop fixed maxWidth so the name uses the pill.
               isRumble && styles.logoScoreNameRumble,
               isActive && styles.logoScoreNameActive,
@@ -333,13 +341,20 @@ export function PlayMatchTopBar({
             {team.name}
           </Text>
           <Text
+            testID={`logo-score-value-${team.id}`}
             style={[
               styles.logoScoreValue,
               { color: isActive ? surfaceColors.activeTurnOnFace : surfaceColors.textPrimary },
               dense && styles.logoScoreValueDense,
+              ultraDense && styles.logoScoreValueUltraDense,
+              isRumble && styles.logoScoreValueRumble,
               isActive && styles.logoScoreValueActive,
             ]}
             numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={scoreMinFontScale}
+            // Keep full digits visible; never ellipsize a score number mid-value.
+            ellipsizeMode="clip"
           >
             {team.score}
           </Text>
@@ -352,6 +367,7 @@ export function PlayMatchTopBar({
             styles.logoScoreAdjust,
             { backgroundColor: nestedFill },
             dense && styles.logoScoreAdjustDense,
+            ultraDense && styles.logoScoreAdjustUltraDense,
             pressed && styles.logoScoreAdjustPressed,
           ]}
         >
@@ -360,6 +376,7 @@ export function PlayMatchTopBar({
               styles.logoScoreAdjustText,
               { color: onFace },
               dense && styles.logoScoreAdjustTextDense,
+              ultraDense && styles.logoScoreAdjustTextUltraDense,
             ]}
           >
             +
@@ -595,6 +612,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     borderRadius: 12,
   },
+  /** Six-team Rumble: free horizontal room for multi-digit scores. */
+  logoScorePillUltraDense: {
+    minWidth: 0,
+    maxWidth: 9999,
+    minHeight: 30,
+    gap: 1,
+    paddingHorizontal: 2,
+    borderRadius: 10,
+  },
   logoScoreAdjust: {
     width: 26,
     height: 26,
@@ -607,6 +633,11 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 7,
+  },
+  logoScoreAdjustUltraDense: {
+    width: 18,
+    height: 18,
+    borderRadius: 6,
   },
   logoScoreAdjustPressed: {
     opacity: 0.72,
@@ -621,6 +652,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 16,
   },
+  logoScoreAdjustTextUltraDense: {
+    fontSize: 12,
+    lineHeight: 14,
+  },
   logoScoreTextBlock: {
     minWidth: 0,
     alignItems: 'center',
@@ -631,6 +666,8 @@ const styles = StyleSheet.create({
   logoScoreTextBlockRumble: {
     flex: 1,
     alignSelf: 'stretch',
+    minWidth: 28,
+    overflow: 'visible',
   },
   logoScoreName: {
     maxWidth: 88,
@@ -643,6 +680,11 @@ const styles = StyleSheet.create({
     maxWidth: 56,
     fontSize: 9,
     lineHeight: 11,
+  },
+  logoScoreNameUltraDense: {
+    maxWidth: '100%',
+    fontSize: 8,
+    lineHeight: 10,
   },
   /** Override dense/default pixel caps; name fills the flex text block. */
   logoScoreNameRumble: {
@@ -658,10 +700,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 16,
     fontVariant: ['tabular-nums'],
+    textAlign: 'center',
   },
   logoScoreValueDense: {
     fontSize: 12,
     lineHeight: 14,
+  },
+  /** Slightly tighter base so multi-digit scores fit six equal pills. */
+  logoScoreValueUltraDense: {
+    fontSize: 11,
+    lineHeight: 13,
+    letterSpacing: -0.3,
+  },
+  /** Rumble: score claims full text-block width so adjustsFontSizeToFit can shrink. */
+  logoScoreValueRumble: {
+    width: '100%',
+    maxWidth: '100%',
+    flexShrink: 1,
   },
   logoScoreValueActive: {
     color: '#E8420C',

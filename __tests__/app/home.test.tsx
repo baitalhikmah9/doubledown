@@ -76,7 +76,7 @@ jest.mock('@/lib/i18n/useI18n', () => ({
         'play.mode.classic': 'Classic',
         'play.mode.classicCopy': 'Full board, wagers, six topics.',
         'play.mode.quick': 'Quick Play',
-        'play.mode.quickCopy': 'Pick 3, 4, or 5 topics for a faster match with wagers.',
+        'play.mode.quickCopy': 'Pick 1–5 topics for a faster match with wagers.',
         'play.mode.random': 'Random',
         'play.mode.randomCopy': 'Random questions each turn.',
         'play.mode.rumble': 'Rumble',
@@ -150,7 +150,7 @@ describe('AppHubScreen', () => {
   it('shows the token cost under each game mode', () => {
     render(<AppHubScreen />);
 
-    expect(screen.getByTestId('home-mode-token-cost-quickPlay')).toHaveTextContent('5-8 TOKENS');
+    expect(screen.getByTestId('home-mode-token-cost-quickPlay')).toHaveTextContent('2-8 TOKENS');
     expect(screen.getByTestId('home-mode-token-cost-classic')).toHaveTextContent('10 TOKENS');
     expect(screen.getByTestId('home-mode-token-cost-random')).toHaveTextContent('10 TOKENS');
     expect(screen.getByTestId('home-mode-token-cost-rumble')).toHaveTextContent('10 TOKENS');

@@ -1,9 +1,19 @@
+import { useMemo } from 'react';
 import { Stack } from 'expo-router';
-import { landscapeStackScreenOptions } from '@/lib/navigation/landscapeStack';
+import { getLandscapeStackScreenOptions } from '@/lib/navigation/landscapeStack';
+import { useThemeStore } from '@/store/theme';
+import { HOME_SOFT_UI } from '@/themes';
 
 export default function AppLayout() {
+  useThemeStore((state) => state.paletteId);
+  const canvas = HOME_SOFT_UI.colors.canvas;
+  const stackScreenOptions = useMemo(
+    () => getLandscapeStackScreenOptions(canvas),
+    [canvas]
+  );
+
   return (
-    <Stack screenOptions={landscapeStackScreenOptions}>
+    <Stack screenOptions={stackScreenOptions}>
       <Stack.Screen name="index" />
       <Stack.Screen name="store" />
       <Stack.Screen name="settings" />

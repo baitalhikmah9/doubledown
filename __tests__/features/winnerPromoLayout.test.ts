@@ -9,19 +9,20 @@ import {
 const IPHONE_LANDSCAPE = { windowWidth: 874, windowHeight: 402 };
 
 describe('getWinnerPromoLayout', () => {
-  it('sizes iOS phone landscape QR cards larger than the prior tight height cap', () => {
+  it('sizes phone landscape QR cards large enough to fill the promo band on all platforms', () => {
     const ios = getWinnerPromoLayout({ ...IPHONE_LANDSCAPE, platform: 'ios' });
     const android = getWinnerPromoLayout({ ...IPHONE_LANDSCAPE, platform: 'android' });
     const web = getWinnerPromoLayout({ ...IPHONE_LANDSCAPE, platform: 'web' });
 
-    // Prior formula: min(150, max(96, 874*0.14), max(72, 402*0.24)) ≈ 96.5
-    expect(android.promoWidth).toBeCloseTo(96.48, 1);
-    expect(web.promoWidth).toBeCloseTo(96.48, 1);
+    // Prior android/web formula left ~96pt cards and a large cream dead band.
+    // min(156, max(120, 874*0.17), max(72, 402*0.36)) ≈ 144.72
+    expect(android.promoWidth).toBeCloseTo(144.72, 1);
+    expect(web.promoWidth).toBeCloseTo(144.72, 1);
+    expect(ios.promoWidth).toBeCloseTo(144.72, 1);
 
-    // iOS fills more of the flex promo band between scoreboard and slogan.
-    expect(ios.promoWidth).toBeGreaterThan(android.promoWidth + 30);
-    expect(ios.promoWidth).toBeGreaterThanOrEqual(140);
-    expect(ios.promoWidth).toBeLessThanOrEqual(150);
+    // All platforms share the larger phone-landscape sizing.
+    expect(android.promoWidth).toBeGreaterThanOrEqual(140);
+    expect(ios.promoWidth).toBeLessThanOrEqual(156);
     expect(ios.tiny).toBe(true);
     expect(ios.compact).toBe(true);
   });
@@ -40,14 +41,14 @@ describe('getWinnerPromoLayout', () => {
 });
 
 describe('getWinnerPromoQrSize', () => {
-  it('uses tighter card chrome on iOS so the bitmap fills more of the tile', () => {
+  it('tightens card chrome on compact so the bitmap fills more of the tile', () => {
     const promoWidth = 148;
     const iosQr = getWinnerPromoQrSize(promoWidth, true, 'ios');
     const androidQr = getWinnerPromoQrSize(promoWidth, true, 'android');
-    // compact pad 6×2 = 12; iOS +2 tighten → 148-12+2 = 138
+    // compact pad 6×2 = 12; phone tighten +2 → 148-12+2 = 138
     expect(iosQr).toBe(138);
-    expect(androidQr).toBe(136);
-    expect(iosQr).toBeGreaterThan(androidQr);
+    expect(androidQr).toBe(138);
+    expect(getWinnerPromoQrSize(promoWidth, false, 'web')).toBe(132);
   });
 });
 

@@ -3,10 +3,13 @@ import { View, Text, StyleSheet, Platform, type TextStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable } from '@/components/ui/Pressable';
 import { useRouter } from 'expo-router';
-import { BORDER_RADIUS, FONT_SIZES, SPACING, LAYOUT, FONTS } from '@/constants';
+import { BORDER_RADIUS, SPACING, LAYOUT, FONTS } from '@/constants';
 import { SOFT_SURFACE_STYLES } from '@/features/play/styles/softSurface';
 import { isActiveMatchStep, routeForPlayStep } from '@/features/play/sessionRouting';
-import { QUICK_PLAY_TOPIC_OPTIONS } from '@/features/play/tokenCosts';
+import {
+  QUICK_PLAY_TOPIC_OPTIONS,
+  type QuickPlayTopicCount,
+} from '@/features/play/tokenCosts';
 import { useI18n } from '@/lib/i18n/useI18n';
 import { useDarkModeFlatTop } from '@/lib/hooks/useTheme';
 import { useViewportLayout } from '@/lib/hooks/useViewportLayout';
@@ -16,22 +19,26 @@ import { PlayScaffold } from '@/features/play/components/PlayScaffold';
 import { getPlaySurfaceColors } from '@/features/play/playSurfaceColors';
 import { useThemeStore } from '@/store/theme';
 
-const QUICK_LENGTH_LABEL_KEYS = {
+const QUICK_LENGTH_LABEL_KEYS: Record<QuickPlayTopicCount, string> = {
+  1: 'play.quickLength.option1',
+  2: 'play.quickLength.option2',
   3: 'play.quickLength.option3',
   4: 'play.quickLength.option4',
   5: 'play.quickLength.option5',
-} as const;
+};
 
-const QUICK_LENGTH_COPY_KEYS = {
+const QUICK_LENGTH_COPY_KEYS: Record<QuickPlayTopicCount, string> = {
+  1: 'play.quickLength.option1Copy',
+  2: 'play.quickLength.option2Copy',
   3: 'play.quickLength.option3Copy',
   4: 'play.quickLength.option4Copy',
   5: 'play.quickLength.option5Copy',
-} as const;
+};
 
-/** Web-only option row with hover tracking - extracted to keep hooks at top level. */
-function OptionRow({
+/** Web-only option tile with hover tracking - extracted to keep hooks at top level. */
+function OptionTile({
   option,
-  isWebRow,
+  isWeb,
   compact,
   tokenLabel,
   tokensText,
@@ -39,7 +46,7 @@ function OptionRow({
   onSelect,
 }: {
   option: { count: number; tokenCost: number; label: string; copy: string };
-  isWebRow: boolean;
+  isWeb: boolean;
   compact: boolean;
   tokenLabel: string;
   tokensText: string;
@@ -58,76 +65,65 @@ function OptionRow({
   return (
     <Pressable
       key={option.count}
-      onPointerEnter={isWebRow ? () => setHovered(true) : undefined}
-      onPointerLeave={isWebRow ? () => setHovered(false) : undefined}
+      onPointerEnter={isWeb ? () => setHovered(true) : undefined}
+      onPointerLeave={isWeb ? () => setHovered(false) : undefined}
       style={({ pressed }) => [
         styles.optionCard,
-        isWebRow
-          ? styles.optionCardWeb
-          : compact
-            ? styles.optionCardCompact
-            : styles.optionCardNative,
+        isWeb ? styles.optionCardWeb : compact ? styles.optionCardCompact : styles.optionCardNative,
         SOFT_SURFACE_STYLES.face,
         darkModeFlatTop,
         SOFT_SURFACE_STYLES.raised,
         { backgroundColor: surfaceColors.controlBackground },
-        isWebRow && hovered && { backgroundColor: surfaceColors.hoverSurface },
+        isWeb && hovered && { backgroundColor: surfaceColors.hoverSurface },
         pressed && styles.optionCardPressed,
       ]}
       onPress={() => onSelect(option.count)}
       accessibilityRole="button"
       accessibilityLabel={`${option.label}, ${option.tokenCost} ${tokensText.toLowerCase()}`}
+      accessibilityHint={option.copy}
     >
       <Text
         style={[
           styles.optionTitle,
-          isWebRow
+          isWeb
             ? styles.optionTitleWeb
             : compact
               ? styles.optionTitleCompact
               : styles.optionTitleNative,
           { color: surfaceColors.textPrimary },
-          getTextStyle(undefined, 'displayBold', 'start'),
+          getTextStyle(undefined, 'displayBold', 'center'),
         ]}
+        numberOfLines={2}
+        adjustsFontSizeToFit
+        minimumFontScale={0.75}
       >
         {option.label}
       </Text>
-      <View style={[styles.tokenCostRow, isWebRow && styles.tokenCostRowWeb]}>
+      <View style={[styles.tokenCostRow, isWeb && styles.tokenCostRowWeb]}>
         <Ionicons
           name="diamond"
-          size={isWebRow ? 13 : compact ? 11 : 13}
+          size={isWeb ? 13 : compact ? 10 : 12}
           color={surfaceColors.textPrimary}
         />
         <Text
           testID={`quick-length-token-cost-${option.count}`}
           style={[
             styles.tokenCostText,
-            isWebRow
+            isWeb
               ? styles.tokenCostTextWeb
               : compact
                 ? styles.tokenCostTextCompact
                 : styles.tokenCostTextNative,
             { color: surfaceColors.textPrimary },
-            getTextStyle(undefined, 'bodyBold', 'start'),
+            getTextStyle(undefined, 'bodyBold', 'center'),
           ]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
         >
           {`${option.tokenCost} ${tokenLabel}`}
         </Text>
       </View>
-      <Text
-        style={[
-          styles.optionCopy,
-          isWebRow
-            ? styles.optionCopyWeb
-            : compact
-              ? styles.optionCopyCompact
-              : styles.optionCopyNative,
-          { color: surfaceColors.textMuted },
-          getTextStyle(),
-        ]}
-      >
-        {option.copy}
-      </Text>
     </Pressable>
   );
 }
@@ -195,46 +191,32 @@ export default function QuickLengthScreen() {
           { justifyContent: viewport.mainJustify },
         ]}
       >
-          <View
-            style={[
-              styles.list,
-              isWeb ? styles.listWeb : styles.listNative,
-              isWeb && { maxWidth: setupMaxWidth },
-            ]}
-          >
-            {options.map((option) => (
-              <OptionRow
-                key={option.count}
-                option={option}
-                isWebRow={isWeb}
-                compact={compact}
-                tokenLabel={tokenLabel}
-                tokensText={tokensText}
-                getTextStyle={getTextStyle}
-                onSelect={handleSelect}
-              />
-            ))}
-          </View>
+        <View
+          style={[
+            styles.list,
+            isWeb ? styles.listWeb : styles.listNative,
+            isWeb && { maxWidth: setupMaxWidth },
+          ]}
+        >
+          {options.map((option) => (
+            <OptionTile
+              key={option.count}
+              option={option}
+              isWeb={isWeb}
+              compact={compact}
+              tokenLabel={tokenLabel}
+              tokensText={tokensText}
+              getTextStyle={getTextStyle}
+              onSelect={handleSelect}
+            />
+          ))}
+        </View>
       </View>
     </PlayScaffold>
   );
 }
 
 const styles = StyleSheet.create({
-  /* ── Subtitle ── */
-  subtitle: {
-    fontSize: FONT_SIZES.sm,
-    lineHeight: 18,
-    marginBottom: SPACING.md,
-    textAlign: 'center',
-    paddingHorizontal: SPACING.sm,
-  },
-  subtitleWeb: {
-    fontSize: FONT_SIZES.md,
-    lineHeight: 22,
-    marginBottom: 32,
-  },
-
   /* ── List wrapper ── */
   listWrap: {
     flex: 1,
@@ -245,48 +227,53 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 0,
   },
+  /** 1 → 5 topics left to right in a single row. */
   list: {
     width: '100%',
     minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'stretch',
   },
   listNative: {
     flex: 1,
     minHeight: 0,
-    gap: SPACING.sm,
+    gap: SPACING.xs,
+    maxHeight: 220,
+    alignSelf: 'center',
   },
   listWeb: {
     maxWidth: LAYOUT.setupMaxWidth,
-    gap: 22,
+    gap: 14,
     justifyContent: 'center',
     paddingVertical: SPACING.xs,
+    minHeight: 160,
+    maxHeight: 200,
   },
 
   /* ── Option card ── */
   optionCard: {
     borderWidth: 0,
     justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
+    minHeight: 0,
   },
   optionCardNative: {
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.lg,
-    flex: 1,
-    minHeight: 0,
-    minWidth: 0,
+    borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: SPACING.md,
   },
   optionCardCompact: {
     borderRadius: BORDER_RADIUS.sm,
-    padding: SPACING.sm,
-    flex: 1,
-    minHeight: 0,
-    minWidth: 0,
+    paddingHorizontal: 4,
+    paddingVertical: SPACING.sm,
   },
   optionCardWeb: {
-    borderRadius: 28,
-    paddingHorizontal: 36,
-    paddingVertical: 28,
-    height: 140,
-    minHeight: 130,
-    maxHeight: 150,
+    borderRadius: 22,
+    paddingHorizontal: 10,
+    paddingVertical: 22,
+    minHeight: 140,
   },
   optionCardPressed: {
     opacity: 0.85,
@@ -297,63 +284,50 @@ const styles = StyleSheet.create({
   optionTitle: {
     fontFamily: FONTS.displayBold,
     marginBottom: SPACING.xs,
+    textAlign: 'center',
+    width: '100%',
   },
   optionTitleNative: {
-    fontSize: 22,
-    lineHeight: 28,
+    fontSize: 15,
+    lineHeight: 18,
   },
   optionTitleCompact: {
-    fontSize: 17,
-    lineHeight: 22,
+    fontSize: 12,
+    lineHeight: 14,
     marginBottom: 2,
   },
   optionTitleWeb: {
-    fontSize: 24,
-    lineHeight: 30,
-    marginBottom: 6,
+    fontSize: 18,
+    lineHeight: 22,
+    marginBottom: 8,
   },
 
   /* ── Token cost row ── */
   tokenCostRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    marginBottom: SPACING.xs,
+    justifyContent: 'center',
+    gap: 3,
+    flexWrap: 'wrap',
   },
   tokenCostRowWeb: {
-    marginBottom: 8,
+    gap: 5,
   },
   tokenCostText: {
     fontFamily: FONTS.uiBold,
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
+    textAlign: 'center',
   },
   tokenCostTextNative: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  tokenCostTextCompact: {
     fontSize: 10,
     lineHeight: 13,
   },
+  tokenCostTextCompact: {
+    fontSize: 9,
+    lineHeight: 11,
+  },
   tokenCostTextWeb: {
-    fontSize: 14,
-    lineHeight: 18,
-  },
-
-  /* ── Option description ── */
-  optionCopy: {
-    fontFamily: FONTS.ui,
-  },
-  optionCopyNative: {
-    fontSize: FONT_SIZES.md,
-    lineHeight: 22,
-  },
-  optionCopyCompact: {
-    fontSize: FONT_SIZES.sm,
-    lineHeight: 18,
-  },
-  optionCopyWeb: {
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 16,
   },
 });

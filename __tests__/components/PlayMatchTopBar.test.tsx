@@ -118,6 +118,36 @@ describe('PlayMatchTopBar rumble score cards', () => {
     }
   });
 
+  it('keeps multi-digit scores fully visible with shrink-to-fit for six rumble teams', () => {
+    const teamNames = ['A', 'B', 'C', 'D', 'E', 'F'];
+    const session = createRumbleSession(teamNames);
+    // Large / negative scores that previously clipped inside equal-width pills.
+    session.teams = session.teams.map((team, index) => ({
+      ...team,
+      score: index === 0 ? 1250 : index === 1 ? -350 : (index + 1) * 100,
+    }));
+
+    render(
+      <PlayMatchTopBar
+        session={session}
+        onLogoPress={jest.fn()}
+        showTeamScores={false}
+        scorePillsNextToLogo
+      />
+    );
+
+    for (const team of session.teams) {
+      const scoreNode = screen.getByTestId(`logo-score-value-${team.id}`);
+      expect(scoreNode).toHaveTextContent(String(team.score));
+      expect(scoreNode.props.adjustsFontSizeToFit).toBe(true);
+      expect(scoreNode.props.numberOfLines).toBe(1);
+      expect(scoreNode.props.minimumFontScale).toBeLessThanOrEqual(0.5);
+
+      const style = StyleSheet.flatten(scoreNode.props.style);
+      expect(style.width).toBe('100%');
+    }
+  });
+
   it('shows every team name for two and four rumble teams as well', () => {
     for (const names of [
       ['Red Rockets', 'Blue Bombers'],
@@ -139,6 +169,12 @@ describe('PlayMatchTopBar rumble score cards', () => {
         expect(style.maxWidth).not.toBe(56);
         expect(style.maxWidth).not.toBe(88);
         expect(nameNode.props.adjustsFontSizeToFit).toBe(true);
+      }
+
+      // Scores always shrink-to-fit so digits are never mid-number clipped.
+      for (const team of session.teams) {
+        const scoreNode = screen.getByTestId(`logo-score-value-${team.id}`);
+        expect(scoreNode.props.adjustsFontSizeToFit).toBe(true);
       }
 
       unmount();
