@@ -10,13 +10,13 @@
     "splash": {
       "image": "./assets/BF in game logo safe.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FAF9F6"
+      "backgroundColor": "#F0EBE3"
     },
     "ios": {
       "supportsTablet": true,
       "requireFullScreen": true,
       "usesAppleSignIn": true,
-      "buildNumber": "7",
+      "buildNumber": "8",
       "bundleIdentifier": "com.playbackfire.app",
       "infoPlist": {
         "UIStatusBarHidden": true,
@@ -29,7 +29,7 @@
       "hidden": true
     },
     "android": {
-      "versionCode": 16,
+      "versionCode": 17,
       "package": "com.playbackfire.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -62,12 +62,12 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FAF9F6",
+          "backgroundColor": "#F0EBE3",
           "image": "./assets/BF in game logo safe.png",
           "imageWidth": 240,
           "resizeMode": "contain",
           "dark": {
-            "backgroundColor": "#FAF9F6",
+            "backgroundColor": "#F0EBE3",
             "image": "./assets/BF in game logo safe.png"
           }
         }
@@ -81,7 +81,10 @@
             "buildArchs": [
               "arm64-v8a",
               "armeabi-v7a"
-            ]
+            ],
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-keep class com.facebook.react.turbomodule.** { *; }\n-keep class com.revenuecat.purchases.** { *; }\n-dontwarn com.revenuecat.purchases.**"
           }
         }
       ],
