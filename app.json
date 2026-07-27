@@ -29,7 +29,7 @@
       "hidden": true
     },
     "android": {
-      "versionCode": 17,
+      "versionCode": 16,
       "package": "com.playbackfire.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
