@@ -19,7 +19,7 @@ import { PublicAuthEntry } from '@/components/PublicAuthEntry';
 import { useTheme } from '@/lib/hooks/useTheme';
 import { HOME_SOFT_UI } from '@/themes';
 import { useI18n } from '@/lib/i18n/useI18n';
-import { getRowDirection } from '@/lib/i18n/direction';
+import { getLocaleFontFamily, getRowDirection } from '@/lib/i18n/direction';
 import type { SupportedLocale } from '@/lib/i18n/config';
 import type { TranslationKey } from '@/lib/i18n/messages/en';
 
@@ -59,10 +59,7 @@ function ModeBullets({
 }
 
 function getRuleTitleFont(locale: SupportedLocale): string {
-  if (locale === 'ar' || locale === 'ur' || locale === 'hi' || locale === 'bn' || locale === 'zh-Hans') {
-    return FONTS.uiBold;
-  }
-  return FONTS.displayBold;
+  return getLocaleFontFamily(locale, 'displayBold') ?? FONTS.displayBold;
 }
 
 export default function HowToPlayScreen() {

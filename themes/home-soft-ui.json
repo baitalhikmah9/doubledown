@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Neumorphic home / lobby — warm cream canvas, white squircles, amber glow halos (see docs/BRAND_GUIDELINES.md)",
   "colors": {
-    "canvas": "#FAF9F6",
+    "canvas": "#F0EBE3",
     "surface": "#FFFFFF",
     "textPrimary": "#333333",
     "textMuted": "rgba(51, 51, 51, 0.58)",

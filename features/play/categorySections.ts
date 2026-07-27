@@ -19,7 +19,7 @@ const TOPICS: Record<CategorySectionId, string[]> = {
   history: [
     '19th Century', '19th Century Europe', '20th Century', '21st Century',
     'Ancient Civilisations', 'Cold War', 'European Christendom', 'European History',
-    'Modern Middle East', 'Talab-ul Ilm', 'UK History', 'US History', 'WW1', 'WW2',
+    'Talab-ul Ilm', 'The Modern Middle East', 'UK History', 'US History', 'WW1', 'WW2',
   ],
   popCulture: [
     'Attack on Titan', 'Avatar: The Last Airbender',

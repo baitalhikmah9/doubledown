@@ -105,7 +105,9 @@ function buildCategoryListData(
   let offset = SPACING.xs;
 
   sections.forEach((section, sectionIndex) => {
-    const marginTop = sectionIndex > 0 ? SPACING.md : 0;
+    // Clear break between sections (General Knowledge → History, etc.) —
+    // larger than the in-section row gap so groups don't read as one list.
+    const marginTop = sectionIndex > 0 ? gridGap * 2 + SPACING.xl : 0;
     const sectionCols = Math.min(cols, section.categories.length);
     const sectionWidth = cardW * sectionCols + gridGap * Math.max(0, sectionCols - 1);
 

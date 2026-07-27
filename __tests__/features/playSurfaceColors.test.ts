@@ -61,7 +61,7 @@ describe('getPlaySurfaceColors', () => {
     expect(colors.iconChipBackground).not.toBe('rgba(255, 255, 255, 0.95)');
     expect(colors.dangerSoftBackground).not.toBe('#FEE2E2');
     expect(colors.hoverSurface).not.toBe('#FDFCFA');
-    expect(colors.bootScrim).not.toContain('250, 249, 246');
+    expect(colors.bootScrim).not.toContain('240, 235, 227');
     expect(colors.activeTurnFace).not.toBe('#FFF3EC');
     // Opaque dark face — rgba faces punch a mid-card strip under ± controls on Android.
     expect(colors.activeTurnFace).toBe('#5E281B');

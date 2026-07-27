@@ -466,11 +466,5 @@
     "title": "UEFA Champions League",
     "themeGroup": "s9",
     "enabled": true
-  },
-  {
-    "slug": "famous-quotes",
-    "title": "Famous Quotes (retired)",
-    "themeGroup": "",
-    "enabled": false
   }
 ]

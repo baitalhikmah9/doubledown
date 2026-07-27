@@ -3,8 +3,23 @@
  * (Electric Blue, Lively Orange, Vivid Purple; Clash Display + General Sans).
  */
 
-/** PostScript keys registered in app/_layout.tsx via expo-font */
-export const FONTS = {
+import { Platform } from 'react-native';
+
+/**
+ * PostScript keys registered in app/_layout.tsx via expo-font.
+ * Latin brand faces only — Arabic/Urdu UI remaps to Noto Sans Arabic
+ * (see lib/i18n/fonts.ts + useFonts in app/_layout.tsx).
+ *
+ * On web, brand faces are stacked with Noto Sans Arabic so Arabic codepoints
+ * still render when a style only references Clash/General Sans (static CSS
+ * classes often skip StyleSheet.flatten remapping).
+ */
+const NotoUi = 'NotoSansArabic_400Regular';
+const NotoMedium = 'NotoSansArabic_500Medium';
+const NotoSemibold = 'NotoSansArabic_600SemiBold';
+const NotoBold = 'NotoSansArabic_700Bold';
+
+const brandFonts = {
   display: 'ClashDisplay-Semibold',
   displayBold: 'ClashDisplay-Bold',
   ui: 'GeneralSans-Regular',
@@ -12,6 +27,18 @@ export const FONTS = {
   uiSemibold: 'GeneralSans-Semibold',
   uiBold: 'GeneralSans-Bold',
 } as const;
+
+export const FONTS =
+  Platform.OS === 'web'
+    ? ({
+        display: `${brandFonts.display}, ${NotoSemibold}, sans-serif`,
+        displayBold: `${brandFonts.displayBold}, ${NotoBold}, sans-serif`,
+        ui: `${brandFonts.ui}, ${NotoUi}, sans-serif`,
+        uiMedium: `${brandFonts.uiMedium}, ${NotoMedium}, sans-serif`,
+        uiSemibold: `${brandFonts.uiSemibold}, ${NotoSemibold}, sans-serif`,
+        uiBold: `${brandFonts.uiBold}, ${NotoBold}, sans-serif`,
+      } as const)
+    : brandFonts;
 
 /** Brand primary - Electric Blue (single source for primary + page background) */
 const BRAND_PRIMARY = '#007BFF' as const;

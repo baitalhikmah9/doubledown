@@ -62,9 +62,9 @@ describe('LegalScrollScreen', () => {
     expect(shellStyle.backgroundColor).toBe(darkCanvas);
     expect(scrollStyle.backgroundColor).toBe(darkCanvas);
     expect(shellStyle.backgroundColor).not.toBe('#FFFFFF');
-    expect(shellStyle.backgroundColor).not.toBe('#FAF9F6');
+    expect(shellStyle.backgroundColor).not.toBe('#F0EBE3');
     expect(scrollStyle.backgroundColor).not.toBe('#FFFFFF');
-    expect(scrollStyle.backgroundColor).not.toBe('#FAF9F6');
+    expect(scrollStyle.backgroundColor).not.toBe('#F0EBE3');
     expect(screen.getByText('Terms of Service')).toBeTruthy();
     expect(screen.getByText('Agreement')).toBeTruthy();
   });

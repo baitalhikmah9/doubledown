@@ -602,7 +602,7 @@ export default function PlayQuestionScreen() {
       <Text
         style={[
           styles.questionTextReveal,
-          getTextStyle(q.locale, 'display', 'center'),
+          getTextStyle(q.locale, 'display', 'center', q.prompt),
           {
             color: T.textPrimary,
             fontSize: answerQuestionFontSize,
@@ -896,7 +896,7 @@ export default function PlayQuestionScreen() {
                 <Text
                   style={[
                     styles.questionText,
-                    getTextStyle(q.locale, 'display', 'center'),
+                    getTextStyle(q.locale, 'display', 'center', q.prompt),
                     {
                       color: T.textPrimary,
                       fontSize: unrevealedActiveQuestionTypography.fontSize,
@@ -1270,7 +1270,6 @@ const styles = StyleSheet.create({
     maxHeight: 120,
   },
   questionTextReveal: {
-    fontWeight: '500',
     textAlign: 'center',
     width: '100%',
   },
@@ -1407,7 +1406,6 @@ const styles = StyleSheet.create({
     height: 200,
   },
   questionText: {
-    fontWeight: '500',
     textAlign: 'center',
     width: '100%',
   },

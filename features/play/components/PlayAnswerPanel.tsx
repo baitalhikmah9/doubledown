@@ -423,6 +423,11 @@ export function PlayAnswerPanel({
   }
 
   const currentQuestion = session.currentQuestion;
+  const questionTextStyle = (
+    role: 'body' | 'bodyMedium' | 'bodySemibold' | 'bodyBold' | 'display' | 'displayBold',
+    edge: 'start' | 'center' | 'end',
+    content?: string
+  ) => getTextStyle(currentQuestion.locale, role, edge, content);
   const wager = session.wager;
   const isTimedOut = session.timedOutQuestionId === currentQuestion.id;
   const showPostScoreActions = !wager && session.phase === 'scoring';
@@ -796,7 +801,7 @@ export function PlayAnswerPanel({
             lineHeight: Math.max(34, layoutDensity.answerLineHeight * 1.25),
             marginTop: layoutDensity.answerEyebrowMarginBottom,
           },
-          getTextStyle(undefined, 'displayBold', 'center'),
+          questionTextStyle('displayBold', 'center', currentQuestion.answer),
         ]}
         maxFontSizeMultiplier={1.25}
         numberOfLines={6}
@@ -880,7 +885,7 @@ export function PlayAnswerPanel({
               Math.round(SPACING.md * combinedCardLayoutScale * answerCardOnlyScale)
             ),
           },
-          getTextStyle(undefined, 'displayBold', 'center'),
+          questionTextStyle('displayBold', 'center', currentQuestion.answer),
         ]}
         maxFontSizeMultiplier={1.25}
         numberOfLines={4}
@@ -959,7 +964,13 @@ export function PlayAnswerPanel({
                     </Text>
                   </View>
 
-                  <Text style={[styles.questionPromptText, { color: colors.textOnBackground }]}>
+                  <Text
+                    style={[
+                      styles.questionPromptText,
+                      { color: colors.textOnBackground },
+                      questionTextStyle('displayBold', 'center', currentQuestion.prompt),
+                    ]}
+                  >
                     {currentQuestion.prompt}
                   </Text>
                 </>
@@ -1265,7 +1276,6 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.md,
   },
   questionPromptText: {
-    fontFamily: FONTS.displayBold,
     fontSize: 16,
     lineHeight: 24,
     textAlign: 'center',
@@ -1340,7 +1350,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   referenceAnswerMain: {
-    fontFamily: FONTS.displayBold,
     textAlign: 'center',
   },
   whoGetsPointsHeading: {
@@ -1400,7 +1409,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   answerText: {
-    fontWeight: '800',
     textAlign: 'center',
   },
   awardRow: {

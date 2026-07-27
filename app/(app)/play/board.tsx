@@ -1092,7 +1092,7 @@ export default function PlayBoardScreen() {
             {
               backgroundColor: surfaceColors.isDark
                 ? 'rgba(7, 17, 31, 0.55)'
-                : 'rgba(250, 249, 246, 0.45)',
+                : 'rgba(240, 235, 227, 0.45)',
             },
           ]}
           accessibilityViewIsModal
@@ -1209,7 +1209,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     zIndex: 100,
-    backgroundColor: 'rgba(250, 249, 246, 0.65)',
+    backgroundColor: 'rgba(240, 235, 227, 0.65)',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 8,

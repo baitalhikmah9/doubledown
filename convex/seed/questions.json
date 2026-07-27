@@ -12432,7 +12432,7 @@
     "categorySlug": "in-between",
     "canonicalKey": "in-between:300:7",
     "prompt": "Between the Meiji Restoration and the beginning of the Shōwa era, which short period of Japanese history coincided with Emperor Yoshihito's reign?",
-    "answer": "The Taish? era",
+    "answer": "The Taishō era",
     "pointValue": 300,
     "locale": "en",
     "status": "active"
@@ -17886,7 +17886,7 @@
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:100:3",
     "prompt": "Where did the Ark of Prophet Nuh PBUH finally come to rest?",
-    "answer": "Mount Judi (??????) (Qur'an 11:44)",
+    "answer": "Mount Judi (Judi, الجودي) (Qur'an 11:44)",
     "pointValue": 100,
     "locale": "en",
     "status": "active"
@@ -18020,7 +18020,7 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:100:18",
-    "prompt": "Which bird brought Prophet Sulayman PBUH news about the kingdom of Sheba (Saba, ???)?",
+    "prompt": "Which bird brought Prophet Sulayman PBUH news about the kingdom of Sheba (Saba, سبأ)?",
     "answer": "The hoopoe (Qur'an 27:20-24)",
     "pointValue": 100,
     "locale": "en",
@@ -18029,7 +18029,7 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:100:19",
-    "prompt": "What royal object did Prophet Sulayman PBUH order his court to alter before the Queen of Sheba (Saba, ???) arrived?",
+    "prompt": "What royal object did Prophet Sulayman PBUH order his court to alter before the Queen of Sheba (Saba, سبأ) arrived?",
     "answer": "Her throne (Qur'an 27:41)",
     "pointValue": 100,
     "locale": "en",
@@ -18083,7 +18083,7 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:100:25",
-    "prompt": "Which two materials were used to construct the barrier of the Two-Horned One (Dhul Qarnayn, ?? ???????)?",
+    "prompt": "Which two materials were used to construct the barrier of the Two-Horned One (Dhul Qarnayn, ذو القرنين)?",
     "answer": "Blocks of iron and molten copper (Qur'an 18:96)",
     "pointValue": 100,
     "locale": "en",
@@ -18110,8 +18110,8 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:100:28",
-    "prompt": "Which sacred mosque was the earthly destination of the Night Journey (Al-Isra, ???????)?",
-    "answer": "The Farthest Mosque (Al-Masjid al-Aqsa, ?????? ??????) (Qur'an 17:1)",
+    "prompt": "Which sacred mosque was the earthly destination of the Night Journey (Al-Isra, الإسراء)?",
+    "answer": "The Farthest Mosque (Al-Masjid al-Aqsa, المسجد الأقصى) (Qur'an 17:1)",
     "pointValue": 100,
     "locale": "en",
     "status": "active"
@@ -18119,7 +18119,7 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:100:29",
-    "prompt": "How many daily prayers were first prescribed during the Ascension (Al-Mi'raj, ???????) before the obligation was reduced to five?",
+    "prompt": "How many daily prayers were first prescribed during the Ascension (Al-Mi'raj, المعراج) before the obligation was reduced to five?",
     "answer": "Fifty prayers (Sahih al-Bukhari 349 and Sahih Muslim 162a)",
     "pointValue": 100,
     "locale": "en",
@@ -18128,8 +18128,8 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:100:30",
-    "prompt": "Which cave sheltered Prophet Muhammad PBUH and Abu Bakr may Allah be pleased with him during the Migration (Hijrah, ??????)?",
-    "answer": "The Cave of Thawr (Ghar Thawr, ??? ???) (Qur'an 9:40 and Ibn Hisham's al-Sirah al-Nabawiyyah account of the Hijrah)",
+    "prompt": "Which cave sheltered Prophet Muhammad PBUH and Abu Bakr may Allah be pleased with him during the Migration (Hijrah, الهجرة)?",
+    "answer": "The Cave of Thawr (Ghar Thawr, غار ثور) (Qur'an 9:40 and Ibn Hisham's al-Sirah al-Nabawiyyah account of the Hijrah)",
     "pointValue": 100,
     "locale": "en",
     "status": "active"
@@ -18156,7 +18156,7 @@
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:100:33",
     "prompt": "What was the pledge made by the believers beneath the tree at Hudaybiyyah called?",
-    "answer": "The Pledge of Acceptance (Bay'at al-Ridwan, ???? ???????) (Qur'an 48:18)",
+    "answer": "The Pledge of Acceptance (Bay'at al-Ridwan, بيعة الرضوان) (Qur'an 48:18)",
     "pointValue": 100,
     "locale": "en",
     "status": "active"
@@ -18164,7 +18164,7 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:100:34",
-    "prompt": "Which companion slept in the bed of Prophet Muhammad PBUH on the night of the Migration (Hijrah, ??????)?",
+    "prompt": "Which companion slept in the bed of Prophet Muhammad PBUH on the night of the Migration (Hijrah, الهجرة)?",
     "answer": "Ali ibn Abi Talib may Allah be pleased with him (Ibn Hisham's al-Sirah al-Nabawiyyah account of the Hijrah)",
     "pointValue": 100,
     "locale": "en",
@@ -18191,8 +18191,8 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:100:37",
-    "prompt": "Which destructive peoples prompted the request for the Two-Horned One (Dhul Qarnayn, ?? ???????) to build a barrier?",
-    "answer": "Gog and Magog (Ya'juj and Ma'juj, ????? ??????) (Qur'an 18:94)",
+    "prompt": "Which destructive peoples prompted the request for the Two-Horned One (Dhul Qarnayn, ذو القرنين) to build a barrier?",
+    "answer": "Gog and Magog (Ya'juj and Ma'juj, يأجوج ومأجوج) (Qur'an 18:94)",
     "pointValue": 100,
     "locale": "en",
     "status": "active"
@@ -18201,7 +18201,7 @@
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:100:38",
     "prompt": "Which surah reassured Prophet Muhammad PBUH that his Lord had neither abandoned him nor detested him?",
-    "answer": "Surah Morning Brightness (Al-Duha, ?????) (Qur'an 93:3)",
+    "answer": "Surah Morning Brightness (Al-Duha, الضحى) (Qur'an 93:3)",
     "pointValue": 100,
     "locale": "en",
     "status": "active"
@@ -18210,7 +18210,7 @@
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:100:39",
     "prompt": "Toward which sanctuary was the prayer direction changed in Madinah?",
-    "answer": "Al-Masjid al-Haram (Kaaba) (Qur'an 2:144)",
+    "answer": "Al-Masjid al-Haram (Al-Masjid al-Haram, المسجد الحرام) (Kaaba, الكعبة) (Qur'an 2:144)",
     "pointValue": 100,
     "locale": "en",
     "status": "active"
@@ -18218,7 +18218,7 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:100:40",
-    "prompt": "What defensive obstacle was dug across the exposed approaches to Madinah before the Battle of the Confederates (Al-Ahzab, ???????)?",
+    "prompt": "What defensive obstacle was dug across the exposed approaches to Madinah before the Battle of the Confederates (Al-Ahzab, الأحزاب)?",
     "answer": "A trench (Sahih al-Bukhari 4101)",
     "pointValue": 100,
     "locale": "en",
@@ -18263,7 +18263,7 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:200:3",
-    "prompt": "What did the Companions of the Cave (Ashab al-Kahf, ????? ?????) send one of their number into the city carrying?",
+    "prompt": "What did the Companions of the Cave (Ashab al-Kahf, أصحاب الكهف) send one of their number into the city carrying?",
     "answer": "Silver money (Qur'an 18:19)",
     "pointValue": 200,
     "locale": "en",
@@ -18407,7 +18407,7 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:200:19",
-    "prompt": "What did the Queen of Sheba (Saba, ???) mistake for deep water when entering the palace?",
+    "prompt": "What did the Queen of Sheba (Saba, سبأ) mistake for deep water when entering the palace?",
     "answer": "A smooth floor made of glass (Qur'an 27:44)",
     "pointValue": 200,
     "locale": "en",
@@ -18452,7 +18452,7 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:200:24",
-    "prompt": "How long does the Qur'an state that the Companions of the Cave (Ashab al-Kahf, ????? ?????) remained in their cave?",
+    "prompt": "How long does the Qur'an state that the Companions of the Cave (Ashab al-Kahf, أصحاب الكهف) remained in their cave?",
     "answer": "Three hundred years plus nine (Qur'an 18:25)",
     "pointValue": 200,
     "locale": "en",
@@ -18488,7 +18488,7 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:200:28",
-    "prompt": "What was the only fault for which the People of the Trench (Ashab al-Ukhdud, ????? ???????) persecuted the believers?",
+    "prompt": "What was the only fault for which the People of the Trench (Ashab al-Ukhdud, أصحاب الأخدود) persecuted the believers?",
     "answer": "They believed in Allah, the Almighty and Praiseworthy (Qur'an 85:8)",
     "pointValue": 200,
     "locale": "en",
@@ -18497,7 +18497,7 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:200:29",
-    "prompt": "Which travel incident preceded the revelation permitting dry ablution (tayammum, ??????) when water was unavailable?",
+    "prompt": "Which travel incident preceded the revelation permitting dry ablution (tayammum, التيمم) when water was unavailable?",
     "answer": "Aishah may Allah be pleased with her lost a necklace and the group halted where there was no water (Sahih al-Bukhari 334)",
     "pointValue": 200,
     "locale": "en",
@@ -18533,7 +18533,7 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:200:33",
-    "prompt": "What principle did Abu Bakr may Allah be pleased with him invoke when confronting those who withheld obligatory charity (zakah, ??????) after the Prophet's death?",
+    "prompt": "What principle did Abu Bakr may Allah be pleased with him invoke when confronting those who withheld obligatory charity (zakah, الزكاة) after the Prophet's death?",
     "answer": "He would fight those who separated prayer from zakah (Sahih al-Bukhari 1399-1400)",
     "pointValue": 200,
     "locale": "en",
@@ -18561,7 +18561,7 @@
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:200:36",
     "prompt": "What name does the Qur'an give to the father whom Prophet Ibrahim PBUH warned against idol worship?",
-    "answer": "Azar (???) (Qur'an 6:74)",
+    "answer": "(Azar, آزر) (Qur'an 6:74)",
     "pointValue": 200,
     "locale": "en",
     "status": "active"
@@ -18615,7 +18615,7 @@
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:200:42",
     "prompt": "How did Waraqah ibn Nawfal identify the being who brought the first revelation to Prophet Muhammad PBUH?",
-    "answer": "As the bearer of revelation (Al-Namus, ???????) who had come to Prophet Musa PBUH (Sahih al-Bukhari 3)",
+    "answer": "As the bearer of revelation (Al-Namus, الناموس) who had come to Prophet Musa PBUH (Sahih al-Bukhari 3)",
     "pointValue": 200,
     "locale": "en",
     "status": "active"
@@ -18623,7 +18623,7 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:200:43",
-    "prompt": "How is the heavenly mount (Al-Buraq, ??????) described in the authentic narration of the Night Journey?",
+    "prompt": "How is the heavenly mount (Al-Buraq, البراق) described in the authentic narration of the Night Journey?",
     "answer": "It was larger than a donkey and smaller than a mule (Sahih Muslim 162a)",
     "pointValue": 200,
     "locale": "en",
@@ -18642,7 +18642,7 @@
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:300:1",
     "prompt": "Which word were the Children of Israel commanded to say while entering the gate in humility?",
-    "answer": "Relieve us of our burden (Hittah, ??????) (Qur'an 2:58)",
+    "answer": "Relieve us of our burden (Hittah, حِطَّة) (Qur'an 2:58)",
     "pointValue": 300,
     "locale": "en",
     "status": "active"
@@ -18749,7 +18749,7 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:300:13",
-    "prompt": "What construction sequence did the Two-Horned One (Dhul Qarnayn, ?? ???????) use to seal the mountain gap?",
+    "prompt": "What construction sequence did the Two-Horned One (Dhul Qarnayn, ذو القرنين) use to seal the mountain gap?",
     "answer": "He stacked iron blocks, heated them until they glowed and poured molten copper over them (Qur'an 18:96)",
     "pointValue": 300,
     "locale": "en",
@@ -18758,7 +18758,7 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:300:14",
-    "prompt": "Which court figure brought the throne of the Queen of Sheba (Saba, ???) before Prophet Sulayman PBUH could finish a glance?",
+    "prompt": "Which court figure brought the throne of the Queen of Sheba (Saba, سبأ) before Prophet Sulayman PBUH could finish a glance?",
     "answer": "One who possessed knowledge from the Scripture (Qur'an 27:40)",
     "pointValue": 300,
     "locale": "en",
@@ -18812,7 +18812,7 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:300:20",
-    "prompt": "Which prophet did Prophet Muhammad PBUH meet in the first heaven during the Ascension (Al-Mi'raj, ???????)?",
+    "prompt": "Which prophet did Prophet Muhammad PBUH meet in the first heaven during the Ascension (Al-Mi'raj, المعراج)?",
     "answer": "Prophet Adam PBUH (Sahih al-Bukhari 349 and Sahih Muslim 162a)",
     "pointValue": 300,
     "locale": "en",
@@ -18840,7 +18840,7 @@
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:300:23",
     "prompt": "According to Sahih Muslim 162a, against which heavenly house was Prophet Ibrahim PBUH reclining?",
-    "answer": "The Frequented House (Al-Bayt al-Ma'mur, ????? ???????) (Sahih Muslim 162a)",
+    "answer": "The Frequented House (Al-Bayt al-Ma'mur, البيت المعمور) (Sahih Muslim 162a)",
     "pointValue": 300,
     "locale": "en",
     "status": "active"
@@ -18857,7 +18857,7 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:300:25",
-    "prompt": "How did Asma bint Abi Bakr may Allah be pleased with her secure the provisions prepared for the Migration (Hijrah, ??????)?",
+    "prompt": "How did Asma bint Abi Bakr may Allah be pleased with her secure the provisions prepared for the Migration (Hijrah, الهجرة)?",
     "answer": "She tore her waistband into two pieces and used one to tie the food container (Sahih al-Bukhari 3907)",
     "pointValue": 300,
     "locale": "en",
@@ -18920,7 +18920,7 @@
   {
     "categorySlug": "talab-ul-ilm",
     "canonicalKey": "talab-ul-ilm:300:32",
-    "prompt": "With which companion did Zayd ibn Thabit may Allah be pleased with him find the final verses of Surah Repentance (Al-Tawbah, ??????) during the first compilation?",
+    "prompt": "With which companion did Zayd ibn Thabit may Allah be pleased with him find the final verses of Surah Repentance (Al-Tawbah, التوبة) during the first compilation?",
     "answer": "Abu Khuzaymah al-Ansari may Allah be pleased with him (Sahih al-Bukhari 4986)",
     "pointValue": 300,
     "locale": "en",
@@ -36372,7 +36372,7 @@
     "categorySlug": "ww2",
     "canonicalKey": "ww2:100:9",
     "prompt": "On what date did the attack on Pearl Harbor occur?",
-    "answer": "07-Dec-41",
+    "answer": "7-Dec-41",
     "pointValue": 100,
     "locale": "en",
     "status": "active"
@@ -38675,7 +38675,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:100:2",
-    "prompt": "Instead of a standard single blade, what unique weapon combination does the veteran warrior Bams? Beyrek use in combat?",
+    "prompt": "Instead of a standard single blade, what unique weapon combination does the veteran warrior Bamsı Beyrek use in combat?",
     "answer": "Dual swords",
     "pointValue": 100,
     "locale": "en",
@@ -38684,7 +38684,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:100:3",
-    "prompt": "Before his eventual defeat and execution, which Byzantine Tekfur rules ?negöl and constantly employs Greek Fire against the Turks?",
+    "prompt": "Before his eventual defeat and execution, which Byzantine Tekfur rules İnegöl and constantly employs Greek Fire against the Turks?",
     "answer": "Aya Nikola",
     "pointValue": 100,
     "locale": "en",
@@ -38694,7 +38694,7 @@
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:100:4",
     "prompt": "When Selcan Hatun steps down, what leadership title is bestowed upon Bala Hatun to govern the women of the tribe?",
-    "answer": "Head of the Bacıyân-? Rûm (or Ba? Hatun)",
+    "answer": "Head of the Bacıyân-ı Rûm (or Baş Hatun)",
     "pointValue": 100,
     "locale": "en",
     "status": "active"
@@ -38720,7 +38720,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:100:7",
-    "prompt": "Which of Osman's elder brothers temporarily assumes the role of Kay? Bey during his absences?",
+    "prompt": "Which of Osman's elder brothers temporarily assumes the role of Kayı Bey during his absences?",
     "answer": "Gündüz Bey",
     "pointValue": 100,
     "locale": "en",
@@ -38748,7 +38748,7 @@
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:100:10",
     "prompt": "Under Bala Hatun's command, what name is given to the organized guild of female warriors protecting the tribe?",
-    "answer": "Bacıyân-? Rûm",
+    "answer": "Bacıyân-ı Rûm",
     "pointValue": 100,
     "locale": "en",
     "status": "active"
@@ -38765,8 +38765,8 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:100:12",
-    "prompt": "For what underlying reason does Targun Hatun initially agree to act as a spy for Aya Nikola within the Kay? camp?",
-    "answer": "She is trying to save her captive father, ?nal Bey",
+    "prompt": "For what underlying reason does Targun Hatun initially agree to act as a spy for Aya Nikola within the Kayı camp?",
+    "answer": "She is trying to save her captive father, İnal Bey",
     "pointValue": 100,
     "locale": "en",
     "status": "active"
@@ -38775,7 +38775,7 @@
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:100:13",
     "prompt": "While fiercely defending the sacred trusts left by Ertuğrul, which legendary veteran Alp is martyred by Togay?",
-    "answer": "Bams? Beyrek",
+    "answer": "Bamsı Beyrek",
     "pointValue": 100,
     "locale": "en",
     "status": "active"
@@ -38783,7 +38783,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:100:14",
-    "prompt": "What incriminating item does Malhun Hatun uncover in Sö?üt that provides the first concrete proof of a traitor in the tribe?",
+    "prompt": "What incriminating item does Malhun Hatun uncover in Söğüt that provides the first concrete proof of a traitor in the tribe?",
     "answer": "Dündar Bey's ring",
     "pointValue": 100,
     "locale": "en",
@@ -38811,7 +38811,7 @@
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:100:17",
     "prompt": "Because of Gündüz Bey's misguided alliance with Vizier Alemshah, which fiercely loyal Alp is tragically executed?",
-    "answer": "Göktu? Alp",
+    "answer": "Göktuğ Alp",
     "pointValue": 100,
     "locale": "en",
     "status": "active"
@@ -38819,8 +38819,8 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:100:18",
-    "prompt": "Before the capital is moved to Yenişehir, which town serves as the resting place of Ertuğrul and the central hub of the Kay??",
-    "answer": "Sö?üt",
+    "prompt": "Before the capital is moved to Yenişehir, which town serves as the resting place of Ertuğrul and the central hub of the Kayı?",
+    "answer": "Söğüt",
     "pointValue": 100,
     "locale": "en",
     "status": "active"
@@ -38855,7 +38855,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:100:22",
-    "prompt": "Which major Mongol leader, driven by a desire to overthrow his brother Argun, constantly threatens the Kay? tribe with annihilation?",
+    "prompt": "Which major Mongol leader, driven by a desire to overthrow his brother Argun, constantly threatens the Kayı tribe with annihilation?",
     "answer": "Geyhatu",
     "pointValue": 100,
     "locale": "en",
@@ -38865,7 +38865,7 @@
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:100:23",
     "prompt": "To break the economic monopoly of the Byzantine Tekfurs, in which town does Osman establish a thriving free-trade market?",
-    "answer": "Sö?üt",
+    "answer": "Söğüt",
     "pointValue": 100,
     "locale": "en",
     "status": "active"
@@ -38910,7 +38910,7 @@
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:100:28",
     "prompt": "During a bloody ambush at the Domaniç Pass orchestrated by Kalanoz, which of Osman's older brothers is martyred?",
-    "answer": "Savc? Bey",
+    "answer": "Savcı Bey",
     "pointValue": 100,
     "locale": "en",
     "status": "active"
@@ -38918,7 +38918,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:100:29",
-    "prompt": "Until her peaceful death from old age, who serves as the revered mother figure and fierce protector of the Kay? women?",
+    "prompt": "Until her peaceful death from old age, who serves as the revered mother figure and fierce protector of the Kayı women?",
     "answer": "Selcan Hatun",
     "pointValue": 100,
     "locale": "en",
@@ -38928,7 +38928,7 @@
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:100:30",
     "prompt": "During the climactic and victorious siege of which castle does Gündüz Bey achieve martyrdom?",
-    "answer": "?negöl Castle",
+    "answer": "İnegöl Castle",
     "pointValue": 100,
     "locale": "en",
     "status": "active"
@@ -38972,7 +38972,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:200:1",
-    "prompt": "By utilizing dark shamanic rituals, which Mongol commander temporarily brainwashes Göktu? into becoming a loyal Mankurt?",
+    "prompt": "By utilizing dark shamanic rituals, which Mongol commander temporarily brainwashes Göktuğ into becoming a loyal Mankurt?",
     "answer": "Balgay",
     "pointValue": 200,
     "locale": "en",
@@ -38999,7 +38999,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:200:4",
-    "prompt": "Fueling his father's relentless quest for vengeance, what is the name of Bams? Beyrek's son who is murdered in an ambush?",
+    "prompt": "Fueling his father's relentless quest for vengeance, what is the name of Bamsı Beyrek's son who is murdered in an ambush?",
     "answer": "Aybars",
     "pointValue": 200,
     "locale": "en",
@@ -39018,7 +39018,7 @@
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:200:6",
     "prompt": "To prevent a political alliance, who secretly provides the poison to Olivia with strict instructions to assassinate Elçim Hatun?",
-    "answer": "?mren Tegin",
+    "answer": "İmren Tegin",
     "pointValue": 200,
     "locale": "en",
     "status": "active"
@@ -39026,7 +39026,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:200:7",
-    "prompt": "Within the family tree of the Kay? leadership, what is the exact familial relationship between Aktemur Bey and Osman?",
+    "prompt": "Within the family tree of the Kayı leadership, what is the exact familial relationship between Aktemur Bey and Osman?",
     "answer": "Aktemur is Osman's nephew (son of Gündüz Bey)",
     "pointValue": 200,
     "locale": "en",
@@ -39035,7 +39035,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:200:8",
-    "prompt": "Which noblewoman, tasked by her father to inspect the western borders, inadvertently becomes entangled in the Kay? tribe's internal conflicts?",
+    "prompt": "Which noblewoman, tasked by her father to inspect the western borders, inadvertently becomes entangled in the Kayı tribe's internal conflicts?",
     "answer": "Malhun Hatun",
     "pointValue": 200,
     "locale": "en",
@@ -39053,7 +39053,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:200:10",
-    "prompt": "What extremist organization does Commander Yannis secretly lead while posing as a humble religious figure in Sö?üt?",
+    "prompt": "What extremist organization does Commander Yannis secretly lead while posing as a humble religious figure in Söğüt?",
     "answer": "The Margarit Monks",
     "pointValue": 200,
     "locale": "en",
@@ -39080,7 +39080,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:200:13",
-    "prompt": "For repeatedly failing to crush the Turkmen threat, which former Tekfur of ?negöl is ruthlessly executed by Aya Nikola?",
+    "prompt": "For repeatedly failing to crush the Turkmen threat, which former Tekfur of İnegöl is ruthlessly executed by Aya Nikola?",
     "answer": "Tekfur Alexis",
     "pointValue": 200,
     "locale": "en",
@@ -39089,7 +39089,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:200:14",
-    "prompt": "How does Hazal Hatun attempt to manipulate Kay? tribal politics following Ertuğrul's death?",
+    "prompt": "How does Hazal Hatun attempt to manipulate Kayı tribal politics following Ertuğrul's death?",
     "answer": "She actively conspires to have her husband Dündar elected as the new Bey",
     "pointValue": 200,
     "locale": "en",
@@ -39135,7 +39135,7 @@
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:200:19",
     "prompt": "After renouncing his Byzantine allegiance and embracing Islam, what new name does the former Commander Salvador adopt?",
-    "answer": "Ṣiddīq Alp",
+    "answer": "Sıddık Alp",
     "pointValue": 200,
     "locale": "en",
     "status": "active"
@@ -39143,7 +39143,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:200:20",
-    "prompt": "In his brutal duel with Bams? Beyrek, what signature weapon does Togay employ to gain a lethal advantage?",
+    "prompt": "In his brutal duel with Bamsı Beyrek, what signature weapon does Togay employ to gain a lethal advantage?",
     "answer": "A specialized garrote wire (or Mongol whip)",
     "pointValue": 200,
     "locale": "en",
@@ -39152,7 +39152,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:200:21",
-    "prompt": "To gain political leverage and control over the Kay? tribe, whom does the corrupt Alişar Bey manipulate into a forced marriage?",
+    "prompt": "To gain political leverage and control over the Kayı tribe, whom does the corrupt Alişar Bey manipulate into a forced marriage?",
     "answer": "Aygül Hatun",
     "pointValue": 200,
     "locale": "en",
@@ -39161,7 +39161,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:200:22",
-    "prompt": "Where exactly does Osman formally reveal the Kay? tribe's new independent flag following his election as Bey?",
+    "prompt": "Where exactly does Osman formally reveal the Kayı tribe's new independent flag following his election as Bey?",
     "answer": "Inside the main Tribal Marquee (Bey's Tent)",
     "pointValue": 200,
     "locale": "en",
@@ -39197,8 +39197,8 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:200:26",
-    "prompt": "Within the generational lineage of the Kay?, what is the exact relationship between the martyred Bayhoca and Osman?",
-    "answer": "Bayhoca is Osman's nephew (son of Savc? Bey)",
+    "prompt": "Within the generational lineage of the Kayı, what is the exact relationship between the martyred Bayhoca and Osman?",
+    "answer": "Bayhoca is Osman's nephew (son of Savcı Bey)",
     "pointValue": 200,
     "locale": "en",
     "status": "active"
@@ -39234,7 +39234,7 @@
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:200:30",
     "prompt": "During a tense standoff in the first season, what shocking revelation is made regarding the Mongol warrior Kongar?",
-    "answer": "He is actually Göktu?, the long-lost brother of Konur Alp",
+    "answer": "He is actually Göktuğ, the long-lost brother of Konur Alp",
     "pointValue": 200,
     "locale": "en",
     "status": "active"
@@ -39242,7 +39242,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:200:31",
-    "prompt": "Immediately following the monumental victory at ?negöl, which heavily fortified Byzantine city does Osman capture next?",
+    "prompt": "Immediately following the monumental victory at İnegöl, which heavily fortified Byzantine city does Osman capture next?",
     "answer": "Yenişehir",
     "pointValue": 200,
     "locale": "en",
@@ -39260,7 +39260,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:300:0",
-    "prompt": "To frame Osman and ignite a civil war within the Kay? tribe, who secretly orchestrates the assassination of Batur Alp?",
+    "prompt": "To frame Osman and ignite a civil war within the Kayı tribe, who secretly orchestrates the assassination of Batur Alp?",
     "answer": "Alişar Bey",
     "pointValue": 300,
     "locale": "en",
@@ -39278,7 +39278,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:300:2",
-    "prompt": "Before she married into the Kay? leadership, to which specific Anatolian tribe did the ambitious Hazal Hatun originally belong?",
+    "prompt": "Before she married into the Kayı leadership, to which specific Anatolian tribe did the ambitious Hazal Hatun originally belong?",
     "answer": "The Çobanoğlu Tribe",
     "pointValue": 300,
     "locale": "en",
@@ -39296,7 +39296,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:300:4",
-    "prompt": "What specific disguise does Commander Yannis frequently utilize to move undetected through the Sö?üt marketplace?",
+    "prompt": "What specific disguise does Commander Yannis frequently utilize to move undetected through the Söğüt marketplace?",
     "answer": "He dresses as an old blind beggar or fortune teller",
     "pointValue": 300,
     "locale": "en",
@@ -39350,7 +39350,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:300:10",
-    "prompt": "Whom do ?mren Tegin and Olivia manipulate into a bitter feud with Holofira using a poisoned water scheme?",
+    "prompt": "Whom do İmren Tegin and Olivia manipulate into a bitter feud with Holofira using a poisoned water scheme?",
     "answer": "Elçim Hatun",
     "pointValue": 300,
     "locale": "en",
@@ -39368,7 +39368,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:300:12",
-    "prompt": "Serving as a covert meeting ground for Dündar's treason, which specific artisan's shop in Sö?üt hides the Byzantine spies?",
+    "prompt": "Serving as a covert meeting ground for Dündar's treason, which specific artisan's shop in Söğüt hides the Byzantine spies?",
     "answer": "The Potter's Shop",
     "pointValue": 300,
     "locale": "en",
@@ -39422,7 +39422,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:300:18",
-    "prompt": "As a prominent leader who initially opposes the Kay?'s rise, what is the full name of Hazal Hatun's powerful brother?",
+    "prompt": "As a prominent leader who initially opposes the Kayı's rise, what is the full name of Hazal Hatun's powerful brother?",
     "answer": "Muzaffereddin Yavlak Arslan",
     "pointValue": 300,
     "locale": "en",
@@ -39449,7 +39449,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:300:21",
-    "prompt": "Where exactly does Commander Kalanoz orchestrate the tragic ambush that claims Savc? Bey's life?",
+    "prompt": "Where exactly does Commander Kalanoz orchestrate the tragic ambush that claims Savcı Bey's life?",
     "answer": "The Domaniç Pass",
     "pointValue": 300,
     "locale": "en",
@@ -39458,7 +39458,7 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:300:22",
-    "prompt": "When Osman is unjustly imprisoned by Vizier Alemshah, who controversially assumes emergency leadership of the Kay? tribe?",
+    "prompt": "When Osman is unjustly imprisoned by Vizier Alemshah, who controversially assumes emergency leadership of the Kayı tribe?",
     "answer": "Gündüz Bey",
     "pointValue": 300,
     "locale": "en",
@@ -39468,7 +39468,7 @@
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:300:23",
     "prompt": "What vital intelligence does Targun Hatun steal from Osman's tent to deliver to Aya Nikola?",
-    "answer": "The secret maps detailing the Kay? conquest plans",
+    "answer": "The secret maps detailing the Kayı conquest plans",
     "pointValue": 300,
     "locale": "en",
     "status": "active"
@@ -39503,8 +39503,8 @@
   {
     "categorySlug": "kurulu-osman",
     "canonicalKey": "kurulu-osman:300:27",
-    "prompt": "Before sacrificing his life to protect the sacred trusts, what highest military rank does Bams? Beyrek hold among the Kay? warriors?",
-    "answer": "Head Alp (Alpba??)",
+    "prompt": "Before sacrificing his life to protect the sacred trusts, what highest military rank does Bamsı Beyrek hold among the Kayı warriors?",
+    "answer": "Head Alp (Alpbaşı)",
     "pointValue": 300,
     "locale": "en",
     "status": "active"
@@ -40844,7 +40844,7 @@
   {
     "categorySlug": "20th-century",
     "canonicalKey": "20th-century:100:28",
-    "prompt": "Which popular 3D puzzle was invented by Hungarian architect and design professor Ern? Rubik in 1974?",
+    "prompt": "Which popular 3D puzzle was invented by Hungarian architect and design professor Ernő Rubik in 1974?",
     "answer": "Rubik's Cube",
     "pointValue": 100,
     "locale": "en",
@@ -54111,7 +54111,7 @@
     "categorySlug": "breaking-bad",
     "canonicalKey": "breaking-bad:200:11",
     "prompt": "What amount does Walter White calculate he needs to secure his family's financial future?",
-    "answer": "737000",
+    "answer": "$737,000",
     "pointValue": 200,
     "locale": "en",
     "status": "active"
@@ -54418,15 +54418,6 @@
     "canonicalKey": "breaking-bad:200:45",
     "prompt": "Which state does Walter White relocate to under Ed Galbraith's protection?",
     "answer": "New Hampshire",
-    "pointValue": 200,
-    "locale": "en",
-    "status": "active"
-  },
-  {
-    "categorySlug": "breaking-bad",
-    "canonicalKey": "breaking-bad:200:46",
-    "prompt": "What amount does Walter White calculate he needs to secure his family's financial future?",
-    "answer": "$737,000",
     "pointValue": 200,
     "locale": "en",
     "status": "active"
@@ -57297,7 +57288,7 @@
     "categorySlug": "stranger-things",
     "canonicalKey": "stranger-things:200:27",
     "prompt": "On what date does Will Byers disappear?",
-    "answer": "06-Nov-83",
+    "answer": "6-Nov-83",
     "pointValue": 200,
     "locale": "en",
     "status": "active"
@@ -77367,7 +77358,7 @@
     "categorySlug": "uefa-champions-league",
     "canonicalKey": "uefa-champions-league:300:12",
     "prompt": "Which defender scored a brace for Chelsea against Liverpool in the 2008-09 Champions League quarter-finals?",
-    "answer": "Branislav Ivanovi?",
+    "answer": "Branislav Ivanović",
     "pointValue": 300,
     "locale": "en",
     "status": "active"
@@ -77376,7 +77367,7 @@
     "categorySlug": "uefa-champions-league",
     "canonicalKey": "uefa-champions-league:300:13",
     "prompt": "Who scored a halfway line goal for Inter Milan against Schalke in the opening minute in the 2011 Champions League quarter-finals?",
-    "answer": "Dejan Stankovi?",
+    "answer": "Dejan Stanković",
     "pointValue": 300,
     "locale": "en",
     "status": "active"

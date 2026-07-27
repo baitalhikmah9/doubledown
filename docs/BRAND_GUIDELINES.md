@@ -14,7 +14,7 @@ Primary marketing and home surfaces use a **soft, raised-surface** look: control
 
 | Role | Name | Hex (reference) | Usage |
 |------|------|-----------------|--------|
-| Canvas | Warm cream | `#FAF9F6`–`#FDFBF7` | Screen background; slightly warm off-white |
+| Canvas | Warm cream | `#F0EBE3` | Screen background; warm cream with clear contrast vs white surfaces |
 | Surface | Pure white | `#FFFFFF` | Raised cards and primary controls |
 | Text & icons | Charcoal | `#333333` | Primary copy, icons, wordmark on light surfaces |
 | Neumorphic shade | Soft gray | Derived from canvas | Very subtle shadow tones for inset/raised edges |

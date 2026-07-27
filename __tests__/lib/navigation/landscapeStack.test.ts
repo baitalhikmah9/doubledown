@@ -27,7 +27,7 @@ describe('getLandscapeStackScreenOptions', () => {
 
     expect(contentStyle.backgroundColor).toBe(darkCanvas);
     expect(contentStyle.backgroundColor).not.toBe('#FFFFFF');
-    expect(contentStyle.backgroundColor).not.toBe('#FAF9F6');
+    expect(contentStyle.backgroundColor).not.toBe('#F0EBE3');
     expect(options.animation).toBe('fade');
   });
 

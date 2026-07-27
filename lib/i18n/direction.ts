@@ -1,56 +1,46 @@
 import { Platform, type TextStyle, type ViewStyle } from 'react-native';
-import { FONTS } from '@/constants/theme';
 import type { Direction, SupportedLocale } from './config';
-import { getDirection, usesSystemFonts } from './config';
+import { getDirection } from './config';
+import {
+  type FontRole,
+  containsArabicScript,
+  resolveContentFontFamily,
+  resolveLocaleFontFamily,
+  usesArabicScriptFont,
+} from './fonts';
 
-type FontRole =
-  | 'body'
-  | 'bodyMedium'
-  | 'bodySemibold'
-  | 'bodyBold'
-  | 'display'
-  | 'displayBold';
-
-function getSystemFontFamily(role: FontRole): string | undefined {
-  if (Platform.OS === 'android') {
-    if (role === 'bodyMedium' || role === 'bodySemibold' || role === 'bodyBold') {
-      return 'sans-serif-medium';
-    }
-    return 'sans-serif';
-  }
-
-  return undefined;
-}
+export type { FontRole };
 
 export function getLocaleFontFamily(
   locale: SupportedLocale,
   role: FontRole = 'body'
 ): string | undefined {
-  if (usesSystemFonts(locale)) {
-    return getSystemFontFamily(role);
-  }
+  return resolveLocaleFontFamily(locale, role, Platform.OS);
+}
 
-  switch (role) {
-    case 'display':
-      return FONTS.display;
-    case 'displayBold':
-      return FONTS.displayBold;
-    case 'bodyMedium':
-      return FONTS.uiMedium;
-    case 'bodySemibold':
-      return FONTS.uiSemibold;
-    case 'bodyBold':
-      return FONTS.uiBold;
-    case 'body':
-    default:
-      return FONTS.ui;
-  }
+export function getContentFontFamily(
+  locale: SupportedLocale,
+  content: string | null | undefined,
+  role: FontRole = 'body'
+): string | undefined {
+  return resolveContentFontFamily(locale, content, role, Platform.OS);
 }
 
 export function getWritingDirection(
   locale: SupportedLocale
 ): TextStyle['writingDirection'] {
   return getDirection(locale);
+}
+
+export function getContentWritingDirection(
+  locale: SupportedLocale,
+  content?: string | null
+): TextStyle['writingDirection'] {
+  if (containsArabicScript(content) && !usesArabicScriptFont(locale)) {
+    return 'rtl';
+  }
+
+  return getWritingDirection(locale);
 }
 
 export function getDirectionalTextAlign(
@@ -75,4 +65,3 @@ export function getRowDirection(direction: Direction): ViewStyle['flexDirection'
 export function getChevronName(direction: Direction): 'chevron-forward' | 'chevron-back' {
   return direction === 'rtl' ? 'chevron-back' : 'chevron-forward';
 }
-

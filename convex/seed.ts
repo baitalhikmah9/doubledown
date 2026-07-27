@@ -101,12 +101,38 @@ export const seedQuestions = internalMutation({
     ),
   },
   handler: async (ctx, args) => {
+    let inserted = 0;
+    let updated = 0;
+    let skipped = 0;
+
     for (const q of args.questions) {
       const category = await ctx.db
         .query('categories')
         .withIndex('by_slug', (i) => i.eq('slug', q.categorySlug))
         .unique();
-      if (!category) continue;
+      if (!category) {
+        skipped += 1;
+        continue;
+      }
+
+      const existing = await ctx.db
+        .query('questions')
+        .withIndex('by_canonical_locale', (i) =>
+          i.eq('canonicalKey', q.canonicalKey).eq('locale', q.locale)
+        )
+        .unique();
+
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          categoryId: category._id,
+          prompt: q.prompt,
+          answer: q.answer,
+          pointValue: q.pointValue,
+          status: q.status,
+        });
+        updated += 1;
+        continue;
+      }
 
       await ctx.db.insert('questions', {
         categoryId: category._id,
@@ -117,7 +143,33 @@ export const seedQuestions = internalMutation({
         locale: q.locale,
         status: q.status,
       });
+      inserted += 1;
     }
+
+    return { inserted, updated, skipped };
+  },
+});
+
+/** Disable categories whose slugs are not in the current seed import. */
+export const retireCategoriesNotInSeed = internalMutation({
+  args: {
+    activeSlugs: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const active = new Set(args.activeSlugs);
+    const categories = await ctx.db.query('categories').collect();
+    let retired = 0;
+
+    for (const category of categories) {
+      if (active.has(category.slug) || !category.enabled) {
+        continue;
+      }
+
+      await ctx.db.patch(category._id, { enabled: false });
+      retired += 1;
+    }
+
+    return { retired };
   },
 });
 

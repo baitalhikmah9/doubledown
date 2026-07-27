@@ -17,7 +17,10 @@
     "test:coverage": "jest --coverage",
     "eas-build-post-install": "node scripts/patch-standalone-debug-bundle.mjs",
     "lint": "eslint .",
+    "seed:import": "tsx scripts/import-questions-from-csv.ts && tsx scripts/normalize-questions.ts",
     "seed:normalize": "tsx scripts/normalize-questions.ts",
+    "seed:push": "tsx scripts/push-seed-to-convex.ts",
+    "seed:push:prod": "tsx scripts/push-seed-to-convex.ts --prod",
     "topics:transparent": "python3 scripts/transparency-topic-images.py"
   },
   "keywords": [
@@ -38,6 +41,7 @@
   "license": "MIT",
   "dependencies": {
     "@clerk/clerk-expo": "^2.19.30",
+    "@expo-google-fonts/noto-sans-arabic": "^0.4.3",
     "@expo/metro-runtime": "~55.0.11",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@react-native-async-storage/async-storage": "2.2.0",

@@ -51,17 +51,11 @@ function slugify(name: string): string {
     .replace(/^-|-$/g, '');
 }
 
-/** Temporarily hidden topics (questions kept in seed, not playable). */
-const DISABLED_THEME_GROUPS = new Set(['gen11', 'gen25']);
+/** Temporarily hidden topics (not in spreadsheet — do not re-add). */
+const DISABLED_THEME_GROUPS = new Set<string>();
 
 /** Keep stable slugs when display titles change (avoids seed/DB collisions). */
-const SLUG_BY_THEME_GROUP: Record<string, string> = {
-  // Renamed "Who Said This Quote?" → "Famous Quotes"; old famous-quotes was finish-the-blank (removed).
-  gen24: 'who-said-this-quote',
-};
-
-/** Slugs retired from source — disable on re-seed if still in DB. */
-const RETIRED_SLUGS = ['famous-quotes'];
+const SLUG_BY_THEME_GROUP: Record<string, string> = {};
 
 function main() {
   const inputPath = path.join(
@@ -111,16 +105,6 @@ function main() {
   }
 
   const categories = Array.from(categoryMap.values());
-  for (const slug of RETIRED_SLUGS) {
-    if (!categoryMap.has(slug)) {
-      categories.push({
-        slug,
-        title: 'Famous Quotes (retired)',
-        themeGroup: '',
-        enabled: false,
-      });
-    }
-  }
 
   if (!fs.existsSync(seedDir)) {
     fs.mkdirSync(seedDir, { recursive: true });

@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   type ReactNode,
 } from 'react';
@@ -14,7 +15,15 @@ import {
   type Direction,
   type SupportedLocale,
 } from './config';
-import { getDirectionalTextAlign, getLocaleFontFamily, getWritingDirection } from './direction';
+import {
+  getContentFontFamily,
+  getContentWritingDirection,
+  getDirectionalTextAlign,
+} from './direction';
+import {
+  installLocaleFontRemap,
+  setActiveUiFontLocale,
+} from './fonts';
 import en, { type Messages, type TranslationKey } from './messages/en';
 import ar from './messages/ar';
 import es from './messages/es';
@@ -27,6 +36,9 @@ import ru from './messages/ru';
 import id from './messages/id';
 import bn from './messages/bn';
 import { useLocaleHydration, useLocaleStore } from '@/store/locale';
+
+// Remap brand Latin faces → Noto Sans Arabic while UI locale is ar/ur.
+installLocaleFontRemap();
 
 const MESSAGE_MAP: Record<SupportedLocale, Messages> = {
   en,
@@ -58,7 +70,8 @@ interface I18nContextValue {
   getTextStyle: (
     locale?: SupportedLocale,
     role?: 'body' | 'bodyMedium' | 'bodySemibold' | 'bodyBold' | 'display' | 'displayBold',
-    edge?: 'start' | 'center' | 'end'
+    edge?: 'start' | 'center' | 'end',
+    content?: string
   ) => Pick<TextStyle, 'fontFamily' | 'writingDirection' | 'textAlign'>;
 }
 
@@ -80,6 +93,12 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
   const uiLocale = useLocaleStore((state) => state.uiLocale) ?? DEFAULT_UI_LOCALE;
   const contentLocales = useLocaleStore((state) => state.contentLocales);
+
+  // Keep StyleSheet.flatten remap in sync with the active UI locale (incl. first paint).
+  setActiveUiFontLocale(uiLocale);
+  useEffect(() => {
+    setActiveUiFontLocale(uiLocale);
+  }, [uiLocale]);
 
   const value = useMemo<I18nContextValue>(() => {
     const direction = getDirection(uiLocale);
@@ -104,12 +123,15 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
         return interpolate(localized, params);
       },
       getLocaleName: (locale, format = 'native') => getLocaleLabel(locale, format),
-      getTextStyle: (locale = uiLocale, role = 'body', edge = 'start') => {
+      getTextStyle: (locale = uiLocale, role = 'body', edge = 'start', content) => {
         const localeDirection = getDirection(locale);
+        const fontFamily = getContentFontFamily(locale, content, role);
 
         return {
-          fontFamily: getLocaleFontFamily(locale, role),
-          writingDirection: getWritingDirection(locale),
+          // Only set fontFamily when we have a concrete face. `undefined` would not
+          // clear a prior brand fontFamily in a style array on RN.
+          ...(fontFamily ? { fontFamily } : null),
+          writingDirection: getContentWritingDirection(locale, content),
           textAlign: getDirectionalTextAlign(localeDirection, edge),
         };
       },

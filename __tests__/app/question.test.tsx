@@ -200,7 +200,7 @@ describe('PlayQuestionScreen', () => {
     const flat = StyleSheet.flatten(canvas.props.style);
     expect(flat.backgroundColor).toBe(PALETTES.dark.background);
     expect(flat.backgroundColor).not.toBe('#FFFFFF');
-    expect(flat.backgroundColor).not.toBe('#FAF9F6');
+    expect(flat.backgroundColor).not.toBe('#F0EBE3');
   });
 
   it('uses dual party chips for rumble reveals and restores the timing guide across windows', () => {

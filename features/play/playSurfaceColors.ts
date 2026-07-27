@@ -45,7 +45,7 @@ export function getPlaySurfaceColors() {
     /** Web hover on raised option cards. */
     hoverSurface: isDark ? 'rgba(255, 255, 255, 0.06)' : '#FDFCFA',
     /** Full-screen boot / letterbox scrim. */
-    bootScrim: isDark ? 'rgba(7, 17, 31, 0.92)' : 'rgba(250, 249, 246, 0.92)',
+    bootScrim: isDark ? 'rgba(7, 17, 31, 0.92)' : 'rgba(240, 235, 227, 0.92)',
     /**
      * Active-turn score pill face (ember warmth in both themes).
      * Opaque only — semi-transparent faces punch dark strips through nested

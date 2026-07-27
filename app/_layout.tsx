@@ -6,6 +6,12 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar, setStatusBarHidden } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
 import { useFonts } from 'expo-font';
+import {
+  NotoSansArabic_400Regular,
+  NotoSansArabic_500Medium,
+  NotoSansArabic_600SemiBold,
+  NotoSansArabic_700Bold,
+} from '@expo-google-fonts/noto-sans-arabic';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { SplashHider } from '@/components/SplashHider';
 import { WebSeoHead } from '@/components/WebSeoHead';
@@ -16,6 +22,7 @@ import {
   FONTS,
   paletteUsesLightStatusBarContent,
 } from '@/constants/theme';
+import { ARABIC_FONTS } from '@/lib/i18n/fonts';
 import { HOME_SOFT_UI } from '@/themes';
 import { immersiveStatusBarScreenOptions } from '@/lib/navigation/statusBar';
 
@@ -87,6 +94,11 @@ export default function RootLayout() {
     [FONTS.uiMedium]: require('../assets/fonts/GeneralSans-Medium.ttf'),
     [FONTS.uiSemibold]: require('../assets/fonts/GeneralSans-Semibold.ttf'),
     [FONTS.uiBold]: require('../assets/fonts/GeneralSans-Bold.ttf'),
+    // Arabic / Urdu UI (Latin brand faces lack Arabic glyphs)
+    [ARABIC_FONTS.ui]: NotoSansArabic_400Regular,
+    [ARABIC_FONTS.uiMedium]: NotoSansArabic_500Medium,
+    [ARABIC_FONTS.uiSemibold]: NotoSansArabic_600SemiBold,
+    [ARABIC_FONTS.uiBold]: NotoSansArabic_700Bold,
   });
 
   if (fontsLoaded) markOnce('fonts loaded');
