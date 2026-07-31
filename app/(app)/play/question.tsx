@@ -132,7 +132,7 @@ function scaleUpQuestionEmphasis(phase: { fontSize: number; lineHeight: number }
 const MATCH_TOP_BAR_EST_HEIGHT = 0;
 const QUESTION_MAX_SECONDS = 10 * 60;
 
-const WAGER_FAB_ICON = require('@/assets/wager.png');
+const WAGER_FAB_ICON = require('@/assets/wager.webp');
 
 type RumbleChipTranslate = (
   key: string,
@@ -849,6 +849,7 @@ export default function PlayQuestionScreen() {
                       source={WAGER_FAB_ICON}
                       style={styles.answerDockWagerImage}
                       contentFit="contain"
+                      cachePolicy="memory-disk"
                       accessibilityIgnoresInvertColors
                     />
                     <Text style={styles.answerDockWagerText} numberOfLines={1} adjustsFontSizeToFit>

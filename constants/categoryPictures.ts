@@ -101,6 +101,11 @@ export function getCategoryPictureSource(categoryId: string): ImageSource | null
   return LOCAL[categoryId] ?? null;
 }
 
+/** All bundled topic thumbs — for home-screen warm cache. */
+export function getAllCategoryPictureSources(): ImageSource[] {
+  return Object.values(LOCAL);
+}
+
 /** Topic stripe colour (matches TriviaApp Games vs default blue). */
 export function getCategoryBoardAccent(categoryId: string): string {
   return /^g\d+$/.test(categoryId) ? '#10b981' : '#3b82f6';

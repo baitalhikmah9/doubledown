@@ -23,8 +23,8 @@ const FIRE = {
   glow: '#FF3D00', // halo - deeper fire red for the burn
 };
 
-const WAGER_HEADER_ART = require('@/assets/wager.png');
-const HOT_SEAT_HEADER_ART = require('@/assets/hot-seat.png');
+const WAGER_HEADER_ART = require('@/assets/wager.webp');
+const HOT_SEAT_HEADER_ART = require('@/assets/hot-seat.webp');
 
 function isHotSeatConfigured(session: GameSessionState): boolean {
   if (!SHOW_HOT_SEAT_UI) return false;
@@ -118,7 +118,12 @@ export function PlayMatchTopBar({
               pressed && !wagerDimmed && styles.headerFeatureButtonPressed,
             ]}
           >
-            <Image source={WAGER_HEADER_ART} style={styles.headerIconChipImage} contentFit="contain" />
+            <Image
+              source={WAGER_HEADER_ART}
+              style={styles.headerIconChipImage}
+              contentFit="contain"
+              cachePolicy="memory-disk"
+            />
           </Pressable>
         ) : null}
         {showHotSeat ? (
@@ -140,7 +145,12 @@ export function PlayMatchTopBar({
               pressed && !hotSeatDimmed && styles.headerFeatureButtonPressed,
             ]}
           >
-            <Image source={HOT_SEAT_HEADER_ART} style={styles.headerIconChipImage} contentFit="contain" />
+            <Image
+              source={HOT_SEAT_HEADER_ART}
+              style={styles.headerIconChipImage}
+              contentFit="contain"
+              cachePolicy="memory-disk"
+            />
           </Pressable>
         ) : null}
       </View>

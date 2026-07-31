@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Platform,
@@ -44,6 +44,7 @@ import type { GameMode } from '@/features/shared';
 import type { TranslationKey } from '@/lib/i18n/messages/en';
 
 import { markOnce } from '@/lib/startupTiming';
+import { prefetchPlayArtwork } from '@/lib/prefetchPlayArtwork';
 
 const T = HOME_SOFT_UI;
 
@@ -138,6 +139,11 @@ export default function AppHubScreen() {
   const refundEntryMutation = useMutation(api.wallet.refundEntry);
   const [activeModeInfo, setActiveModeInfo] = useState<GameMode | null>(null);
   const [pendingMode, setPendingMode] = useState<GameMode | null>(null);
+
+  // Decode play art into expo-image cache while the user is still on home.
+  useEffect(() => {
+    void prefetchPlayArtwork();
+  }, []);
 
   const viewport = useViewportLayout();
   const insets = useSafeAreaInsets();

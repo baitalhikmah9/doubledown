@@ -23,8 +23,8 @@ import { getLocaleFontFamily, getRowDirection } from '@/lib/i18n/direction';
 import type { SupportedLocale } from '@/lib/i18n/config';
 import type { TranslationKey } from '@/lib/i18n/messages/en';
 
-const WAGER_SECTION_ART = require('@/assets/wager.png');
-const HOT_SEAT_SECTION_ART = require('@/assets/hot-seat.png');
+const WAGER_SECTION_ART = require('@/assets/wager.webp');
+const HOT_SEAT_SECTION_ART = require('@/assets/hot-seat.webp');
 
 const MODE_ROWS: { labelKey: TranslationKey; bodyKey: TranslationKey }[] = [
   { labelKey: 'play.mode.classic', bodyKey: 'play.mode.classicCopy' },

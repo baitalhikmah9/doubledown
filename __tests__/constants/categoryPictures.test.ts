@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  getAllCategoryPictureSources,
   getCategoryPictureSource,
   MISSING_CATEGORY_PICTURE_LABEL,
 } from '@/constants/categoryPictures';
@@ -35,5 +36,11 @@ describe('categoryPictures asset loading', () => {
 
   it('exports MISSING as the placeholder label for absent art', () => {
     expect(MISSING_CATEGORY_PICTURE_LABEL).toBe('MISSING');
+  });
+
+  it('exposes every mapped topic source for home prefetch', () => {
+    const all = getAllCategoryPictureSources();
+    expect(all.length).toBeGreaterThan(50);
+    expect(all.every(Boolean)).toBe(true);
   });
 });

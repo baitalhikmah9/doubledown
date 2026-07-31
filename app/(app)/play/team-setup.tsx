@@ -62,8 +62,8 @@ const RUMBLE_TEAM_COUNT_OPTIONS = [2, 3, 4, 6] as const;
 const MAX_WAGERS_PER_TEAM = 9;
 const MAX_HOT_SEAT_ROUNDS = 5;
 
-const WAGER_CARD_ICON = require('@/assets/wager.png');
-const HOT_SEAT_CARD_ICON = require('@/assets/hot-seat.png');
+const WAGER_CARD_ICON = require('@/assets/wager.webp');
+const HOT_SEAT_CARD_ICON = require('@/assets/hot-seat.webp');
 
 /** Scales rumble team-setup panel so it fits phone landscape and narrow web widths. */
 function getRumbleTeamSetupDensity(windowWidth: number, windowHeight: number) {
@@ -488,6 +488,7 @@ export default function TeamSetupScreen() {
               source={HOT_SEAT_CARD_ICON}
               style={{ width: centerIconSize, height: centerIconSize }}
               contentFit="contain"
+              cachePolicy="memory-disk"
               accessible={false}
             />
             <Text style={[styles.centerCardTitle, themedStyles.centerCardTitle, { fontSize: centerTitleSize }, getTextStyle(undefined, 'display', 'center')]}>
@@ -518,6 +519,7 @@ export default function TeamSetupScreen() {
               source={WAGER_CARD_ICON}
               style={{ width: centerIconSize, height: centerIconSize }}
               contentFit="contain"
+              cachePolicy="memory-disk"
               accessible={false}
             />
             <Text style={[styles.centerCardTitle, themedStyles.centerCardTitle, { fontSize: centerTitleSize }, getTextStyle(undefined, 'display', 'center')]}>
