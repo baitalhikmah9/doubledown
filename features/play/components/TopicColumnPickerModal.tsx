@@ -133,7 +133,13 @@ export function TopicColumnPickerModal({
               <View style={[styles.hero, { minHeight: heroMinHeight, backgroundColor: colors.primary }]}>
                 <View style={styles.heroInner}>
                   {picture ? (
-                    <Image source={picture} style={styles.heroImage as never} contentFit="cover" transition={120} />
+                    <Image
+                      source={picture}
+                      style={styles.heroImage as never}
+                      contentFit="cover"
+                      loading="lazy"
+                      transition={120}
+                    />
                   ) : (
                     <View style={[styles.heroFallback, { backgroundColor: `${accent}28` }]}>
                       <Text

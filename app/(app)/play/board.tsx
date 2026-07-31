@@ -897,6 +897,7 @@ export default function PlayBoardScreen() {
                     source={picture}
                     style={styles.topicImageFill}
                     contentFit={surfaceColors.topicImageContentFit}
+                    loading="lazy"
                     transition={120}
                   />
                 ) : (

@@ -19,6 +19,10 @@ The build script runs `expo export --platform web`, which matches Expo SDK 55's 
 
 The current Expo Router export emits real per-route HTML files, including `dist/play/mode.html`, so Vercel should serve those files directly for known routes. `vercel.json` keeps a catch-all fallback rewrite to `/index.html` for client-side app paths that do not have a matching static file. Vercel serves real static files before rewrites, so route HTML, files under `/_expo/static/**`, `/assets/**`, `/favicon.ico`, and `/_expo/.routes.json` continue to resolve as files.
 
+## Caching
+
+Content-hashed build outputs under `/assets/**` and `/_expo/static/**` are served with `Cache-Control: public, max-age=31536000, immutable` (see `vercel.json`). HTML entry documents stay on Vercel’s default short cache so deploys take effect.
+
 ## Environment Variables
 
 Set public client variables in Vercel Production. Set the same values in Preview only if previews should use real Clerk and Convex services.

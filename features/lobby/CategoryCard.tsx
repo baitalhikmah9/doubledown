@@ -91,6 +91,8 @@ export function CategoryCard({
                             source={illustration} 
                             style={styles.fullImage} 
                             contentFit="cover"
+                            loading="lazy"
+                            priority="low"
                             transition={400}
                         />
                     ) : (

@@ -238,6 +238,9 @@ const CategoryCard = memo(function CategoryCard({
             // has blanked bitmaps on select re-renders. Keep on non-Android only.
             recyclingKey={isAndroid ? undefined : category.slug}
             cachePolicy="memory-disk"
+            // Web: avoid eager-fetch of offscreen cards (FlatList still mounts a window).
+            loading="lazy"
+            priority="low"
             style={styles.cardImage as ImageStyle}
             contentFit={topicImageContentFit}
             transition={isAndroid ? ANDROID_LIST_IMAGE_TRANSITION : WEB_LIST_IMAGE_TRANSITION}

@@ -5,6 +5,9 @@ Make flat grey plate backgrounds transparent for topic PNGs.
 Requires ffmpeg + ffprobe on PATH. Samples corners to pick a per-image key
 colour, then applies libavfilter colorkey. Skips images that do not look like
 a uniform grey canvas (avoids mangling full-bleed art).
+
+Note: shipped art is 512px WebP (`bun run topics:optimize`). Run this on PNG
+masters, then re-optimize before committing.
 """
 
 from __future__ import annotations

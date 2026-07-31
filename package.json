@@ -21,7 +21,8 @@
     "seed:normalize": "tsx scripts/normalize-questions.ts",
     "seed:push": "tsx scripts/push-seed-to-convex.ts",
     "seed:push:prod": "tsx scripts/push-seed-to-convex.ts --prod",
-    "topics:transparent": "python3 scripts/transparency-topic-images.py"
+    "topics:transparent": "python3 scripts/transparency-topic-images.py",
+    "topics:optimize": "python3 scripts/optimize-topic-images.py"
   },
   "keywords": [
     "expo",
