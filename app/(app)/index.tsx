@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Image,
   Platform,
   View,
   Text,
   StyleSheet,
   type ViewStyle,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { showThemedAlert } from '@/store/themedAlert';
 import { Pressable } from '@/components/ui/Pressable';
 import { Ionicons } from '@expo/vector-icons';
@@ -346,9 +346,10 @@ export default function AppHubScreen() {
                     ]}
                   >
                     <Image
-                      source={require('../../assets/qf-settings-button.png')}
+                      source={require('../../assets/qf-settings-button.webp')}
                       style={styles.settingsImage}
-                      resizeMode="contain"
+                      contentFit="contain"
+                      cachePolicy="memory-disk"
                     />
                   </Pressable>
                 }

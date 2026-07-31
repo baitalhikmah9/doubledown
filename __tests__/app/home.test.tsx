@@ -103,9 +103,23 @@ jest.mock('@expo/vector-icons', () => ({
   Ionicons: 'Ionicons',
 }));
 
-jest.mock('expo-image', () => ({
-  Image: 'Image',
-}));
+jest.mock('expo-image', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  function MockImage(props: {
+    accessibilityLabel?: string;
+    testID?: string;
+    accessibilityRole?: string;
+  }) {
+    return React.createElement(View, {
+      accessibilityLabel: props.accessibilityLabel,
+      accessibilityRole: props.accessibilityRole,
+      testID: props.testID,
+    });
+  }
+  MockImage.loadAsync = jest.fn(async () => ({}));
+  return { Image: MockImage };
+});
 
 describe('AppHubScreen', () => {
   beforeEach(async () => {

@@ -1,8 +1,8 @@
 import { Image } from 'expo-image';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-const BACKFIRE_TITLE_LOGO = require('@/assets/bf-in-game-logo.png');
-/** Intrinsic pixel ratio of `bf-in-game-logo.png` (width ÷ height). Update if the asset is replaced. */
+const BACKFIRE_TITLE_LOGO = require('@/assets/bf-in-game-logo.webp');
+/** Intrinsic pixel ratio of the wordmark (width ÷ height). Update if the asset is replaced. */
 const BACKFIRE_TITLE_LOGO_ASPECT_RATIO = 1536 / 384;
 
 type BackfireTitleLogoProps = {
@@ -24,6 +24,7 @@ export function BackfireTitleLogo({
         source={BACKFIRE_TITLE_LOGO}
         style={[styles.logo, { width }]}
         contentFit="contain"
+        cachePolicy="memory-disk"
         accessibilityRole="image"
         accessibilityLabel={accessibilityLabel}
         testID={testID}
