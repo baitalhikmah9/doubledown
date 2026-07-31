@@ -7,6 +7,7 @@ import {
   getBoardGridRowSpacerCount,
   getBoardGridVerticalInsets,
   getBoardPointTileBox,
+  getBoardRailWidth,
   getBoardTopicCellBox,
   getBoardTopicGridAlignment,
   maxRowHeightForFixedRailTiles,
@@ -14,14 +15,17 @@ import {
 } from '@/features/play/boardLayout';
 
 describe('board topic grid alignment', () => {
-  it('vertically centers the topic grid and centers incomplete last rows (no left spacers)', () => {
-    const alignment = getBoardTopicGridAlignment();
+  it('Y-centers single-row boards and top-aligns multi-row boards (equal edge cream)', () => {
+    const single = getBoardTopicGridAlignment({ gridRowCount: 1 });
+    const multi = getBoardTopicGridAlignment({ gridRowCount: 2 });
 
     // Single-row boards (quick play 3 topics) sit mid-viewport, not flush under the header.
-    expect(alignment.contentJustifyContent).toBe('center');
+    expect(single.contentJustifyContent).toBe('center');
+    // Classic 2-row boards fill from the top so header gap matches bottom edge pad.
+    expect(multi.contentJustifyContent).toBe('flex-start');
     // Rows cluster remaining topics in the middle (like topic select), not left + empty.
-    expect(alignment.rowJustifyContent).toBe('center');
-    expect(alignment.padIncompleteRowsWithSpacers).toBe(false);
+    expect(single.rowJustifyContent).toBe('center');
+    expect(single.padIncompleteRowsWithSpacers).toBe(false);
   });
 
   it('uses fixed cell boxes so a 2-of-3 last row can center at full-row cell width', () => {
@@ -35,7 +39,7 @@ describe('board topic grid alignment', () => {
   });
 
   it('does not insert empty flex spacers on incomplete rows when centering is enabled', () => {
-    const alignment = getBoardTopicGridAlignment();
+    const alignment = getBoardTopicGridAlignment({ gridRowCount: 2 });
     // 5 topics → row of 3 + row of 2 under a 3-column grid.
     expect(getBoardGridRowSpacerCount(2, 3, alignment.padIncompleteRowsWithSpacers)).toBe(0);
     expect(getBoardGridRowSpacerCount(3, 3, alignment.padIncompleteRowsWithSpacers)).toBe(0);
@@ -100,41 +104,33 @@ describe('board topic grid alignment', () => {
     ).toBeGreaterThan(400);
   });
 
-  it('does not double-stack home-indicator inset into iOS grid bottom padding', () => {
+  it('keeps top/bottom grid edge padding equal (no home-indicator double-stack)', () => {
     // SafeAreaView already applies bottom inset on the board scaffold.
+    // All platforms use the same edge pad so top and bottom match.
     expect(
       getBoardGridBottomPadding({
         platform: 'ios',
         bottomInset: 21,
-        spacingSm: 8,
+        spacingSm: 12,
         spacingXs: 4,
       })
-    ).toBe(8);
+    ).toBe(12);
     expect(
       getBoardGridBottomPadding({
         platform: 'web',
         bottomInset: 0,
-        spacingSm: 8,
+        spacingSm: 12,
         spacingXs: 4,
       })
-    ).toBe(8);
-    // Android keeps prior behavior (max(inset, xs) + sm).
+    ).toBe(12);
     expect(
       getBoardGridBottomPadding({
         platform: 'android',
         bottomInset: 16,
-        spacingSm: 8,
+        spacingSm: 12,
         spacingXs: 4,
       })
-    ).toBe(24);
-    expect(
-      getBoardGridBottomPadding({
-        platform: 'android',
-        bottomInset: 0,
-        spacingSm: 8,
-        spacingXs: 4,
-      })
-    ).toBe(12); // max(0, xs) + sm — prior native formula
+    ).toBe(12);
   });
 
   it('keeps only edge padding when stacked rows already fill the viewport', () => {
@@ -291,7 +287,7 @@ describe('computeBoardVerticalLayout', () => {
     expect(layout.topicImageHeight).toBeLessThan(180 * 1.2);
   });
 
-  it('lets fixed-rail web tiles grow much taller than square-tile geometry allows', () => {
+  it('lets fill-rail tiles grow much taller than square-tile geometry allows', () => {
     // Desktop cell for 3 topics in a ~1400px column.
     const cellWidth = 448;
     const artGap = 6;
@@ -299,6 +295,7 @@ describe('computeBoardVerticalLayout', () => {
     const titleHeight = 36;
     const centerBlockGap = 2;
     const ratio = 1.18;
+    const railWidth = getBoardRailWidth(cellWidth);
 
     const squareMax = maxRowHeightForSquareTiles({
       cellWidth,
@@ -311,25 +308,26 @@ describe('computeBoardVerticalLayout', () => {
     });
     const fixedRailMax = maxRowHeightForFixedRailTiles({
       cellWidth,
-      railWidth: 54,
+      railWidth,
       artGap,
       titleHeight,
       centerBlockGap,
-      maxArtAspect: 1.55,
+      maxArtAspect: 2.6,
     });
 
-    // Fixed rails grow past square geometry without consuming the full desktop window.
+    // Fill rails grow past square geometry so tall windows use the body height.
     expect(squareMax).toBeLessThan(340);
     expect(fixedRailMax).toBeGreaterThan(squareMax);
-    expect(fixedRailMax).toBeGreaterThan(400);
-    expect(fixedRailMax).toBeLessThan(600);
+    expect(fixedRailMax).toBeGreaterThan(600);
   });
 
-  it('grows a single-row board past square-tile geometry without filling the whole window', () => {
+  it('grows a single-row board to cover most of a tall viewport', () => {
     const viewportHeight = 792;
     const gridVerticalPadding = 12;
+    const cellWidth = 448;
+    const railWidth = getBoardRailWidth(cellWidth);
     const squareMax = maxRowHeightForSquareTiles({
-      cellWidth: 448,
+      cellWidth,
       artGap: 6,
       railChrome: 12 * 2 + 6,
       maxQuestionRows: 3,
@@ -340,12 +338,12 @@ describe('computeBoardVerticalLayout', () => {
     const maxR = Math.max(
       squareMax,
       maxRowHeightForFixedRailTiles({
-        cellWidth: 448,
-        railWidth: 54,
+        cellWidth,
+        railWidth,
         artGap: 6,
         titleHeight: 36,
         centerBlockGap: 2,
-        maxArtAspect: 1.55,
+        maxArtAspect: 2.6,
       })
     );
     const layout = computeBoardVerticalLayout({
@@ -361,9 +359,18 @@ describe('computeBoardVerticalLayout', () => {
     });
 
     const usable = viewportHeight - gridVerticalPadding;
-    // Larger than the old square-tile island, but not edge-to-edge on a tall window.
+    // Larger than the old square-tile island and covers most of the body.
     expect(layout.boardRowHeight).toBeGreaterThan(squareMax * 0.95);
-    expect(layout.boardRowHeight).toBeLessThan(usable * 0.75);
+    expect(layout.boardRowHeight).toBeGreaterThan(usable * 0.85);
+    expect(layout.boardRowHeight).toBeLessThanOrEqual(usable + 0.01);
+  });
+});
+
+describe('getBoardRailWidth', () => {
+  it('scales with cell width and clamps phone/ultrawide extremes', () => {
+    expect(getBoardRailWidth(180)).toBe(42); // floor
+    expect(getBoardRailWidth(300)).toBe(60); // 20%
+    expect(getBoardRailWidth(900)).toBe(128); // ceiling
   });
 });
 
@@ -374,19 +381,19 @@ describe('getBoardPointTileBox', () => {
     ).toEqual({ width: 72, height: 72, railWidth: 72 });
   });
 
-  it('keeps web rail width fixed and allows taller-than-wide tiles', () => {
+  it('fills the rail width so pills scale horizontally with the cell', () => {
     expect(
-      getBoardPointTileBox({ pillHeight: 220, railWidth: 54, squareTiles: false })
-    ).toEqual({ width: 54, height: 220, railWidth: 54 });
-    // Short pills stay nearly square within the rail.
+      getBoardPointTileBox({ pillHeight: 220, railWidth: 90, squareTiles: false })
+    ).toEqual({ width: 90, height: 220, railWidth: 90 });
+    // Short pills still span the full rail (equal width stack).
     expect(
-      getBoardPointTileBox({ pillHeight: 48, railWidth: 54, squareTiles: false })
-    ).toEqual({ width: 48, height: 48, railWidth: 54 });
+      getBoardPointTileBox({ pillHeight: 48, railWidth: 90, squareTiles: false })
+    ).toEqual({ width: 90, height: 48, railWidth: 90 });
   });
 });
 
 describe('getBoardContentMaxWidth', () => {
-  it('gives web a modest bump over playMaxWidth without full-bleed', () => {
+  it('uses the full inner width (near full-bleed; gutters applied outside)', () => {
     const web = getBoardContentMaxWidth({
       platform: 'web',
       windowWidth: 1440,
@@ -395,13 +402,10 @@ describe('getBoardContentMaxWidth', () => {
       playMaxWidth: 1120,
       playWideMaxWidth: 1400,
     });
-    // playMaxWidth * 1.08 = 1209.6 → 1210
-    expect(web).toBe(1210);
-    expect(web).toBeGreaterThan(1120);
-    expect(web).toBeLessThan(1400);
+    expect(web).toBe(1408);
   });
 
-  it('still respects the window when it is narrower than the soft cap', () => {
+  it('still respects the window when it is narrower than legacy caps', () => {
     expect(
       getBoardContentMaxWidth({
         platform: 'web',
@@ -414,7 +418,7 @@ describe('getBoardContentMaxWidth', () => {
     ).toBe(968);
   });
 
-  it('keeps native wide boards on playMaxWidth', () => {
+  it('uses full inner width on native wide boards', () => {
     expect(
       getBoardContentMaxWidth({
         platform: 'ios',

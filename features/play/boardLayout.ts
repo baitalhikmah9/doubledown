@@ -9,8 +9,11 @@
 
 /** Alignment policy for the board topic grid (quick play 1–5, classic 6). */
 export type BoardTopicGridAlignment = {
-  /** Vertically center topic rows when content is shorter than the viewport. */
-  contentJustifyContent: 'center';
+  /**
+   * Single-row boards Y-center in leftover height; multi-row boards start at the
+   * top edge pad so top/bottom cream stays equal (no extra band under the header).
+   */
+  contentJustifyContent: 'center' | 'flex-start';
   /** Horizontally center topics within each row. */
   rowJustifyContent: 'center';
   /**
@@ -21,9 +24,12 @@ export type BoardTopicGridAlignment = {
   padIncompleteRowsWithSpacers: false;
 };
 
-export function getBoardTopicGridAlignment(): BoardTopicGridAlignment {
+export function getBoardTopicGridAlignment(options?: {
+  gridRowCount?: number;
+}): BoardTopicGridAlignment {
+  const rows = Math.max(1, Math.floor(options?.gridRowCount ?? 1));
   return {
-    contentJustifyContent: 'center',
+    contentJustifyContent: rows <= 1 ? 'center' : 'flex-start',
     rowJustifyContent: 'center',
     padIncompleteRowsWithSpacers: false,
   };
@@ -99,11 +105,19 @@ export function getBoardBodyHeight(input: {
 }
 
 /**
- * Bottom content pad for the board topic grid.
+ * Equal top/bottom content pad for the board topic grid.
  *
  * Play board uses `safeAreaEdges={['bottom']}`, so SafeAreaView already clears
- * the home indicator. Re-adding `bottomInset` here double-stacks cream under the
- * grid on iOS (~insets.bottom + spacingSm). Web and Android keep their prior pad.
+ * the home indicator. Do not re-add `bottomInset` here or cream double-stacks
+ * under the grid on iOS. Prefer the same value for top and bottom.
+ */
+export function getBoardGridEdgePadding(edgePadding: number): number {
+  return Math.max(0, edgePadding);
+}
+
+/**
+ * @deprecated Prefer {@link getBoardGridEdgePadding} so top/bottom stay matched.
+ * Kept for callers that still need platform-specific bottom pad math.
  */
 export function getBoardGridBottomPadding(input: {
   platform: string;
@@ -111,11 +125,11 @@ export function getBoardGridBottomPadding(input: {
   spacingSm: number;
   spacingXs: number;
 }): number {
-  if (input.platform === 'web' || input.platform === 'ios') {
-    return Math.max(0, input.spacingSm);
-  }
-  // Android: still reserve max(inset, xs) + sm (gesture/nav bars vary by device).
-  return Math.max(Math.max(0, input.bottomInset), Math.max(0, input.spacingXs)) + Math.max(0, input.spacingSm);
+  // Same edge pad on all platforms; SafeAreaView owns home-indicator / nav inset.
+  void input.platform;
+  void input.bottomInset;
+  void input.spacingXs;
+  return getBoardGridEdgePadding(input.spacingSm);
 }
 
 export type BoardVerticalLayoutInput = {
@@ -225,9 +239,18 @@ export function maxRowHeightForFixedRailTiles(input: {
 }
 
 /**
+ * Point-rail width scales with the topic cell so 100/200/300 controls grow
+ * with the board instead of staying a fixed ~50–56pt strip.
+ */
+export function getBoardRailWidth(cellWidth: number): number {
+  // ~20% of cell per rail; floor keeps 3-digit scores readable on phones.
+  return Math.round(clamp(Math.max(0, cellWidth) * 0.2, 42, 128));
+}
+
+/**
  * Point control size for a resolved pill height and rail width.
- * Native keeps squares (side = pill height, rail grows). Web keeps the rail
- * width fixed and allows taller-than-wide tiles so rows can fill the window.
+ * Square mode: side = pill height (rail expands). Fill mode: tile spans the
+ * full rail width so pills scale horizontally with the cell.
  */
 export function getBoardPointTileBox(input: {
   pillHeight: number;
@@ -243,18 +266,19 @@ export function getBoardPointTileBox(input: {
       railWidth: Math.max(input.railWidth, Math.ceil(height)),
     };
   }
-  const width = Math.max(1, Math.min(height, Math.max(1, input.railWidth)));
+  const rail = Math.max(1, input.railWidth);
   return {
-    width,
+    width: rail,
     height,
-    railWidth: Math.max(1, input.railWidth),
+    railWidth: rail,
   };
 }
 
 /**
- * Horizontal max width for the play board center column on large viewports.
- * Web gets a modest bump over the phone-landscape column so topics read larger
- * without stretching edge-to-edge on desktop monitors.
+ * Horizontal max width for the play board center column.
+ * Near full-bleed: screen gutters are applied outside as padLeft/padRight;
+ * playMaxWidth / playWideMaxWidth stay in the signature for callers but no
+ * longer cap the board (client: board should cover nearly the whole width).
  */
 export function getBoardContentMaxWidth(input: {
   platform: string;
@@ -264,16 +288,12 @@ export function getBoardContentMaxWidth(input: {
   playMaxWidth: number;
   playWideMaxWidth: number;
 }): number {
-  const inner = Math.max(0, input.innerWidth);
-  if (input.windowWidth < input.wideBreakpoint) {
-    return Math.floor(inner * 0.94);
-  }
-  if (input.platform === 'web') {
-    // Between playMaxWidth and a soft desktop cap — not full-bleed.
-    const webSoftCap = Math.min(input.playWideMaxWidth, Math.round(input.playMaxWidth * 1.08));
-    return Math.min(inner, webSoftCap);
-  }
-  return Math.min(inner, input.playMaxWidth);
+  void input.platform;
+  void input.windowWidth;
+  void input.wideBreakpoint;
+  void input.playMaxWidth;
+  void input.playWideMaxWidth;
+  return Math.max(0, Math.floor(input.innerWidth));
 }
 
 /**

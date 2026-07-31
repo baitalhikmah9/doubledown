@@ -64,7 +64,7 @@ function getBoardMetrics(
     Math.max(1, height) - padding * 2 - titleHeight - rowGap * rows
   );
   const cellHeight = availableForCells / rows;
-  const pointFontSize = clamp(Math.min(fontSizes.pointValue, cellHeight * 0.44, columnWidth * 0.28), 6, 22);
+  const pointFontSize = clamp(Math.min(fontSizes.pointValue, cellHeight * 0.44, columnWidth * 0.28), 6, 40);
 
   return {
     padding,

@@ -28,9 +28,10 @@ export function getResponsivePlayFontSizes(width: number, height: number, textSc
     topicTitle: scaled(scaleFont(14, 12, 18, width, height)),
     headerButton: scaled(scaleFont(14, 13, 18, width, height)),
     teamName: scaled(scaleFont(18, 16, 24, width, height)),
-    scoreValue: scaled(scaleFont(20, 18, 28, width, height)),
-    categoryTitle: scaled(scaleFont(15, 14, 22, width, height)),
-    pointValue: scaled(scaleFont(16, 14, 22, width, height)),
+    scoreValue: scaled(scaleFont(20, 18, 36, width, height)),
+    categoryTitle: scaled(scaleFont(15, 14, 26, width, height)),
+    // Point pills track tile size up to a high ceiling (board also clamps to tile).
+    pointValue: scaled(scaleFont(16, 14, 40, width, height)),
   };
 }
 

@@ -21,8 +21,8 @@ import {
   computeBoardVerticalLayout,
   getBoardBodyHeight,
   getBoardContentMaxWidth,
-  getBoardGridBottomPadding,
   getBoardPointTileBox,
+  getBoardRailWidth,
   getBoardTopicCellBox,
   getBoardTopicGridAlignment,
   maxRowHeightForFixedRailTiles,
@@ -156,7 +156,7 @@ function computeTopicFit(
   innerWidth: number,
   m: BoardMetrics,
   cols: number,
-  screenWidth: number
+  _screenWidth: number
 ): {
   cellWidth: number;
   groupWidth: number;
@@ -170,22 +170,15 @@ function computeTopicFit(
   const usableRow = Math.max(0, innerWidth);
   const safeCols = Math.max(1, cols);
   const cellWidth = Math.max(1, (usableRow - m.gridGap * (safeCols - 1)) / safeCols);
-  // Web wide: use nearly the full cell for art so fill-layout cards stay dense.
-  const web = Platform.OS === 'web' && screenWidth >= 900;
-  const railWidth = web ? 54 : screenWidth < 620 ? 50 : 56;
-  const artGap = web ? 6 : screenWidth < 620 ? 6 : 8;
+  // Rails + art fill the cell so the board spans the full row width.
+  const railWidth = getBoardRailWidth(cellWidth);
+  const artGap = cellWidth < 200 ? 5 : cellWidth < 320 ? 6 : 8;
   const horizontalChrome = railWidth * 2 + artGap * 2;
-  const maxCenterWidth = Math.max(56, Math.floor(cellWidth - horizontalChrome));
-  const preferredCenterWidth = web
-    ? Math.max(160, Math.floor(maxCenterWidth * 0.96))
-    : screenWidth < 620
-      ? 116
-      : 152;
-  const centerWidth = Math.max(56, Math.min(preferredCenterWidth, maxCenterWidth));
+  const centerWidth = Math.max(48, Math.floor(cellWidth - horizontalChrome));
   const groupWidth = horizontalChrome + centerWidth;
-  const topicImageSize = Math.max(48, Math.min(m.topicImageSize, centerWidth));
-  // Title tracks art width so long names wrap like phone (not a wider orphan band).
-  const titleWidth = Math.min(Math.max(centerWidth, web ? centerWidth : 160), cellWidth);
+  // Art uses the full center band so columns grow with the screen.
+  const topicImageSize = Math.max(48, centerWidth);
+  const titleWidth = Math.min(Math.max(centerWidth, 120), cellWidth);
   const lineHeight = Math.round(m.topicTitleFont * 1.12);
   // Two-line budget - phone-like density; avoids a tall empty title slab under art.
   const titleHeight = Math.max(Math.round(lineHeight * 2.15), Math.round(m.topicTitleFont * 2.2));
@@ -451,35 +444,29 @@ export default function PlayBoardScreen() {
   const responsiveFontSizes = useResponsivePlayFontSizes();
   const playTextScale = usePlayTextScale();
   const isWebBoard = Platform.OS === 'web' && width >= BREAKPOINTS.wide;
-  /** Web: fixed rail width + rectangular tiles so row height can fill the window. */
-  const useFixedRailTiles = isWebBoard;
   const metrics = useMemo(() => {
     const baseMetrics = getBoardMetrics(height, width);
-    // Web: slightly denser than roomy desktop defaults, without ballooning.
+    // Wide web: denser gaps so larger cards still fit edge-to-edge.
     const webDense = isWebBoard
       ? {
           gridGap: Math.min(baseMetrics.gridGap, 16),
-          topicImageSize: Math.min(Math.max(baseMetrics.topicImageSize, 168), 220),
           topicArtGap: Math.min(baseMetrics.topicArtGap, 12),
           pointRailGap: Math.min(baseMetrics.pointRailGap, 12),
           pointRailClipBleed: Math.min(baseMetrics.pointRailClipBleed, 6),
-          tileFont: Math.min(baseMetrics.tileFont, 18),
-          topicTitleFont: Math.min(baseMetrics.topicTitleFont, 16),
         }
       : null;
     const topicTitleFont = Math.round((isWebBoard
-      ? scaleFont(18, 15, 22, width, height)
-      : scaleFont(20, 18, 26, width, height)) * playTextScale);
+      ? scaleFont(18, 15, 28, width, height)
+      : scaleFont(20, 18, 28, width, height)) * playTextScale);
     return {
       ...baseMetrics,
       ...webDense,
-      tileFont: isWebBoard
-        ? Math.round(scaleFont(15, 13, 18, width, height) * playTextScale)
-        : responsiveFontSizes.pointValue,
+      // Cap high enough that tile-side * 0.42 is the real limit on large screens.
+      tileFont: Math.round(scaleFont(16, 13, 40, width, height) * playTextScale),
       topicTitleFont,
       scoreFont: responsiveFontSizes.scoreValue,
     };
-  }, [height, isWebBoard, playTextScale, responsiveFontSizes, width]);
+  }, [height, isWebBoard, playTextScale, responsiveFontSizes.scoreValue, width]);
   const topicArtHeightRatio = useMemo(() => getTopicArtHeightRatio(height), [height]);
   const bodyPadLeft = Math.max(insets.left, LAYOUT.screenGutter);
   const bodyPadRight = Math.max(insets.right, LAYOUT.screenGutter);
@@ -510,24 +497,19 @@ export default function PlayBoardScreen() {
     () => computeTopicFit(boardLayoutWidth, metrics, gridColumnCount, width),
     [boardLayoutWidth, metrics, gridColumnCount, width]
   );
-  // Top matches question chrome→content gap. Bottom pad must not re-add
-  // SafeAreaView's home-indicator inset (iOS double-stacked ~50pt cream).
-  const gridTopPadding = SPACING.xs;
-  const gridBottomPadding = getBoardGridBottomPadding({
-    platform: Platform.OS,
-    bottomInset: insets.bottom,
-    spacingSm: SPACING.sm,
-    spacingXs: SPACING.xs,
-  });
+  // Equal cream above first topic row and below last row (header chrome uses the same value).
+  // SafeAreaView already clears the home indicator — do not re-add bottomInset here.
+  const gridEdgePadding = SPACING.md;
+  const gridTopPadding = gridEdgePadding;
+  const gridBottomPadding = gridEdgePadding;
   const gridVerticalPadding = gridTopPadding + gridBottomPadding;
   const maxQuestionRows = Math.max(1, ...grouped.map((column) => column.rows.length));
   /** Matches topicCenterBlock gap so pill rail targets image + title stack. */
   const topicCenterBlockGap = 2;
   /**
-   * Width cap on row content height.
-   * Native: square tiles grow with R — must stay inside the cell.
-   * Web: fixed rails + rectangular tiles — only soft-cap extreme art aspect so
-   * tall browser windows fill with larger cards instead of cream dead space.
+   * Soft-cap extreme portrait art on ultrawide+tall monitors while still
+   * covering most of the body height. Floor with square-tile geometry so dense
+   * phone boards never shrink below the old square fit.
    */
   const railChrome =
     metrics.pointRailGap * Math.max(0, maxQuestionRows - 1) + metrics.pointRailClipBleed;
@@ -540,27 +522,25 @@ export default function PlayBoardScreen() {
     centerBlockGap: topicCenterBlockGap,
     topicArtHeightRatio,
   });
-  // Web: grow past square-tile geometry a bit so 3-topic boards are not tiny,
-  // but keep a modest art aspect so the board does not eat the whole window.
-  const maxRowContentHeight = useFixedRailTiles
-    ? Math.max(
-        squareRowCap,
-        maxRowHeightForFixedRailTiles({
-          cellWidth: topicFit.cellWidth,
-          railWidth: topicFit.railWidth,
-          artGap: topicFit.artGap,
-          titleHeight: topicFit.titleHeight,
-          centerBlockGap: topicCenterBlockGap,
-          maxArtAspect: 1.55,
-        })
-      )
-    : squareRowCap;
+  const maxRowContentHeight = Math.max(
+    squareRowCap,
+    maxRowHeightForFixedRailTiles({
+      cellWidth: topicFit.cellWidth,
+      railWidth: topicFit.railWidth,
+      artGap: topicFit.artGap,
+      titleHeight: topicFit.titleHeight,
+      centerBlockGap: topicCenterBlockGap,
+      // Allow tall fill so single-row boards cover most of the body.
+      maxArtAspect: 2.6,
+    })
+  );
   /**
    * Fixed body height under the match header. Prefer window math over onLayout:
    * the edge-to-edge scaffold often measures content height only, which zeros out
    * free-space centering and leaves 3-topic boards stuck under the header.
+   * Reserve must match real chrome: equal edge pad + score pill row (not question-screen ~108).
    */
-  const matchHeaderReserve = height < 420 ? 88 : 108;
+  const matchHeaderReserve = gridEdgePadding + (height < 420 ? 52 : 64);
   const boardBodyHeight = getBoardBodyHeight({
     windowHeight: height,
     bottomInset: Math.max(insets.bottom, 0),
@@ -601,30 +581,20 @@ export default function PlayBoardScreen() {
   );
   const fittedBoardRowHeight = verticalLayout.boardRowHeight;
   const topicRowGap = verticalLayout.topicRowGap;
-  const topicGridAlignment = getBoardTopicGridAlignment();
+  // Multi-row boards fill from the top with equal edge pads; single-row still Y-centers.
+  const topicGridAlignment = getBoardTopicGridAlignment({ gridRowCount: gridRows.length });
   const topicCellBox = getBoardTopicCellBox(topicFit.cellWidth, fittedBoardRowHeight);
-  /** 100/200/300 control box — square on native; fixed-rail rectangles on web. */
+  /** 100/200/300 control box — full rail width, height from vertical fill. */
   const pointTileBox = getBoardPointTileBox({
     pillHeight: verticalLayout.pointPillHeight,
     railWidth: topicFit.railWidth,
-    squareTiles: !useFixedRailTiles,
+    squareTiles: false,
   });
   const pointTileWidth = pointTileBox.width;
   const pointTileHeight = pointTileBox.height;
   const pointRailWidth = pointTileBox.railWidth;
-  /**
-   * Art width: web fills the cell center (rails fixed) so columns scale with the
-   * window; native still tracks preferred portrait art width under square tiles.
-   */
-  const topicArtWidth = useFixedRailTiles
-    ? Math.max(48, topicFit.centerWidth)
-    : Math.max(
-        48,
-        Math.min(
-          topicFit.centerWidth,
-          Math.floor(verticalLayout.topicImageHeight / topicArtHeightRatio)
-        )
-      );
+  /** Art fills the cell center so columns scale with the window. */
+  const topicArtWidth = Math.max(48, topicFit.centerWidth);
   const topicGroupWidth = 2 * (pointRailWidth + topicFit.artGap) + topicArtWidth;
   const topicTitleWidth = Math.min(topicFit.titleWidth, Math.max(topicArtWidth, 120));
   /** Squircle corners (~14pt), never height/2 (that makes a pill). */
@@ -1000,8 +970,9 @@ export default function PlayBoardScreen() {
         /** Top edge skipped while status bar is hidden; keep bottom for home-indicator clearance. */
         safeAreaEdges={['bottom']}
         chromeColumnStyle={{
-          // Top pad comes from PlayScaffold (question-screen standard / with insets).
-          paddingBottom: SPACING.xs,
+          // Match grid edge pad — do not use question-screen chromeTopPad (~24 web).
+          paddingTop: gridEdgePadding,
+          paddingBottom: 0,
         }}
       >
         {wager && !showWagerSelector ? (
@@ -1401,14 +1372,12 @@ const styles = StyleSheet.create({
   },
   boardCenterContainer: {
     width: '100%',
-    maxWidth: LAYOUT.playMaxWidth,
     alignSelf: 'center',
     flexGrow: 0,
     flexShrink: 0,
   },
   headerCenterWrap: {
     width: '100%',
-    maxWidth: LAYOUT.playMaxWidth,
     alignSelf: 'center',
     overflow: 'visible',
   },
