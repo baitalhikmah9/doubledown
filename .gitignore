@@ -70,6 +70,7 @@ tmp_logo_audit/
 *.aab
 build/
 eas-build/
+.asc/
 
 # Testing
 coverage/

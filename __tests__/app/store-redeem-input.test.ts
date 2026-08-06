@@ -7,8 +7,13 @@ import path from 'node:path';
 
 const storePath = path.join(__dirname, '../../app/(app)/store.tsx');
 
-describe('store redeem input dark mode', () => {
+describe('store redeem input', () => {
   const source = fs.readFileSync(storePath, 'utf8');
+
+  it('does not expose promo-code redemption on iOS', () => {
+    expect(source).toContain("const IS_IOS_PLATFORM = Platform.OS === 'ios'");
+    expect(source).toMatch(/!IS_IOS_PLATFORM\s*&&\s*\([\s\S]*styles\.redeemSection/);
+  });
 
   it('does not hard-code pure white on redeemInput styles', () => {
     // The StyleSheet redeemInput block must not pin backgroundColor: '#FFFFFF'.

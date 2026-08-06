@@ -16,7 +16,7 @@
       "supportsTablet": true,
       "requireFullScreen": true,
       "usesAppleSignIn": true,
-      "buildNumber": "8",
+      "buildNumber": "11",
       "bundleIdentifier": "com.playbackfire.app",
       "infoPlist": {
         "UIStatusBarHidden": true,

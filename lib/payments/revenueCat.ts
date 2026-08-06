@@ -38,6 +38,9 @@ export interface RevenueCatSessionState {
   error: string | null;
 }
 
+export const STORE_PRODUCTS_UNAVAILABLE_ERROR =
+  'Store products are temporarily unavailable. Please try again shortly.';
+
 type PurchasesModule = Record<string, unknown> & {
   default?: Record<string, unknown>;
 };
@@ -95,6 +98,21 @@ function envFlagEnabled(value: string | undefined): boolean {
   return normalized === '1' || normalized === 'true' || normalized === 'yes';
 }
 
+function getConfiguredStoreApiKey(): string | null {
+  const iosKey =
+    process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY ?? getExtraString('revenueCatIosApiKey');
+  const androidKey =
+    process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY ?? getExtraString('revenueCatAndroidApiKey');
+
+  if (Platform.OS === 'ios') return iosKey ?? null;
+  if (Platform.OS === 'android') return androidKey ?? null;
+  return null;
+}
+
+function isProductionStoreApiKey(apiKey: string | null | undefined): boolean {
+  return !!apiKey && (apiKey.startsWith('appl_') || apiKey.startsWith('goog_'));
+}
+
 /**
  * Prefer RevenueCat Test Store unless production explicitly opts in.
  *
@@ -103,10 +121,13 @@ function envFlagEnabled(value: string | undefined): boolean {
  * App Store / Play keys. Metro (__DEV__), EAS development/preview, and local
  * debug APKs should always hit Test Store.
  *
- * Production store keys are used only when:
+ * Production store keys are used when:
  * - EXPO_PUBLIC_REVENUECAT_USE_PRODUCTION_STORE=1 (EAS production / release), and
  * - not __DEV__ / Constants.debugMode, and
  * - not EXPO_PUBLIC_REVENUECAT_USE_TEST_STORE=1
+ *
+ * Release builds that bake in appl_/goog_ keys also use the real store even if
+ * the explicit opt-in flag is missing from the embedded bundle.
  */
 export function shouldUseRevenueCatTestStore(): boolean {
   if (typeof __DEV__ !== 'undefined' && __DEV__) return true;
@@ -118,6 +139,10 @@ export function shouldUseRevenueCatTestStore(): boolean {
     return false;
   }
 
+  if (isProductionStoreApiKey(getConfiguredStoreApiKey())) {
+    return false;
+  }
+
   return true;
 }
 
@@ -126,14 +151,7 @@ export function getRevenueCatApiKey(): string | null {
     return REVENUECAT_TEST_STORE_API_KEY;
   }
 
-  const iosKey =
-    process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY ?? getExtraString('revenueCatIosApiKey');
-  const androidKey =
-    process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY ?? getExtraString('revenueCatAndroidApiKey');
-
-  if (Platform.OS === 'ios') return iosKey ?? null;
-  if (Platform.OS === 'android') return androidKey ?? null;
-  return null;
+  return getConfiguredStoreApiKey();
 }
 
 export function isRevenueCatSupported(): boolean {
@@ -376,6 +394,16 @@ export async function logOutRevenueCat(): Promise<void> {
   } finally {
     clearRevenueCatSessionState();
   }
+}
+
+export function getMissingStoreProductIds(
+  requestedProductIds: string[],
+  products: Pick<StoreProductInfo, 'identifier'>[]
+): string[] {
+  const availableProductIds = new Set(products.map((product) => product.identifier));
+  return Array.from(new Set(requestedProductIds.filter(Boolean))).filter(
+    (productId) => !availableProductIds.has(productId)
+  );
 }
 
 export async function getStoreProducts(productIds: string[]): Promise<StoreProductInfo[]> {

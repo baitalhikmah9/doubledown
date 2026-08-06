@@ -66,7 +66,8 @@ function getPromoErrorMessage(error?: string) {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-const IS_NATIVE_PLATFORM = Platform.OS === 'ios' || Platform.OS === 'android';
+const IS_IOS_PLATFORM = Platform.OS === 'ios';
+const IS_NATIVE_PLATFORM = IS_IOS_PLATFORM || Platform.OS === 'android';
 
 // ── Sub-components ─────────────────────────────────────────────────────────
 
@@ -437,6 +438,7 @@ export default function StoreScreen() {
           <View
             style={[
               styles.storeBody,
+              IS_IOS_PLATFORM && styles.storeBodyWithoutRedeem,
               isCompactViewport && styles.storeBodyCompact,
               isTightViewport && styles.storeBodyTight,
             ]}
@@ -498,7 +500,8 @@ export default function StoreScreen() {
             </Text>
           </View>
 
-          {/* ── Promo redemption ───────────────────────── */}
+          {/* Apple guideline 3.1.1: promo codes cannot grant paid digital tokens on iOS. */}
+          {!IS_IOS_PLATFORM && (
           <View style={styles.redeemSection}>
             <Text style={[styles.redeemTitle, isCompactViewport && styles.redeemTitleCompact, { color: textPrimary }]}>REDEEM CODE</Text>
             <View
@@ -554,6 +557,7 @@ export default function StoreScreen() {
             {promoError ? <Text style={styles.promoErrorText}>{promoError}</Text> : null}
             {promoSuccess ? <Text style={styles.promoSuccessText}>{promoSuccess}</Text> : null}
           </View>
+          )}
         </View>
       </ScreenContent>
     </SafeAreaView>
@@ -590,6 +594,10 @@ const styles = StyleSheet.create({
     width: '100%',
     gap: SPACING.md,
     alignItems: 'stretch',
+  },
+  storeBodyWithoutRedeem: {
+    flex: 1,
+    justifyContent: 'center',
   },
   storeBodyCompact: {
     gap: SPACING.sm,

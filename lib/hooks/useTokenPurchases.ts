@@ -3,11 +3,13 @@ import { Platform } from 'react-native';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import {
+  getMissingStoreProductIds,
   getStoreProducts,
   isPurchaseCancelledError,
   isRevenueCatSupported,
   purchaseStoreProduct,
   resolvePlatformProductIds,
+  STORE_PRODUCTS_UNAVAILABLE_ERROR,
   subscribeRevenueCatSession,
   type PurchaseResult,
   type RevenueCatSessionState,
@@ -84,8 +86,9 @@ export function useTokenPurchases({ catalog, enabled }: UseTokenPurchasesOptions
           productMap[sp.identifier] = sp;
         }
         setProducts(productMap);
-        setIsReady(true);
-        setError(null);
+        const missingProductIds = getMissingStoreProductIds(platformProductIds, storeProducts);
+        setIsReady(missingProductIds.length === 0);
+        setError(missingProductIds.length === 0 ? null : STORE_PRODUCTS_UNAVAILABLE_ERROR);
       })
       .catch((cause) => {
         if (!cancelled) {
@@ -120,7 +123,7 @@ export function useTokenPurchases({ catalog, enabled }: UseTokenPurchasesOptions
 
       const product = products[productId] ?? (await getStoreProducts([productId]))[0];
       if (!product) {
-        throw new Error('This product is not available from the store yet.');
+        throw new Error(STORE_PRODUCTS_UNAVAILABLE_ERROR);
       }
 
       setIsPurchasing(true);

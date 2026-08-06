@@ -5,6 +5,7 @@ import { NativeModules, Platform } from 'react-native';
 import {
   clearRevenueCatSessionState,
   configureRevenueCatOnce,
+  getMissingStoreProductIds,
   getPaymentStoreForPurchase,
   getRevenueCatApiKey,
   getRevenueCatSession,
@@ -13,6 +14,7 @@ import {
   logOutRevenueCat,
   normalizeCustomerInfo,
   shouldUseRevenueCatTestStore,
+  STORE_PRODUCTS_UNAVAILABLE_ERROR,
 } from '@/lib/payments/revenueCat';
 import { REVENUECAT_TEST_STORE_API_KEY } from '@/lib/payments/revenueCatConfig';
 
@@ -70,6 +72,23 @@ describe('revenueCat helpers', () => {
     }
   });
 
+  it('detects missing store products', () => {
+    expect(
+      getMissingStoreProductIds(
+        ['consumable', 'consumable_2', 'consumable_3'],
+        [{ identifier: 'consumable' }]
+      )
+    ).toEqual(['consumable_2', 'consumable_3']);
+    expect(getMissingStoreProductIds(['consumable'], [])).toEqual(['consumable']);
+    expect(getMissingStoreProductIds(['consumable'], [{ identifier: 'consumable' }])).toEqual([]);
+  });
+
+  it('uses a stable error for an unavailable store catalog', () => {
+    expect(STORE_PRODUCTS_UNAVAILABLE_ERROR).toBe(
+      'Store products are temporarily unavailable. Please try again shortly.'
+    );
+  });
+
   it('detects SDK purchase cancellation errors', () => {
     expect(isPurchaseCancelledError({ userCancelled: true })).toBe(true);
     expect(isPurchaseCancelledError({ code: 'PURCHASE_CANCELLED_ERROR' })).toBe(true);
@@ -109,12 +128,34 @@ describe('revenueCat helpers', () => {
     expect(hasActiveEntitlement(snapshot, 'premium')).toBe(false);
   });
 
-  it('defaults to the RevenueCat Test Store key (even with live keys present)', () => {
+  it('uses production store keys when appl_/goog_ keys are baked into a release build', () => {
     (globalThis as { __DEV__?: boolean }).__DEV__ = false;
     Object.defineProperty(Constants, 'debugMode', { configurable: true, value: false });
     setRevenueCatEnv({
       EXPO_PUBLIC_REVENUECAT_IOS_API_KEY: 'appl_live_key',
       EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY: 'goog_live_key',
+      EXPO_PUBLIC_REVENUECAT_USE_TEST_STORE: undefined,
+      EXPO_PUBLIC_REVENUECAT_USE_PRODUCTION_STORE: undefined,
+    });
+
+    expect(shouldUseRevenueCatTestStore()).toBe(false);
+    if (Platform.OS === 'ios') {
+      expect(getRevenueCatApiKey()).toBe('appl_live_key');
+      expect(getPaymentStoreForPurchase()).toBe('app_store');
+    } else if (Platform.OS === 'android') {
+      expect(getRevenueCatApiKey()).toBe('goog_live_key');
+      expect(getPaymentStoreForPurchase()).toBe('play_store');
+    } else {
+      expect(getRevenueCatApiKey()).toBeNull();
+    }
+  });
+
+  it('defaults to the RevenueCat Test Store key when only test keys are present', () => {
+    (globalThis as { __DEV__?: boolean }).__DEV__ = false;
+    Object.defineProperty(Constants, 'debugMode', { configurable: true, value: false });
+    setRevenueCatEnv({
+      EXPO_PUBLIC_REVENUECAT_IOS_API_KEY: 'test_hbpxoGCDXRBRDjhBSdRMowxgIVL',
+      EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY: 'test_hbpxoGCDXRBRDjhBSdRMowxgIVL',
       EXPO_PUBLIC_REVENUECAT_USE_TEST_STORE: undefined,
       EXPO_PUBLIC_REVENUECAT_USE_PRODUCTION_STORE: undefined,
     });
