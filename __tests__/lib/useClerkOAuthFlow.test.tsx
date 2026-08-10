@@ -65,7 +65,7 @@ describe('useClerkOAuthFlow web redirect', () => {
     expect(mockAuthenticateWithRedirect).toHaveBeenCalledTimes(1);
     expect(mockAuthenticateWithRedirect).toHaveBeenCalledWith({
       strategy: 'oauth_google',
-      redirectUrl: 'https://example.test/(app)/',
+      redirectUrl: 'https://example.test/sso-callback',
       redirectUrlComplete: 'https://example.test/(app)/',
     });
     // startSSOFlow (popup-based) must NOT be called on web.

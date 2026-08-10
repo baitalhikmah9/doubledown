@@ -61,15 +61,14 @@ export function useClerkOAuthFlow(redirectPath = '/(app)/') {
 
         // Web: full-page redirect via signIn.authenticateWithRedirect(). This
         // avoids expo-web-browser's popup (blocked by browsers). The browser
-        // navigates to the OAuth provider and returns to the redirect URL,
-        // where app/sso-callback.tsx completes the flow.
+        // navigates to the OAuth provider and returns to redirectUrl (the
+        // /sso-callback route), where AuthenticateWithRedirectCallback completes
+        // the flow and navigates to redirectUrlComplete (the app destination).
         if (Platform.OS === 'web') {
           if (!isSignInLoaded || !signIn) {
             throw new Error('Sign-in is still loading. Please try again.');
           }
-          const redirectUrl = clerkOAuthRedirectUrl(redirectPath);
-          // redirectUrlComplete is where the user lands after the callback
-          // screen finishes; use the same destination the native flow uses.
+          const redirectUrl = clerkOAuthRedirectUrl('/sso-callback');
           const redirectUrlComplete = clerkOAuthRedirectUrl(redirectPath);
           await signIn.authenticateWithRedirect({
             strategy,
