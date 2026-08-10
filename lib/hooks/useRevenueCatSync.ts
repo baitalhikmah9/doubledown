@@ -40,11 +40,14 @@ export function useRevenueCatSync(): RevenueCatSessionState {
     if (authDisabled || !isRevenueCatSupported()) return;
 
     if (!getRevenueCatApiKey()) {
+      const keyHint =
+        Platform.OS === 'web'
+          ? 'EXPO_PUBLIC_REVENUECAT_WEB_API_KEY'
+          : 'EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY / EXPO_PUBLIC_REVENUECAT_IOS_API_KEY';
       setSession({
         appUserId: null,
         ready: false,
-        error:
-          'RevenueCat is not configured for this build. Add EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY and rebuild the app.',
+        error: `RevenueCat is not configured for this build. Add ${keyHint} and rebuild the app.`,
       });
       return;
     }

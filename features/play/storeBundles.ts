@@ -36,21 +36,21 @@ export const STORE_BUNDLES: StoreBundle[] = [
     id: 'b10',
     nameKey: 'store.packQuick',
     tokens: 10,
-    priceLabel: '£5',
+    priceLabel: '£4.99',
     icon: 'flash-outline',
   },
   {
     id: 'b20',
     nameKey: 'store.packValue',
     tokens: 20,
-    priceLabel: '£9',
+    priceLabel: '£8.99',
     icon: 'layers-outline',
   },
   {
     id: 'b30',
     nameKey: 'store.packPro',
     tokens: 30,
-    priceLabel: '£12',
+    priceLabel: '£11.99',
     icon: 'star-outline',
     featured: true,
   },
@@ -58,14 +58,14 @@ export const STORE_BUNDLES: StoreBundle[] = [
     id: 'b50',
     nameKey: 'store.packPower',
     tokens: 50,
-    priceLabel: '£17',
+    priceLabel: '£16.99',
     icon: 'rocket-outline',
   },
   {
     id: 'b70',
     nameKey: 'store.packMega',
     tokens: 70,
-    priceLabel: '£21',
+    priceLabel: '£20.99',
     icon: 'trophy-outline',
   },
 ];
@@ -102,7 +102,9 @@ export function buildDisplayBundles(
           ? cp.iosProductId
           : platform === 'android'
             ? cp.androidProductId
-            : null;
+            : platform === 'web'
+              ? cp.androidProductId
+              : null;
       const nativeProduct = platformProductId ? nativeProducts[platformProductId] : undefined;
 
       return {

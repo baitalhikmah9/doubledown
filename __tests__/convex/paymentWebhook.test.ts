@@ -14,6 +14,7 @@ describe('paymentWebhook helpers', () => {
     expect(canClientSyncConsumablePurchase('test_store')).toBe(true);
     expect(canClientSyncConsumablePurchase('app_store')).toBe(false);
     expect(canClientSyncConsumablePurchase('play_store')).toBe(false);
+    expect(canClientSyncConsumablePurchase('web_store')).toBe(false);
   });
 
   it('normalizes RevenueCat identity aliases without duplicates', () => {
@@ -29,6 +30,9 @@ describe('paymentWebhook helpers', () => {
   it('normalizes RevenueCat store identifiers including test store', () => {
     expect(normalizeRevenueCatStore('PLAY_STORE')).toBe('play_store');
     expect(normalizeRevenueCatStore('TEST_STORE')).toBe('test_store');
+    expect(normalizeRevenueCatStore('STRIPE')).toBe('web_store');
+    expect(normalizeRevenueCatStore('RC_BILLING')).toBe('web_store');
+    expect(normalizeRevenueCatStore('WEB_STORE')).toBe('web_store');
     expect(normalizeRevenueCatStore('unknown')).toBeNull();
   });
 

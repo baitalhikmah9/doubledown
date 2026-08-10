@@ -1,4 +1,4 @@
-export type PaymentStore = 'app_store' | 'play_store' | 'test_store';
+export type PaymentStore = 'app_store' | 'play_store' | 'web_store' | 'test_store';
 
 export interface TokenProductSeed {
   productKey: string;
@@ -18,6 +18,14 @@ const TOKEN_STORE_PRODUCT_IDS = {
   tokens70: 'consumable_5',
 } as const;
 
+/**
+ * Web product identifiers.
+ *
+ * Web uses RevenueCat Billing (Stripe gateway) with the SAME product
+ * identifiers as iOS/Android (`consumable`, `consumable_2`, …). RC Billing
+ * supports repeated consumable purchases, unlike raw Stripe Billing, so no
+ * separate `webProductId` is needed — web lookups reuse `androidProductId`.
+ */
 export const DEFAULT_TOKEN_PRODUCTS: TokenProductSeed[] = [
   {
     productKey: 'bundle_10',
@@ -73,6 +81,11 @@ export function findTokenProductByStoreProductId(
 
     if (store === 'test_store') {
       return product.iosProductId === productId || product.androidProductId === productId;
+    }
+
+    // Web uses RC Billing with the same product ids as Android.
+    if (store === 'web_store') {
+      return product.androidProductId === productId;
     }
 
     return store === 'app_store'

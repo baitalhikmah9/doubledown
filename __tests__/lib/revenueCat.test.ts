@@ -21,6 +21,7 @@ import { REVENUECAT_TEST_STORE_API_KEY } from '@/lib/payments/revenueCatConfig';
 const ENV_KEYS = [
   'EXPO_PUBLIC_REVENUECAT_IOS_API_KEY',
   'EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY',
+  'EXPO_PUBLIC_REVENUECAT_WEB_API_KEY',
   'EXPO_PUBLIC_REVENUECAT_USE_TEST_STORE',
   'EXPO_PUBLIC_REVENUECAT_USE_PRODUCTION_STORE',
 ] as const;
@@ -40,6 +41,7 @@ describe('revenueCat helpers', () => {
   const originalEnv: Record<string, string | undefined> = {};
   const originalDev = (globalThis as { __DEV__?: boolean }).__DEV__;
   const originalDebugMode = Constants.debugMode;
+  const originalPlatform = Platform.OS;
 
   beforeAll(() => {
     for (const key of ENV_KEYS) {
@@ -58,6 +60,7 @@ describe('revenueCat helpers', () => {
       configurable: true,
       value: originalDebugMode,
     });
+    (Platform as { OS: string }).OS = originalPlatform;
   });
 
   it('fails clearly when the native purchases module is unavailable', async () => {
@@ -199,6 +202,27 @@ describe('revenueCat helpers', () => {
 
     expect(shouldUseRevenueCatTestStore()).toBe(true);
     expect(getRevenueCatApiKey()).toBe(REVENUECAT_TEST_STORE_API_KEY);
+  });
+
+  it('uses the Web Billing key and web_store on web when an rcb_ key is configured', () => {
+    // Force web platform so this runs under jest-expo (which defaults to ios).
+    (Platform as { OS: string }).OS = 'web';
+
+    (globalThis as { __DEV__?: boolean }).__DEV__ = false;
+    Object.defineProperty(Constants, 'debugMode', { configurable: true, value: false });
+    setRevenueCatEnv({
+      EXPO_PUBLIC_REVENUECAT_IOS_API_KEY: undefined,
+      EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY: undefined,
+      EXPO_PUBLIC_REVENUECAT_WEB_API_KEY: 'rcb_live_key',
+      EXPO_PUBLIC_REVENUECAT_USE_TEST_STORE: undefined,
+      EXPO_PUBLIC_REVENUECAT_USE_PRODUCTION_STORE: undefined,
+    });
+
+    // Web bypasses native Test Store selection — the configured rcb_ key is
+    // returned directly (RC Test Store keys are not valid for purchases-js).
+    expect(shouldUseRevenueCatTestStore()).toBe(false);
+    expect(getRevenueCatApiKey()).toBe('rcb_live_key');
+    expect(getPaymentStoreForPurchase()).toBe('web_store');
   });
 
   it('clears local session state without requiring the native SDK', () => {

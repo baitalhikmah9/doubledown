@@ -33,6 +33,7 @@ Set public client variables in Vercel Production. Set the same values in Preview
 | `EXPO_PUBLIC_CONVEX_URL` | Public | Yes | Vercel env, from the target Convex deployment |
 | `EXPO_PUBLIC_DISABLE_AUTH` | Public | Optional | Vercel env only for intentionally auth-disabled previews |
 | `EXPO_PUBLIC_API_BASE_URL` | Public | Optional legacy | Vercel env only if legacy API code is active |
+| `EXPO_PUBLIC_REVENUECAT_WEB_API_KEY` | Public (mark Sensitive in Vercel) | Yes (web purchases) | Vercel env — RevenueCat RC Billing (Stripe gateway) SDK key. Use `rcb_sb_...` sandbox for Preview, `rcb_...` live for Production. Never commit real values |
 
 Do not add these as Vercel static web client variables unless the app starts reading them on web:
 
