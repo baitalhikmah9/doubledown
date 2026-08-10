@@ -15,6 +15,13 @@ import {
   type RevenueCatSessionState,
   type StoreProductInfo,
 } from '@/lib/payments/revenueCat';
+import {
+  configureWebRevenueCat,
+  getWebStoreProducts,
+  isWebBillingSupported,
+  isWebPurchaseCancelledError,
+  purchaseWebProduct,
+} from '@/lib/payments/revenueCatWeb';
 import { usePlayStore } from '@/store/play';
 
 export interface TokenCatalogProduct {
@@ -77,7 +84,16 @@ export function useTokenPurchases({ catalog, enabled }: UseTokenPurchasesOptions
     setIsReady(false);
     setError(session.error);
 
-    void getStoreProducts(platformProductIds)
+    const isWeb = isWebBillingSupported();
+
+    // Web: configure the Web Billing SDK for this purchaser, then fetch offerings.
+    const fetchPromise = isWeb
+      ? configureWebRevenueCat(session.appUserId).then(() =>
+          getWebStoreProducts(platformProductIds)
+        )
+      : getStoreProducts(platformProductIds);
+
+    void fetchPromise
       .then((storeProducts) => {
         if (cancelled) return;
 
@@ -107,13 +123,15 @@ export function useTokenPurchases({ catalog, enabled }: UseTokenPurchasesOptions
     async (catalogProduct: TokenCatalogProduct): Promise<TokenPurchaseOutcome> => {
       if (!enabled) throw new Error('Purchases are not enabled.');
       if (!isRevenueCatSupported())
-        throw new Error('Purchases are only available in the iOS and Android app.');
+        throw new Error('Purchases are only available in the iOS, Android, and web apps.');
       if (!session.ready || !session.appUserId) {
         throw new Error('Purchases are still loading.');
       }
 
-      const productId =
-        Platform.OS === 'ios'
+      const isWeb = isWebBillingSupported();
+      const productId = isWeb
+        ? catalogProduct.androidProductId
+        : Platform.OS === 'ios'
           ? catalogProduct.iosProductId
           : catalogProduct.androidProductId;
 
@@ -121,7 +139,10 @@ export function useTokenPurchases({ catalog, enabled }: UseTokenPurchasesOptions
         throw new Error('This product is not available on this platform.');
       }
 
-      const product = products[productId] ?? (await getStoreProducts([productId]))[0];
+      const product = products[productId] ??
+        (isWeb
+          ? (await getWebStoreProducts([productId]))[0]
+          : (await getStoreProducts([productId]))[0]);
       if (!product) {
         throw new Error(STORE_PRODUCTS_UNAVAILABLE_ERROR);
       }
@@ -129,10 +150,64 @@ export function useTokenPurchases({ catalog, enabled }: UseTokenPurchasesOptions
       setIsPurchasing(true);
       setError(null);
       try {
-        const purchaseResult = await purchaseStoreProduct(product);
+        const purchaseResult = isWeb
+          ? await purchaseWebProduct(product)
+          : await purchaseStoreProduct(product);
+
+        // Web purchases are webhook-authoritative: the client never forges a
+        // transaction id. If the SDK returned a real id, record it via sync so
+        // the backend can de-duplicate; if not, skip sync and rely on the webhook.
+        if (isWeb) {
+          const realTransactionId = purchaseResult.transactionId?.trim() ?? null;
+          if (!realTransactionId) {
+            // No transaction id yet — grant will come from the RC webhook.
+            return {
+              ...purchaseResult,
+              transactionId: null,
+              granted: false,
+              pending: true,
+              tokensGranted: 0,
+              balance: null,
+            };
+          }
+
+          try {
+            const sync = await syncConsumablePurchase({
+              purchaserAccountId: session.appUserId,
+              productId: product.identifier,
+              transactionId: realTransactionId,
+              store: purchaseResult.store,
+            });
+
+            if (typeof sync.balance === 'number') {
+              setTokenBalance(sync.balance);
+            }
+
+            return {
+              ...purchaseResult,
+              transactionId: realTransactionId,
+              granted: sync.granted,
+              pending: sync.pending,
+              tokensGranted: sync.tokensGranted,
+              balance: sync.balance,
+            };
+          } catch (syncError) {
+            console.warn('[purchases] web syncConsumablePurchase failed', syncError);
+            return {
+              ...purchaseResult,
+              transactionId: realTransactionId,
+              granted: false,
+              pending: true,
+              tokensGranted: 0,
+              balance: null,
+            };
+          }
+        }
+
+        // Native: Test Store grants may omit a transaction id; use a
+        // deterministic fallback so client-side grant still works.
         const transactionId =
           purchaseResult.transactionId?.trim() ||
-          // Deterministic fallback so Test Store grants still work when RC omits an id.
           `rc:${purchaseResult.store}:${session.appUserId}:${product.identifier}:${Date.now()}`;
 
         try {
@@ -168,7 +243,7 @@ export function useTokenPurchases({ catalog, enabled }: UseTokenPurchasesOptions
           };
         }
       } catch (cause: unknown) {
-        if (isPurchaseCancelledError(cause)) {
+        if (isPurchaseCancelledError(cause) || isWebPurchaseCancelledError(cause)) {
           throw new Error('Purchase cancelled.');
         }
         throw cause instanceof Error ? cause : new Error('Purchase failed. Please try again.');

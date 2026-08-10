@@ -261,6 +261,7 @@ export const syncConsumablePurchase = mutation({
     store: v.union(
       v.literal('app_store'),
       v.literal('play_store'),
+      v.literal('web_store'),
       v.literal('test_store')
     ),
   },

@@ -14,7 +14,7 @@ export interface StoreProductInfo {
 export interface PurchaseResult {
   productIdentifier: string;
   transactionId: string | null;
-  store: 'app_store' | 'play_store' | 'test_store';
+  store: 'app_store' | 'play_store' | 'web_store' | 'test_store';
   customerInfo: CustomerInfoSnapshot;
 }
 
@@ -103,14 +103,22 @@ function getConfiguredStoreApiKey(): string | null {
     process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY ?? getExtraString('revenueCatIosApiKey');
   const androidKey =
     process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY ?? getExtraString('revenueCatAndroidApiKey');
+  const webKey =
+    process.env.EXPO_PUBLIC_REVENUECAT_WEB_API_KEY ?? getExtraString('revenueCatWebApiKey');
 
   if (Platform.OS === 'ios') return iosKey ?? null;
   if (Platform.OS === 'android') return androidKey ?? null;
+  if (Platform.OS === 'web') return webKey ?? null;
   return null;
 }
 
 function isProductionStoreApiKey(apiKey: string | null | undefined): boolean {
-  return !!apiKey && (apiKey.startsWith('appl_') || apiKey.startsWith('goog_'));
+  return (
+    !!apiKey &&
+    (apiKey.startsWith('appl_') ||
+      apiKey.startsWith('goog_') ||
+      apiKey.startsWith('rcb_'))
+  );
 }
 
 /**
@@ -147,6 +155,13 @@ export function shouldUseRevenueCatTestStore(): boolean {
 }
 
 export function getRevenueCatApiKey(): string | null {
+  // Web uses RevenueCat Billing (Stripe gateway) via purchases-js. RC Test
+  // Store keys are not valid for the web SDK, so return the configured rcb_ /
+  // rcb_sb_ key directly, bypassing native Test Store selection.
+  if (Platform.OS === 'web') {
+    return getConfiguredStoreApiKey();
+  }
+
   if (shouldUseRevenueCatTestStore()) {
     return REVENUECAT_TEST_STORE_API_KEY;
   }
@@ -155,25 +170,41 @@ export function getRevenueCatApiKey(): string | null {
 }
 
 export function isRevenueCatSupported(): boolean {
-  return Platform.OS === 'ios' || Platform.OS === 'android';
+  // Native platforms are supported when a platform key is present. Web is
+  // supported only when a Web Billing (Stripe) key is configured.
+  if (Platform.OS === 'ios' || Platform.OS === 'android') return true;
+  if (Platform.OS === 'web') return !!getConfiguredStoreApiKey();
+  return false;
 }
 
-export function getPaymentStoreForPurchase(): 'app_store' | 'play_store' | 'test_store' {
+export function getPaymentStoreForPurchase(): 'app_store' | 'play_store' | 'web_store' | 'test_store' {
   const apiKey = getRevenueCatApiKey();
   if (apiKey?.startsWith('test_')) {
     return 'test_store';
   }
 
+  if (Platform.OS === 'web') {
+    return 'web_store';
+  }
+
   return Platform.OS === 'ios' ? 'app_store' : 'play_store';
 }
 
-/** Platform-specific product IDs for the given catalog product IDs. */
+/**
+ * Platform-specific product IDs for the given catalog product IDs.
+ *
+ * Web uses the SAME product identifiers as Android (`consumable`, …) under
+ * RevenueCat Billing, so no separate `webProductId` is needed.
+ */
 export function resolvePlatformProductIds(
   productIds: { iosProductId: string; androidProductId: string }[]
 ): string[] {
   if (!isRevenueCatSupported()) return [];
-  const key = Platform.OS === 'ios' ? 'iosProductId' : 'androidProductId';
-  return productIds.map((p) => p[key]).filter(Boolean) as string[];
+  if (Platform.OS === 'ios') return productIds.map((p) => p.iosProductId).filter(Boolean) as string[];
+  if (Platform.OS === 'android') return productIds.map((p) => p.androidProductId).filter(Boolean) as string[];
+  // Web uses RC Billing with the same product ids as Android.
+  if (Platform.OS === 'web') return productIds.map((p) => p.androidProductId).filter(Boolean) as string[];
+  return [];
 }
 
 async function loadPurchasesModule(): Promise<PurchasesModule> {
@@ -363,8 +394,22 @@ export async function loginRevenueCatUser(appUserId: string): Promise<void> {
   }
 }
 
-/** Configure once, then log in with the purchaser account id. */
+/**
+ * Configure once, then log in with the purchaser account id.
+ *
+ * On web this delegates to the Web Billing SDK (`@revenuecat/purchases-js`)
+ * via a dynamic import so the web SDK is never loaded in native bundles. On
+ * native platforms it uses `react-native-purchases`.
+ */
 export async function establishRevenueCatSession(appUserId: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    const { configureWebRevenueCat } = await import('./revenueCatWeb');
+    await configureWebRevenueCat(appUserId);
+    loggedInAppUserId = appUserId;
+    notifySessionListeners();
+    return;
+  }
+
   await loginRevenueCatUser(appUserId);
 }
 
@@ -381,7 +426,10 @@ export function clearRevenueCatSessionState(): void {
  */
 export async function logOutRevenueCat(): Promise<void> {
   try {
-    if (isRevenueCatSupported() && NativeModules.RNPurchases && getRevenueCatApiKey()) {
+    if (Platform.OS === 'web') {
+      const { clearWebRevenueCatConfig } = await import('./revenueCatWeb');
+      clearWebRevenueCatConfig();
+    } else if (isRevenueCatSupported() && NativeModules.RNPurchases && getRevenueCatApiKey()) {
       await configureRevenueCatOnce();
       const module = await loadPurchasesModule();
       const Purchases = getPurchases(module);

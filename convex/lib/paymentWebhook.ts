@@ -69,5 +69,10 @@ export function normalizeRevenueCatStore(store?: string | null): PaymentStore | 
     return 'test_store';
   }
 
+  // RevenueCat Web Billing (Stripe) events use `stripe` or `rc_billing` as the store.
+  if (normalized === 'stripe' || normalized === 'rc_billing' || normalized === 'web_store') {
+    return 'web_store';
+  }
+
   return null;
 }

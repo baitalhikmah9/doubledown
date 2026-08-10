@@ -45,6 +45,14 @@ describe('paymentCatalog', () => {
         'consumable'
       )?.productKey
     ).toBe('bundle_10');
+
+    expect(
+      findTokenProductByStoreProductId(
+        DEFAULT_TOKEN_PRODUCTS,
+        'web_store',
+        'consumable_4'
+      )?.productKey
+    ).toBe('bundle_50');
   });
 
   it('ignores inactive products during store id lookup', () => {

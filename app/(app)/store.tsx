@@ -68,6 +68,11 @@ function getPromoErrorMessage(error?: string) {
 
 const IS_IOS_PLATFORM = Platform.OS === 'ios';
 const IS_NATIVE_PLATFORM = IS_IOS_PLATFORM || Platform.OS === 'android';
+// Web is purchaseable when a RevenueCat Web Billing key is configured.
+const IS_WEB_PURCHASE_ENABLED =
+  Platform.OS === 'web' &&
+  !!(process.env.EXPO_PUBLIC_REVENUECAT_WEB_API_KEY ?? '').trim();
+const IS_PURCHASE_PLATFORM = IS_NATIVE_PLATFORM || IS_WEB_PURCHASE_ENABLED;
 
 // ── Sub-components ─────────────────────────────────────────────────────────
 
@@ -210,12 +215,12 @@ export default function StoreScreen() {
     purchase,
   } = useTokenPurchases({
     catalog: catalogProducts,
-    enabled: IS_NATIVE_PLATFORM && !!catalogProducts?.length,
+    enabled: IS_PURCHASE_PLATFORM && !!catalogProducts?.length,
   });
 
-  const isPurchaseUnavailable = !IS_NATIVE_PLATFORM || !rcReady || !!rcError;
-  const purchaseUnavailableReason = !IS_NATIVE_PLATFORM
-    ? 'Available on iOS & Android'
+  const isPurchaseUnavailable = !IS_PURCHASE_PLATFORM || !rcReady || !!rcError;
+  const purchaseUnavailableReason = !IS_PURCHASE_PLATFORM
+    ? 'Available on iOS, Android & web'
     : rcError
       ? rcError
       : !rcReady
@@ -236,7 +241,7 @@ export default function StoreScreen() {
     async (bundle: DisplayBundle) => {
       if (!rcSupported || !rcReady || !catalogProducts) {
         if (!rcSupported) {
-          showThemedAlert('Unavailable', 'In-app purchases are only available on iOS and Android.');
+          showThemedAlert('Unavailable', 'In-app purchases are only available on iOS, Android, and the web app.');
         } else if (!rcReady) {
           showThemedAlert('Not Ready', 'The store is still loading. Please try again shortly.');
         }
@@ -444,11 +449,11 @@ export default function StoreScreen() {
             ]}
           >
             {/* ── Status banner (non-native / error) ──────── */}
-            {!IS_NATIVE_PLATFORM && (
+            {!IS_PURCHASE_PLATFORM && (
               <View style={[styles.statusBanner, { backgroundColor: surface }]}>
                 <Ionicons name="information-circle-outline" size={16} color={textMuted} />
                 <Text style={[styles.statusBannerText, { color: textMuted }]}>
-                  In-app purchases are only available on iOS and Android. Promo codes can be
+                  In-app purchases are only available on iOS, Android, and the web app. Promo codes can be
                   redeemed on any platform.
                 </Text>
               </View>
@@ -461,7 +466,7 @@ export default function StoreScreen() {
                 </Text>
               </View>
             )}
-            {IS_NATIVE_PLATFORM && !rcReady && !rcError && (
+            {IS_PURCHASE_PLATFORM && !rcReady && !rcError && (
               <View style={[styles.statusBanner, { backgroundColor: surface }]}>
                 <ActivityIndicator size="small" color={textMuted} />
                 <Text style={[styles.statusBannerText, { color: textMuted }]}>

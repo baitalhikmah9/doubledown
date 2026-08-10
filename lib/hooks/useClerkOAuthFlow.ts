@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import { useSSO, useSignInWithApple } from '@clerk/clerk-expo';
+import { Platform } from 'react-native';
+import { useSignIn, useSSO, useSignInWithApple } from '@clerk/clerk-expo';
 import type { OAuthStrategy } from '@clerk/types';
 import { prefersNativeAppleSignIn, supportsAppleSignIn } from '@/lib/auth/appleSignIn';
 import { clerkOAuthRedirectUrl } from '@/lib/auth/clerkOAuthRedirect';
@@ -18,13 +19,19 @@ function isAppleCancelError(error: unknown): boolean {
 
 /**
  * Google / Apple auth via Clerk.
- * - Google: browser SSO on all platforms
+ * - Google: browser SSO on native; full-page redirect on web
  * - Apple iOS: native Sign in with Apple (`useSignInWithApple`)
- * - Apple web: browser SSO (`oauth_apple`)
+ * - Apple web: full-page redirect SSO (`oauth_apple`)
  * - Apple Android: not available (UI hidden; guard remains)
+ *
+ * On web, `useSSO.startSSOFlow` uses `expo-web-browser.openAuthSessionAsync`,
+ * which opens a popup that browsers block. The web branch instead calls
+ * `signIn.authenticateWithRedirect()` for a full-page redirect to the OAuth
+ * provider; the return is handled by `app/sso-callback.tsx`.
  */
 export function useClerkOAuthFlow(redirectPath = '/(app)/') {
   const { startSSOFlow } = useSSO();
+  const { signIn, isLoaded: isSignInLoaded } = useSignIn();
   const { startAppleAuthenticationFlow } = useSignInWithApple();
   const inFlight = useRef(false);
   const [busy, setBusy] = useState(false);
@@ -52,6 +59,27 @@ export function useClerkOAuthFlow(redirectPath = '/(app)/') {
           return;
         }
 
+        // Web: full-page redirect via signIn.authenticateWithRedirect(). This
+        // avoids expo-web-browser's popup (blocked by browsers). The browser
+        // navigates to the OAuth provider and returns to redirectUrl (the
+        // /sso-callback route), where AuthenticateWithRedirectCallback completes
+        // the flow and navigates to redirectUrlComplete (the app destination).
+        if (Platform.OS === 'web') {
+          if (!isSignInLoaded || !signIn) {
+            throw new Error('Sign-in is still loading. Please try again.');
+          }
+          const redirectUrl = clerkOAuthRedirectUrl('/sso-callback');
+          const redirectUrlComplete = clerkOAuthRedirectUrl(redirectPath);
+          await signIn.authenticateWithRedirect({
+            strategy,
+            redirectUrl,
+            redirectUrlComplete,
+          });
+          // authenticateWithRedirect navigates away; the code below runs only
+          // if the redirect didn't happen (e.g. misconfigured redirect URL).
+          return;
+        }
+
         const redirectUrl = clerkOAuthRedirectUrl(redirectPath);
         const { createdSessionId, setActive } = await startSSOFlow({
           strategy,
@@ -73,7 +101,7 @@ export function useClerkOAuthFlow(redirectPath = '/(app)/') {
         setBusy(false);
       }
     },
-    [redirectPath, startAppleAuthenticationFlow, startSSOFlow]
+    [redirectPath, isSignInLoaded, signIn, startAppleAuthenticationFlow, startSSOFlow]
   );
 
   return { busy, signInWithOAuthStrategy };

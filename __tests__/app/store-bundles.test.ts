@@ -9,18 +9,18 @@ import {
 import { DEFAULT_TOKEN_PRODUCTS } from '@/convex/lib/paymentCatalog';
 
 describe('store bundles', () => {
-  it('uses the preliminary GBP token pricing', () => {
+  it('uses the mobile-matching GBP token pricing', () => {
     expect(
       STORE_BUNDLES.map((bundle) => ({
         tokens: bundle.tokens,
         priceLabel: bundle.priceLabel,
       }))
     ).toEqual([
-      { tokens: 10, priceLabel: '£5' },
-      { tokens: 20, priceLabel: '£9' },
-      { tokens: 30, priceLabel: '£12' },
-      { tokens: 50, priceLabel: '£17' },
-      { tokens: 70, priceLabel: '£21' },
+      { tokens: 10, priceLabel: '£4.99' },
+      { tokens: 20, priceLabel: '£8.99' },
+      { tokens: 30, priceLabel: '£11.99' },
+      { tokens: 50, priceLabel: '£16.99' },
+      { tokens: 70, priceLabel: '£20.99' },
     ]);
   });
 });
@@ -85,11 +85,15 @@ describe('buildDisplayBundles', () => {
     ]);
   });
 
-  it('returns null platformProductId for web', () => {
+  it('maps platform product IDs correctly for web (reuses android product ids)', () => {
     const result = buildDisplayBundles(mockCatalog, {}, 'web');
-    for (const bundle of result) {
-      expect(bundle.platformProductId).toBeNull();
-    }
+    expect(result.map((bundle) => bundle.platformProductId)).toEqual([
+      'consumable',
+      'consumable_2',
+      'consumable_3',
+      'consumable_4',
+      'consumable_5',
+    ]);
   });
 
   it('uses display metadata from STORE_BUNDLES when tokens match', () => {
@@ -128,7 +132,7 @@ describe('buildDisplayBundles', () => {
   it('falls back to static priceLabel when native price is missing', () => {
     const result = buildDisplayBundles(mockCatalog, {}, 'ios');
     const bundle30 = result.find((b) => b.productKey === 'bundle_30');
-    expect(bundle30?.priceLabel).toBe('£12');
+    expect(bundle30?.priceLabel).toBe('£11.99');
   });
 
   it('falls back to tokens string when neither native nor static price exists', () => {
