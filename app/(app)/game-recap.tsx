@@ -1,5 +1,5 @@
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Platform, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Button } from '@/components/ui/Button';
 import {
@@ -7,10 +7,10 @@ import {
   FONT_SIZES,
   SPACING,
   FONTS,
-  LAYOUT,
   getStandardChromeTopPadding,
 } from '@/constants';
 import { useTheme } from '@/lib/hooks/useTheme';
+import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 import { goBackOrReplace } from '@/lib/navigation/goBackOrReplace';
 import { usePlayStore } from '@/store/play';
 import { HOME_SOFT_UI } from '@/themes';
@@ -32,19 +32,25 @@ export default function GameRecapModal() {
   const router = useRouter();
   const colors = useTheme();
   const canvas = HOME_SOFT_UI.colors.canvas;
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const { paddingLeft, paddingRight } = topicCardScreenPadding(width, insets, Platform.OS === 'web');
+  const horizontalPad = { paddingLeft, paddingRight };
   const handleClose = () => goBackOrReplace(router, '/(app)/');
   const session = usePlayStore((state) => state.session);
   const reopenLastResolvedTurn = usePlayStore((state) => state.reopenLastResolvedTurn);
 
   if (!session) {
     return (
-      <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.safeArea, { backgroundColor: canvas }]}>
+      <SafeAreaView edges={['top', 'bottom']} style={[styles.safeArea, { backgroundColor: canvas }]}>
+        <View style={[styles.pageColumn, horizontalPad]}>
         <View style={styles.emptyState}>
           <Text style={[styles.title, { color: colors.text }]}>Game Recap</Text>
           <Text style={[styles.emptyCopy, { color: colors.textSecondary }]}>
             No finished session is available to review.
           </Text>
           <Button title="Close" onPress={handleClose} />
+        </View>
         </View>
       </SafeAreaView>
     );
@@ -53,7 +59,8 @@ export default function GameRecapModal() {
   const winner = [...session.teams].sort((a, b) => b.score - a.score)[0] ?? null;
 
   return (
-    <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.safeArea, { backgroundColor: canvas }]}>
+    <SafeAreaView edges={['top', 'bottom']} style={[styles.safeArea, { backgroundColor: canvas }]}>
+      <View style={[styles.pageColumn, horizontalPad]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <Text style={[styles.title, { color: colors.text }]}>Game Recap</Text>
         <Button title="Close" variant="secondary" onPress={handleClose} />
@@ -161,6 +168,7 @@ export default function GameRecapModal() {
           </View>
         ) : null}
       </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -169,10 +177,14 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  pageColumn: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 0,
+  },
   header: {
-    paddingHorizontal: LAYOUT.screenGutter,
     paddingTop: getStandardChromeTopPadding(Platform.OS === 'web'),
-    paddingBottom: LAYOUT.screenGutter,
+    paddingBottom: SPACING.lg,
     borderBottomWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -184,7 +196,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.displayBold,
   },
   content: {
-    padding: LAYOUT.screenGutter,
+    paddingVertical: SPACING.lg,
     gap: SPACING.lg,
   },
   heroCard: {

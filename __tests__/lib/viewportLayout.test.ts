@@ -1,6 +1,8 @@
 import {
   getContentMaxWidth,
   getViewportLayout,
+  horizontalScreenPadding,
+  topicCardScreenPadding,
   type ContentWidthKind,
 } from '@/lib/layout/viewportLayout';
 import { BREAKPOINTS, LAYOUT } from '@/constants';
@@ -59,5 +61,38 @@ describe('getContentMaxWidth', () => {
   it('keeps form width as the legacy contentMaxWidth alias', () => {
     expect(LAYOUT.formMaxWidth).toBe(LAYOUT.contentMaxWidth);
     expect(kinds).toContain('form');
+  });
+});
+
+describe('horizontalScreenPadding', () => {
+  it('uses screenGutter when safe-area insets are smaller', () => {
+    expect(horizontalScreenPadding({ left: 0, right: 0 })).toEqual({
+      paddingLeft: LAYOUT.screenGutter,
+      paddingRight: LAYOUT.screenGutter,
+    });
+  });
+
+  it('uses landscape safe-area when it exceeds the gutter', () => {
+    expect(horizontalScreenPadding({ left: 59, right: 59 })).toEqual({
+      paddingLeft: 59,
+      paddingRight: 59,
+    });
+  });
+});
+
+describe('topicCardScreenPadding', () => {
+  it('uses the topic row inset beyond the landscape safe area', () => {
+    const layout = topicCardScreenPadding(844, { left: 59, right: 59 }, false);
+    expect(layout.paddingLeft).toBeGreaterThanOrEqual(59 + 24);
+    expect(layout.paddingRight).toBeGreaterThanOrEqual(59 + 24);
+    expect(layout.paddingLeft + layout.contentWidth + layout.paddingRight).toBe(844);
+    expect(layout.cardW).toBeLessThanOrEqual(320);
+  });
+
+  it('insets wide web to the topic-card faces, not the 16px screen gutter', () => {
+    const layout = topicCardScreenPadding(1920, { left: 0, right: 0 }, true);
+    expect(layout.paddingLeft).toBeGreaterThan(LAYOUT.screenGutter + 40);
+    expect(layout.paddingLeft + layout.contentWidth + layout.paddingRight).toBe(1920);
+    expect(layout.cardW).toBeLessThanOrEqual(320);
   });
 });

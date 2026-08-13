@@ -12,6 +12,8 @@ For detailed architecture, see [docs/CODEBASE_MAP.md](docs/CODEBASE_MAP.md).
 
 For colors, typefaces, and UI usage rules, see [docs/BRAND_GUIDELINES.md](docs/BRAND_GUIDELINES.md).
 
+**Client fix requests (Ammar):** Notion kanban is the source of truth. See [docs/CLIENT_FIX_REQUESTS.md](docs/CLIENT_FIX_REQUESTS.md). Board: https://app.notion.com/p/3ba15c9fd0008138b525d6beeebb72e7
+
 ## Quick Reference
 
 ### Key Directories
@@ -29,6 +31,9 @@ For colors, typefaces, and UI usage rules, see [docs/BRAND_GUIDELINES.md](docs/B
 - Game screen forces landscape on mobile
 - Must call `hydrate()` before first render for theme
 - **Responsive play UI:** Avoid clipping on any screen size—use `flex: 1` / `minHeight: 0`, `ScrollView` when content can overflow, density from `useWindowDimensions` (width and height), and alternate layouts (e.g. stacked controls) when width is tight.
+- **NEVER cloud EAS builds.** Do not run `eas build` without `--local`. Do not start remote/cloud EAS builds for Android or iOS. Store release binaries are produced on this machine only (`--local` is required).
+- **Android release builds:** Always local, always production profile, always load `.env.production` (source of truth for prod Convex/Clerk/RevenueCat). Use `bun run build:android:prod`. Do not ship builds that can pick up `.env.local` dev values. Script forces `GRADLE_USER_HOME=$HOME/.gradle` and `ANDROID_HOME=$HOME/Library/Android/sdk` (external Seagate AndroidDev paths are TCC-blocked).
+- **iOS release builds:** Always local, always production profile, always load `.env.production`. Use `bun run build:ios:prod`. Then stage/submit with `asc` (App Store Connect CLI). App Store `CFBundleVersion` must increase app-wide (next after 11 is 12+). **Xcode is at `/Applications/Xcode.app` → symlink to `Mikhail Seagate 2TB SSD`; that volume must be mounted** or the build fails with “Unable to locate Xcode”. Script sets `DEVELOPER_DIR` and aborts early if `xcodebuild` is missing.
 
 ### Environment Variables
 ```
@@ -39,7 +44,9 @@ CLERK_JWT_ISSUER_DOMAIN=  # Set in Convex dashboard
 
 ### Commands
 ```bash
-bun run start        # Dev server
-bun run test         # Run tests
-npx convex dev       # Backend dev
+bun run start                 # Dev server
+bun run test                  # Run tests
+npx convex dev                # Backend dev
+bun run build:android:prod    # Local Play AAB (production env only)
+bun run build:ios:prod        # Local App Store IPA (production env only)
 ```

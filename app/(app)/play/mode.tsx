@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Pressable } from '@/components/ui/Pressable';
-import { SPACING, LAYOUT, FONTS, BORDER_RADIUS } from '@/constants';
+import { SPACING, FONTS, BORDER_RADIUS } from '@/constants';
 import type { GameMode } from '@/features/shared';
 import { useI18n } from '@/lib/i18n/useI18n';
 import { getRowDirection } from '@/lib/i18n/direction';
 import { useViewportLayout } from '@/lib/hooks/useViewportLayout';
+import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 import { usePlayStore } from '@/store/play';
 import { PlayScaffold } from '@/features/play/components/PlayScaffold';
 import { useThemeStore } from '@/store/theme';
@@ -22,6 +24,7 @@ export default function PlayModeScreen() {
   const router = useRouter();
   const viewport = useViewportLayout();
   const { width, height } = viewport;
+  const insets = useSafeAreaInsets();
   const { t, direction } = useI18n();
   useThemeStore((state) => state.paletteId);
   const surfaceColors = getPlaySurfaceColors();
@@ -80,14 +83,12 @@ export default function PlayModeScreen() {
     [onSelectMode]
   );
 
-  const horizontalPadding = LAYOUT.screenGutter * 2;
-  const gap = Math.round(SPACING.md * (viewport.isWide ? viewport.scale : 1));
-  const gapsTotal = gap * 3;
-  /** Web / first paint can report 0×0 before layout; avoid 0-sized tiles and icon size 0 (can crash). */
   const safeW = Math.max(1, width);
   const safeH = Math.max(1, height);
-  const setupMaxWidth = viewport.contentMaxWidth('setup');
-  const rowInnerWidth = Math.min(safeW - horizontalPadding, setupMaxWidth);
+  const topicPad = topicCardScreenPadding(safeW, insets, Platform.OS === 'web');
+  const rowInnerWidth = topicPad.contentWidth;
+  const gap = Math.round(SPACING.md * (viewport.isWide ? viewport.scale : 1));
+  const gapsTotal = gap * 3;
   const rowTileBudget = Math.max(0, (rowInnerWidth - gapsTotal) / 4);
   const tileSide = Math.max(
     56,
@@ -100,7 +101,6 @@ export default function PlayModeScreen() {
       onBack={handleBack}
       bodyFrame={false}
       bodyScrollEnabled={false}
-      contentMaxWidth={viewport.isWide ? setupMaxWidth : undefined}
     >
       <View style={[styles.body, { justifyContent: viewport.mainJustify }]}>
         <View style={styles.cardsArea}>

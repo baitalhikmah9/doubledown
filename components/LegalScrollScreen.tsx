@@ -1,12 +1,11 @@
 import { useCallback } from 'react';
-import { Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/components/ui/Pressable';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   SPACING,
-  LAYOUT,
   SOFT_SURFACE_FACE,
   softSurfaceLift,
   getStandardChromeTopPadding,
@@ -14,6 +13,7 @@ import {
 import { ScreenContent } from '@/components/ScreenContent';
 import { PublicAuthEntry } from '@/components/PublicAuthEntry';
 import { LegalDocumentBody } from '@/components/LegalDocumentBody';
+import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 import { useDarkModeFlatTop, useTheme } from '@/lib/hooks/useTheme';
 import { goBackOrReplace } from '@/lib/navigation/goBackOrReplace';
 import { HOME_SOFT_UI } from '@/themes';
@@ -37,6 +37,10 @@ export function LegalScrollScreen({ title, sections }: LegalScrollScreenProps) {
   const canvas = HOME_SOFT_UI.colors.canvas;
   const surface = HOME_SOFT_UI.colors.surface;
   const textPrimary = HOME_SOFT_UI.colors.textPrimary;
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const { paddingLeft, paddingRight } = topicCardScreenPadding(width, insets, Platform.OS === 'web');
+  const horizontalPad = { paddingLeft, paddingRight };
   const backIcon: keyof typeof Ionicons.glyphMap =
     direction === 'rtl' ? 'chevron-forward' : 'chevron-back';
   const chromeTopPad = getStandardChromeTopPadding(Platform.OS === 'web');
@@ -49,14 +53,14 @@ export function LegalScrollScreen({ title, sections }: LegalScrollScreenProps) {
     <SafeAreaView
       collapsable={false}
       testID="legal-scroll-screen"
-      edges={['top', 'bottom', 'left', 'right']}
+      edges={['top', 'bottom']}
       style={[styles.safeArea, { backgroundColor: canvas }]}
     >
       <ScreenContent fullWidth style={[styles.viewport, { backgroundColor: canvas }]}>
         <ScrollView
           testID="legal-scroll-view"
           style={[styles.scroll, { backgroundColor: canvas }]}
-          contentContainerStyle={[styles.scrollContent, { paddingTop: chromeTopPad }]}
+          contentContainerStyle={[styles.scrollContent, horizontalPad, { paddingTop: chromeTopPad }]}
           showsVerticalScrollIndicator
         >
           <View style={[styles.topBar, { flexDirection: rowDir }]}>
@@ -124,7 +128,6 @@ const styles = StyleSheet.create({
     minHeight: 0,
   },
   scrollContent: {
-    paddingHorizontal: LAYOUT.screenGutter,
     paddingBottom: SPACING.xxl,
     gap: SPACING.md,
   },

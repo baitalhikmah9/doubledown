@@ -1,7 +1,7 @@
-import { Platform, View, Text, StyleSheet } from 'react-native';
+import { Platform, View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/components/ui/Pressable';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   SPACING,
   FONT_SIZES,
@@ -15,6 +15,7 @@ import {
 import { useI18n } from '@/lib/i18n/useI18n';
 import { useDarkModeFlatTop } from '@/lib/hooks/useTheme';
 import { goBackOrReplace } from '@/lib/navigation/goBackOrReplace';
+import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 import { HOME_SOFT_UI } from '@/themes';
 
 const T = HOME_SOFT_UI;
@@ -29,9 +30,14 @@ export default function LobbySettingsModal() {
   const surface = T.colors.surface;
   const textPrimary = T.colors.textPrimary;
   const textMuted = T.colors.textMuted;
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const { paddingLeft, paddingRight } = topicCardScreenPadding(width, insets, Platform.OS === 'web');
+  const horizontalPad = { paddingLeft, paddingRight };
 
   return (
-    <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.safeArea, { backgroundColor: canvas }]}>
+    <SafeAreaView edges={['top', 'bottom']} style={[styles.safeArea, { backgroundColor: canvas }]}>
+      <View style={[styles.pageColumn, horizontalPad]}>
       <View
         style={[
           styles.header,
@@ -41,7 +47,6 @@ export default function LobbySettingsModal() {
           {
             backgroundColor: surface,
             borderRadius: 14,
-            marginHorizontal: LAYOUT.screenGutter,
             marginTop: getStandardChromeTopPadding(Platform.OS === 'web'),
           },
         ]}
@@ -57,7 +62,7 @@ export default function LobbySettingsModal() {
           <Text style={[styles.closeText, { color: textPrimary }]}>CLOSE</Text>
         </Pressable>
       </View>
-      <View style={[styles.content, { paddingHorizontal: LAYOUT.screenGutter }]}>
+      <View style={styles.content}>
         <Text style={[styles.subtitle, { color: textMuted }]}>
           Team setup, player names, mode config, and category selection. Full lobby builder coming in
           Phase 3.
@@ -76,6 +81,7 @@ export default function LobbySettingsModal() {
           <Text style={[styles.placeholderButtonText, { color: textPrimary }]}>START GAME (PLACEHOLDER)</Text>
         </Pressable>
       </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -83,6 +89,11 @@ export default function LobbySettingsModal() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+  },
+  pageColumn: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 0,
   },
   header: {
     flexDirection: 'row',
@@ -113,7 +124,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: SPACING.lg,
+    paddingVertical: SPACING.lg,
     gap: SPACING.xl,
   },
   subtitle: {

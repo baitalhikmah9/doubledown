@@ -19,7 +19,6 @@ import {
   COLORS,
   FONTS,
   SPACING,
-  LAYOUT,
   SHOW_HOME_MODE_INFO_UI,
   SOFT_SURFACE_FACE,
   softSurfaceLift,
@@ -32,6 +31,7 @@ import { getRowDirection } from '@/lib/i18n/direction';
 import { useI18n } from '@/lib/i18n/useI18n';
 import { isAuthDisabled } from '@/lib/authMode';
 import { useViewportLayout } from '@/lib/hooks/useViewportLayout';
+import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 import { getHomeModeCopyLayout, getHomeModeRowLayout } from '@/lib/layout/homeModeLayout';
 import { usePlayStore } from '@/store/play';
 import { useDisplayTokenBalance } from '@/lib/hooks/useDisplayTokenBalance';
@@ -147,9 +147,14 @@ export default function AppHubScreen() {
 
   const viewport = useViewportLayout();
   const insets = useSafeAreaInsets();
+  const isWeb = Platform.OS === 'web';
+  const { paddingLeft: padLeft, paddingRight: padRight } = topicCardScreenPadding(
+    viewport.width,
+    insets,
+    isWeb
+  );
   /** Tighter chrome when vertical space is limited (e.g. phone landscape). */
   const compact = viewport.isCompact;
-  const hubMaxWidth = viewport.contentMaxWidth('hub');
   const hybridScale = viewport.isWide ? viewport.scale : 1;
   const modeRowLayout = useMemo(
     () =>
@@ -160,19 +165,10 @@ export default function AppHubScreen() {
       }),
     [viewport.isCompact, viewport.isWide, viewport.isTall]
   );
-  /**
-   * Horizontal gutters: max(safe-area, screen gutter) — not sum.
-   * SafeAreaView left/right + paddingHorizontal was stacking ~16pt of dead space
-   * on top of landscape Dynamic Island / home-indicator insets.
-   */
-  const padLeft = Math.max(insets.left, LAYOUT.screenGutter);
-  const padRight = Math.max(insets.right, LAYOUT.screenGutter);
 
   const rowDir = getRowDirection(direction);
   const formattedTokens = tokens.toLocaleString(uiLocale, { maximumFractionDigits: 0 });
   const needsSignIn = !authDisabled && !isSignedIn;
-
-  const isWeb = Platform.OS === 'web';
 
   const modeGap = compact
     ? SPACING.md
@@ -302,7 +298,6 @@ export default function AppHubScreen() {
               style={[
                 styles.contentFrame,
                 {
-                  maxWidth: hubMaxWidth,
                   paddingTop: modeRowLayout.contentTopPad,
                   paddingLeft: padLeft,
                   paddingRight: padRight,
@@ -314,7 +309,6 @@ export default function AppHubScreen() {
               <GameHeader
                 variant="logoOnly"
                 topPad="home"
-                barMaxWidthOverride={isWeb ? hubMaxWidth : undefined}
                 onLogoLongPress={
                   __DEV__
                     ? () => {
@@ -677,9 +671,7 @@ const styles = StyleSheet.create({
   contentFrame: {
     flex: 1,
     width: '100%',
-    maxWidth: LAYOUT.hubMaxWidth,
     alignSelf: 'center',
-    // Horizontal padding applied inline via max(safe-area, screenGutter).
   },
   /** Never let the mode row flex-shrink the logo / settings bar on iOS. */
   headerChrome: {

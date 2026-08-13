@@ -1,14 +1,13 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Platform, StyleSheet, Text, TextInput, View, ScrollView } from 'react-native';
+import { Platform, StyleSheet, Text, TextInput, View, ScrollView, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/components/ui/Pressable';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useSignIn } from '@clerk/clerk-expo';
 import {
   SPACING,
   FONTS,
-  LAYOUT,
   COLORS,
   SOFT_SURFACE_FACE,
   softSurfaceLift,
@@ -16,6 +15,7 @@ import {
 } from '@/constants';
 import { useI18n } from '@/lib/i18n/useI18n';
 import { useDarkModeFlatTop } from '@/lib/hooks/useTheme';
+import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 import { goBackOrReplace } from '@/lib/navigation/goBackOrReplace';
 import { HOME_SOFT_UI } from '@/themes';
 
@@ -38,6 +38,9 @@ export default function ForgotPasswordScreen() {
   const surface = T.colors.surface;
   const textPrimary = T.colors.textPrimary;
   const textMuted = T.colors.textMuted;
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const topicPad = topicCardScreenPadding(width, insets, Platform.OS === 'web');
   const darkModeFlatTop = useDarkModeFlatTop();
 
   const handleSubmit = async () => {
@@ -99,9 +102,12 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.safeArea, { backgroundColor: canvas }]}>
+    <SafeAreaView edges={['top', 'bottom']} style={[styles.safeArea, { backgroundColor: canvas }]}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingLeft: topicPad.paddingLeft, paddingRight: topicPad.paddingRight },
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -259,7 +265,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: LAYOUT.screenGutter,
     paddingTop: getStandardChromeTopPadding(Platform.OS === 'web'),
     paddingBottom: SPACING.xxl,
     gap: SPACING.xl,

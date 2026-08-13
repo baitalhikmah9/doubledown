@@ -11,12 +11,11 @@ import {
 import { Pressable } from '@/components/ui/Pressable';
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import {
   SPACING,
   FONTS,
-  LAYOUT,
   SOFT_SURFACE_FACE,
   softSurfaceLift,
   getStandardChromeTopPadding,
@@ -27,6 +26,7 @@ import { AuthEmailSignInForm } from '@/components/auth/AuthEmailSignInForm';
 import { useI18n } from '@/lib/i18n/useI18n';
 import { useClerkOAuthFlow } from '@/lib/hooks/useClerkOAuthFlow';
 import { useDarkModeFlatTop } from '@/lib/hooks/useTheme';
+import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 import { goBackOrReplace } from '@/lib/navigation/goBackOrReplace';
 import { HOME_SOFT_UI } from '@/themes';
 
@@ -49,6 +49,8 @@ export default function SignInScreen() {
   useWarmUpBrowser();
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const topicPad = topicCardScreenPadding(width, insets, Platform.OS === 'web');
   const { direction, t } = useI18n();
   const { busy, signInWithOAuthStrategy } = useClerkOAuthFlow();
   const darkModeFlatTop = useDarkModeFlatTop();
@@ -61,17 +63,20 @@ export default function SignInScreen() {
   // Keep back on the screen-edge gutter while the card stays centered; when the
   // card would sit under the control (narrow widths), nudge the card inward.
   const cardEdgeClearance = useMemo(() => {
-    const contentWidth = Math.max(0, width - LAYOUT.screenGutter * 2);
+    const contentWidth = topicPad.contentWidth;
     const cardWidth = Math.min(AUTH_CARD_MAX_WIDTH, contentWidth);
     const cardSideInset = Math.max(0, (contentWidth - cardWidth) / 2);
     const needed = BACK_CONTROL_SIZE + SPACING.sm;
     return Math.max(0, needed - cardSideInset);
-  }, [width]);
+  }, [topicPad.contentWidth]);
 
   return (
-    <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.safeArea, { backgroundColor: canvas }]}>
+    <SafeAreaView edges={['top', 'bottom']} style={[styles.safeArea, { backgroundColor: canvas }]}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingLeft: topicPad.paddingLeft, paddingRight: topicPad.paddingRight },
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -182,7 +187,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: LAYOUT.screenGutter,
     paddingTop: getStandardChromeTopPadding(Platform.OS === 'web'),
     paddingBottom: SPACING.xxl,
     gap: SPACING.xl,

@@ -18,6 +18,15 @@ jest.mock('expo-router', () => ({
   }),
 }));
 
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaView: ({ children, ...props }: { children?: React.ReactNode }) => {
+    const ReactLib = require('react');
+    const { View } = require('react-native');
+    return ReactLib.createElement(View, props, children);
+  },
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+}));
+
 jest.mock('@/components/PublicAuthEntry', () => ({
   PublicAuthEntry: () => null,
 }));

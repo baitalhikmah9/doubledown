@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { Pressable } from '@/components/ui/Pressable';
 import { HeaderBackButton } from '@/components/HeaderBackButton';
-import { BORDER_RADIUS, LAYOUT, SPACING, FONTS, getChromeTopPaddingWithInsets } from '@/constants';
+import { BORDER_RADIUS, SPACING, FONTS, getChromeTopPaddingWithInsets } from '@/constants';
 import { SHOW_HOT_SEAT_UI } from '@/constants/featureFlags';
 import { SOFT_SURFACE_STYLES } from '@/features/play/styles/softSurface';
 import {
@@ -28,6 +28,7 @@ import { WagerInfoModal } from '@/features/play/components/WagerInfoModal';
 import { getRowDirection } from '@/lib/i18n/direction';
 import { useI18n } from '@/lib/i18n/useI18n';
 import { useDarkModeFlatTop, useTheme } from '@/lib/hooks/useTheme';
+import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 import { usePlayStore } from '@/store/play';
 import { usePlayTextScale } from '@/store/display';
 import { getPlaySurfaceColors } from '@/features/play/playSurfaceColors';
@@ -299,20 +300,14 @@ export default function PlayQuestionScreen() {
   const isVeryCompactHeader = viewportShortSide < 390;
   /** Match play-stack HeaderBackButton: labeled pill when there is room, icon squircle when tight. */
   const backVariant = isCompactHeader ? 'icon' : 'labeled';
-  const headerHorizontalPadding = Math.max(
-    SPACING.sm,
-    Math.min(SPACING.xl, Math.round(windowWidth * 0.025))
-  );
+  const topicPad = topicCardScreenPadding(windowWidth, insets, Platform.OS === 'web');
   const chromeSideWidth = isVeryCompactHeader ? 70 : isCompactHeader ? 78 : 112;
   /** Matches shared non-home chrome (manual inset - no SafeAreaView top edge). */
   const questionChromePaddingTop = getChromeTopPaddingWithInsets(
     insets.top,
     Platform.OS === 'web'
   );
-  const questionContentWidth = Math.min(
-    windowWidth - headerHorizontalPadding * 2,
-    Platform.OS === 'web' ? LAYOUT.playMaxWidth : Math.min(LAYOUT.playMaxWidth, 980)
-  );
+  const questionContentWidth = topicPad.contentWidth;
   /** Keep prompt text clear of landscape camera cutouts and Android navigation bars. */
   const promptLayoutWidth = Math.min(
     questionContentWidth,
@@ -320,9 +315,8 @@ export default function PlayQuestionScreen() {
       windowWidth,
       insets.left,
       insets.right,
-      headerHorizontalPadding
-    ),
-    Platform.OS === 'web' ? LAYOUT.playMaxWidth - 80 : Math.min(LAYOUT.playMaxWidth, 920)
+      Math.min(topicPad.paddingLeft, topicPad.paddingRight)
+    )
   );
   const questionPromptSizing = useMemo(() => {
     const sizing = getQuestionPromptSizing(promptLayoutWidth);
@@ -636,8 +630,8 @@ export default function PlayQuestionScreen() {
             styles.pillChromeBlock,
             {
               paddingTop: questionChromePaddingTop,
-              paddingLeft: Math.max(insets.left, headerHorizontalPadding),
-              paddingRight: Math.max(insets.right, headerHorizontalPadding),
+              paddingLeft: topicPad.paddingLeft,
+              paddingRight: topicPad.paddingRight,
             },
           ]}
         >
@@ -868,8 +862,8 @@ export default function PlayQuestionScreen() {
             style={[
               styles.contentArea,
               {
-                paddingLeft: Math.max(insets.left, headerHorizontalPadding),
-                paddingRight: Math.max(insets.right, headerHorizontalPadding),
+                paddingLeft: topicPad.paddingLeft,
+                paddingRight: topicPad.paddingRight,
                 paddingBottom: Math.max(insets.bottom, SPACING.md),
               },
             ]}

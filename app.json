@@ -3,7 +3,7 @@
     "name": "BackFire",
     "slug": "backfire",
     "scheme": "backfire",
-    "version": "1.0",
+    "version": "1.0.1",
     "orientation": "landscape",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -16,7 +16,7 @@
       "supportsTablet": true,
       "requireFullScreen": true,
       "usesAppleSignIn": true,
-      "buildNumber": "11",
+      "buildNumber": "12",
       "bundleIdentifier": "com.playbackfire.app",
       "infoPlist": {
         "UIStatusBarHidden": true,
@@ -29,7 +29,7 @@
       "hidden": true
     },
     "android": {
-      "versionCode": 16,
+      "versionCode": 20,
       "package": "com.playbackfire.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -97,7 +97,8 @@
       "expo-web-browser",
       "expo-font",
       "expo-image",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "./plugins/withAndroidR8Optimize"
     ],
     "extra": {
       "router": {},

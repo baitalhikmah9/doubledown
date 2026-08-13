@@ -60,7 +60,7 @@ export type GameHeaderProps = {
  *
  * The header always sits at the top of its container with a compact height.
  * It does **not** add outer horizontal inset or bottom margin/padding - screens
- * own `LAYOUT.screenGutter` and spacing between the header and main content.
+ * own topic-card screen padding and spacing between the header and main content.
  *
  * The center (logo or title) is absolutely positioned so it stays perfectly
  * centered regardless of left/right slot widths.
@@ -118,7 +118,7 @@ export function GameHeader({
             // Home: base HEADER pad. Everything else: standard (question) chrome pad.
             paddingTop: topPad,
             paddingBottom: compact ? 2 : SPACING.xs,
-            // Outer horizontal inset is owned by screen shells (`LAYOUT.screenGutter`).
+            // Outer horizontal inset is owned by screen shells (topic-card screen padding).
             paddingHorizontal: 0,
           },
           isWeb && [

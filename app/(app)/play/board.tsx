@@ -10,7 +10,7 @@ import { useRouter } from 'expo-router';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { HubTokenChip } from '@/components/HubTokenChip';
-import { BORDER_RADIUS, BREAKPOINTS, COLORS, FONT_SIZES, LAYOUT, SPACING } from '@/constants';
+import { BORDER_RADIUS, BREAKPOINTS, COLORS, FONT_SIZES, SPACING } from '@/constants';
 import { SHOW_HOT_SEAT_UI } from '@/constants/featureFlags';
 import { FONTS } from '@/constants/theme';
 import {
@@ -20,7 +20,6 @@ import {
 import {
   computeBoardVerticalLayout,
   getBoardBodyHeight,
-  getBoardContentMaxWidth,
   getBoardPointTileBox,
   getBoardRailWidth,
   getBoardTopicCellBox,
@@ -48,6 +47,7 @@ import { hapticSuccess, hapticTick } from '@/lib/haptics';
 import { getRowDirection } from '@/lib/i18n/direction';
 import { useI18n } from '@/lib/i18n/useI18n';
 import { useDarkModeFlatTop, useTheme } from '@/lib/hooks/useTheme';
+import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 import { usePlayStore } from '@/store/play';
 import { useDisplayTokenBalance } from '@/lib/hooks/useDisplayTokenBalance';
 import { abandonGameEntry } from '@/lib/wallet/gameEntry';
@@ -468,19 +468,11 @@ export default function PlayBoardScreen() {
     };
   }, [height, isWebBoard, playTextScale, responsiveFontSizes.scoreValue, width]);
   const topicArtHeightRatio = useMemo(() => getTopicArtHeightRatio(height), [height]);
-  const bodyPadLeft = Math.max(insets.left, LAYOUT.screenGutter);
-  const bodyPadRight = Math.max(insets.right, LAYOUT.screenGutter);
-  const padX = bodyPadLeft + bodyPadRight;
-  const innerWidth = Math.max(0, width - padX);
-  const centeredContentMaxWidth = getBoardContentMaxWidth({
-    platform: Platform.OS,
-    windowWidth: width,
-    innerWidth,
-    wideBreakpoint: BREAKPOINTS.wide,
-    playMaxWidth: LAYOUT.playMaxWidth,
-    playWideMaxWidth: LAYOUT.playWideMaxWidth,
-  });
-  const boardLayoutWidth = Math.max(0, Math.min(innerWidth, centeredContentMaxWidth));
+  const topicPad = topicCardScreenPadding(width, insets, Platform.OS === 'web');
+  const bodyPadLeft = topicPad.paddingLeft;
+  const bodyPadRight = topicPad.paddingRight;
+  const boardLayoutWidth = topicPad.contentWidth;
+  const centeredContentMaxWidth = boardLayoutWidth;
   const preferredGridCols = useMemo(
     () => getGridColumnCount(session?.mode ?? 'classic', grouped.length),
     [session?.mode, grouped.length]
@@ -779,6 +771,7 @@ export default function PlayBoardScreen() {
     const titleHeight = verticalLayout.topicTitleHeight;
     const imgH = Math.max(1, Math.round(verticalLayout.topicImageHeight));
     const imgW = Math.max(1, topicArtWidth);
+    const artSide = Math.min(imgW, imgH);
     // Shared starting size from layout; long names shrink via adjustsFontSizeToFit
     // so nothing is ellipsized/cut off within the two-line title band.
     const titleFontSize = Math.min(
@@ -865,7 +858,7 @@ export default function PlayBoardScreen() {
                 {picture ? (
                   <Image
                     source={picture}
-                    style={styles.topicImageFill}
+                    style={{ width: artSide, height: artSide }}
                     contentFit={surfaceColors.topicImageContentFit}
                     cachePolicy="memory-disk"
                     loading="lazy"
@@ -1453,12 +1446,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  topicImageFill: {
-    width: '100%',
-    height: '100%',
-    // Mild zoom only - heavy scale crops portraits (e.g. Harry Potter) mid-torso.
-    transform: [{ scale: 1.04 }],
   },
   pictureFallbackFill: {
     flex: 1,

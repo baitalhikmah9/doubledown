@@ -14,12 +14,12 @@ import {
   SPACING,
   BORDER_RADIUS,
   FONT_SIZES,
-  LAYOUT,
   getStandardChromeTopPadding,
   getChromeTopPaddingWithInsets,
 } from '@/constants';
 import { HOME_SOFT_UI } from '@/themes';
 import { ScreenContent } from '@/components/ScreenContent';
+import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 import { useI18n } from '@/lib/i18n/useI18n';
 import { useTheme } from '@/lib/hooks/useTheme';
 import type { GameSessionState } from '@/features/shared';
@@ -56,7 +56,9 @@ interface PlayScaffoldProps {
    */
   bodyFrame?: boolean;
   /**
-   * Header / HUD stay inset; body fills full width under horizontal safe areas (landscape bezels).
+   * Drop the body card frame so content fills the shared column under the header.
+   * Header and body still share the same horizontal gutter unless
+   * `contentSafeAreaHorizontal` is false (match board pads itself).
    */
   bodyEdgeToEdge?: boolean;
   /**
@@ -82,9 +84,8 @@ interface PlayScaffoldProps {
   /** Merged onto the column that wraps header chrome + body (e.g. zero bottom inset for a flush CTA on phones). */
   chromeColumnStyle?: StyleProp<ViewStyle>;
   /**
-   * Max width for the play stack header bar (web). Pass the same value used by the
-   * centered content row so back / token chip left-right edges align with content cards.
-   * Home/store `contentFrame` pattern.
+   * Max width for the shared header+body column. Pass the same value used by
+   * the content row so back / token chip edges align with cards.
    */
   contentMaxWidth?: number;
 }
@@ -110,21 +111,22 @@ export function PlayScaffold({
   footerBare = false,
   safeAreaEdges,
   chromeColumnStyle,
-  contentMaxWidth,
+  contentMaxWidth: _contentMaxWidth,
 }: PlayScaffoldProps) {
   const colors = useTheme();
   const shellBackground = backgroundColor ?? HOME_SOFT_UI.colors.canvas;
   const { getTextStyle } = useI18n();
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const subtitleTight = windowHeight < 700;
-  const padLeft = Math.max(insets.left, LAYOUT.screenGutter);
-  const padRight = Math.max(insets.right, LAYOUT.screenGutter);
   const isWeb = Platform.OS === 'web';
+  const { paddingLeft: padLeft, paddingRight: padRight } = topicCardScreenPadding(
+    windowWidth,
+    insets,
+    isWeb
+  );
   /**
-   * Prefer max(safe, gutter) for horizontal insets on both edge and framed layouts.
-   * Stacking SafeAreaView left/right + paddingHorizontal wastes ~16pt per side on
-   * landscape iPhones (Dynamic Island / home indicator already provide large insets).
+   * Prefer topic-card screen padding for horizontal insets on both edge and framed layouts.
    */
   const resolvedSafeAreaEdges: readonly Edge[] =
     safeAreaEdges ??
@@ -165,8 +167,6 @@ export function PlayScaffold({
           title={title}
           onBackPress={onBack}
           backVariant={backVariant}
-          barMaxWidth={contentMaxWidth}
-          // Edge chrome already applies standard top pad on the wrap.
           topPad={bodyEdgeToEdge ? 'none' : 'standard'}
         />
       )}
@@ -211,46 +211,38 @@ export function PlayScaffold({
     <View style={[styles.bodyShellNatural, styles.bodyShellFlush]}>{children}</View>
   );
 
-  const paddedColumnStyles = bodyEdgeToEdge
-    ? [
-        styles.edgeChromeWrap,
-        {
-          paddingTop: chromeTopPad,
-          paddingBottom: SPACING.xs,
-          paddingLeft: padLeft,
-          paddingRight: padRight,
-        },
-      ]
-    : [
-        ...contentStyles,
-        {
-          paddingLeft: padLeft,
-          paddingRight: padRight,
-        },
-      ];
-
   /**
-   * Shared content frame (home/store pattern): when `contentMaxWidth` is set, header
-   * chrome and body share one centered column so control faces align with card faces.
+   * Header and body share one column (Swift layout-margin pattern).
+   * `bodyEdgeToEdge` only drops the body card frame; it does not let chrome
+   * outrun the content column. Board opts out of horizontal gutter via
+   * `contentSafeAreaHorizontal={false}` and pads itself.
    */
-  const contentFrameStyle =
-    contentMaxWidth != null && !bodyEdgeToEdge
-      ? ([styles.contentFrame, { maxWidth: contentMaxWidth }] as const)
-      : null;
-
-  const main = (
-    <>
-      {chrome}
-      {!bodyEdgeToEdge ? bodySection : null}
-    </>
-  );
+  const applyHorizontalGutter = !bodyEdgeToEdge || contentSafeAreaHorizontal;
+  const paddedColumnStyles = [
+    ...(bodyEdgeToEdge
+      ? [
+          styles.sharedEdgeColumn,
+          {
+            paddingTop: chromeTopPad,
+            paddingBottom: SPACING.xs,
+            ...(applyHorizontalGutter ? { paddingLeft: padLeft, paddingRight: padRight } : null),
+          },
+        ]
+      : [
+          ...contentStyles,
+          {
+            paddingLeft: padLeft,
+            paddingRight: padRight,
+          },
+        ]),
+  ];
 
   const footerPlacementAbove = Boolean(footer && bodyEdgeToEdge && footerAboveBody);
 
   const footerChromeStyles = [
     styles.footer,
     footerDense ? styles.footerDense : styles.footerFit,
-    contentSafeAreaHorizontal && bodyEdgeToEdge && {
+    contentSafeAreaHorizontal && bodyEdgeToEdge && !footerPlacementAbove && {
       paddingLeft: padLeft,
       paddingRight: padRight,
     },
@@ -267,7 +259,7 @@ export function PlayScaffold({
   ];
 
   const footerHorizontalGutter =
-    footerBare && contentSafeAreaHorizontal && bodyEdgeToEdge
+    footerBare && contentSafeAreaHorizontal && bodyEdgeToEdge && !footerPlacementAbove
       ? { paddingLeft: padLeft, paddingRight: padRight }
       : null;
 
@@ -294,26 +286,10 @@ export function PlayScaffold({
       <ScreenContent fullWidth style={styles.screenInner}>
         <View style={styles.fitRoot}>
           <View style={[paddedColumnStyles, chromeColumnStyle]}>
-            {contentFrameStyle ? (
-              <View style={contentFrameStyle}>{main}</View>
-            ) : (
-              main
-            )}
+            {chrome}
+            {footerPlacementAbove ? footerShell : null}
+            {bodySection}
           </View>
-          {footerPlacementAbove ? footerShell : null}
-          {bodyEdgeToEdge ? (
-            <View
-              style={[
-                styles.edgeBodySlot,
-                contentSafeAreaHorizontal && {
-                  paddingLeft: padLeft,
-                  paddingRight: padRight,
-                },
-              ]}
-            >
-              {bodySection}
-            </View>
-          ) : null}
         </View>
       </ScreenContent>
 
@@ -342,7 +318,7 @@ const styles = StyleSheet.create({
   contentFit: {
     flex: 1,
     paddingTop: 0,
-    // Horizontal padding applied inline via max(safe-area, screenGutter).
+    // Horizontal padding applied inline via topic-card screen padding.
     paddingBottom: SPACING.xs,
     minHeight: 0,
   },
@@ -354,24 +330,17 @@ const styles = StyleSheet.create({
     minWidth: 0,
     minHeight: 0,
   },
-  /** Top chrome only - body is a sibling (`edgeBodySlot`). Top pad applied via getStandardChromeTopPadding. */
-  edgeChromeWrap: {
-    flexGrow: 0,
-    flexShrink: 0,
+  /** Header + body in one column. Top pad applied via getStandardChromeTopPadding. */
+  sharedEdgeColumn: {
+    flex: 1,
     minHeight: 0,
+    minWidth: 0,
     width: '100%',
   },
   /** Keeps team strip / footer from collapsing when the board body fights for height. */
   footerSlotFixed: {
     flexGrow: 0,
     flexShrink: 0,
-  },
-  edgeBodySlot: {
-    flex: 1,
-    minHeight: 0,
-    minWidth: 0,
-    width: '100%',
-    alignSelf: 'stretch',
   },
   subtitle: {
     fontSize: FONT_SIZES.md,

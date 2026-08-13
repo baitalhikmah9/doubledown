@@ -1,19 +1,20 @@
-import { Platform, View, Text, StyleSheet } from 'react-native';
+import { Platform, View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/components/ui/Pressable';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useGameStore } from '@/store/game';
 import { LobbyBuilder } from '@/features/lobby/LobbyBuilder';
 import { Board } from '@/features/gameplay/Board';
 import type { GameConfig, QuestionCard } from '@/features/shared';
-import { SPACING, FONTS, LAYOUT, COLORS, getStandardChromeTopPadding } from '@/constants';
+import { SPACING, FONTS, COLORS, getStandardChromeTopPadding } from '@/constants';
 import { getResolvedContentLocaleChain } from '@/lib/i18n/config';
 import { HOME_SOFT_UI } from '@/themes';
 import { useLocaleStore } from '@/store/locale';
 import { Ionicons } from '@expo/vector-icons';
 import { useResponsivePlayFontSizes } from '@/utils/responsiveTypography';
 import { useDarkModeFlatTop } from '@/lib/hooks/useTheme';
+import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 
 const T = HOME_SOFT_UI;
 
@@ -70,6 +71,10 @@ export default function GameScreen() {
   const textPrimary = T.colors.textPrimary;
   const textMuted = T.colors.textMuted;
   const accentGlow = T.colors.accentGlow;
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const { paddingLeft, paddingRight } = topicCardScreenPadding(width, insets, Platform.OS === 'web');
+  const horizontalPad = { paddingLeft, paddingRight };
 
   const handleStartGame = (config: GameConfig) => {
     const boardSize = config.boardSize ?? 36;
@@ -104,7 +109,8 @@ export default function GameScreen() {
 
   if (!session) {
     return (
-      <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.safeArea, { backgroundColor: canvas }]}>
+      <SafeAreaView edges={['top', 'bottom']} style={[styles.safeArea, { backgroundColor: canvas }]}>
+        <View style={[styles.pageColumn, horizontalPad]}>
         <View style={[styles.header, styles.plasticFace, darkModeFlatTop, { backgroundColor: surface }]}>
           <Pressable onPress={handleBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={textPrimary} />
@@ -116,6 +122,7 @@ export default function GameScreen() {
         </View>
         <View style={styles.lobbyBody}>
           <LobbyBuilder mode={mode} onStart={handleStartGame} />
+        </View>
         </View>
       </SafeAreaView>
     );
@@ -131,7 +138,8 @@ export default function GameScreen() {
   const panelQuestion = showQuestionPanel && session.currentQuestion ? session.currentQuestion : null;
 
   return (
-    <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.safeArea, { backgroundColor: canvas }]}>
+    <SafeAreaView edges={['top', 'bottom']} style={[styles.safeArea, { backgroundColor: canvas }]}>
+      <View style={[styles.pageColumn, horizontalPad]}>
       <View style={[styles.header, styles.plasticFace, darkModeFlatTop, { backgroundColor: surface }]}>
         <Pressable onPress={handleBack} style={styles.backButton}>
           <Ionicons name="close" size={24} color={textPrimary} />
@@ -341,6 +349,7 @@ export default function GameScreen() {
           </View>
         )}
       </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -355,11 +364,15 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  pageColumn: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 0,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: LAYOUT.screenGutter,
     paddingTop: getStandardChromeTopPadding(Platform.OS === 'web'),
     minHeight: 80,
   },

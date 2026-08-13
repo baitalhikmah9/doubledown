@@ -385,7 +385,7 @@ const enBase = {
   'play.addTeamMemberA11y': 'Add a team member',
   'play.teamNamePlaceholder': 'Team name',
   'play.playerPlaceholder': 'Player {count}',
-  'play.pickTopicsTitle': 'Choose the topics.',
+  'play.pickTopicsTitle': 'Choose the topics',
   'play.pickTopicsSubtitle': 'Choose {count} topics before the board starts.',
   'play.startBoard': 'Start the Board',
   'play.selectTopicsToContinue': 'Select {count} topics to continue.',

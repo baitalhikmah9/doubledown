@@ -281,9 +281,9 @@ describe('TeamSetupScreen', () => {
     expect(flat.borderRadius).toBe(14);
   });
 
-  it('keeps the phone continue strip flush to the safe-area bottom (no double pad)', () => {
-    // iOS landscape team setup: PlayScaffold SafeAreaView already clears the home
-    // indicator. Extra paddingBottom on the floating strip stacked a ~32pt cream gap.
+  it('keeps a small dead zone under the phone continue strip above the bezel', () => {
+    // SafeAreaView still clears the home indicator; strip adds modest pad so Continue
+    // is not flush to the edge on zero-inset / landscape devices.
     mockUseWindowDimensions.mockReturnValue({
       width: 874,
       height: 402,
@@ -295,7 +295,8 @@ describe('TeamSetupScreen', () => {
 
     const strip = screen.getByTestId('team-setup-continue-strip');
     const flat = StyleSheet.flatten(strip.props.style);
-    expect(flat.paddingBottom).toBe(0);
+    expect(flat.paddingBottom).toBeGreaterThanOrEqual(8);
+    expect(flat.paddingBottom).toBeLessThanOrEqual(16);
   });
 
   it('returns to quick-play topic length when going back during quick play', () => {

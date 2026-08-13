@@ -576,7 +576,7 @@ export default function TeamSetupScreen() {
         styles.rumbleScrollContentContainer,
         tightContinueStrip && styles.rumbleScrollContentContainerTight,
         {
-          // Outer horizontal inset comes from PlayScaffold (`LAYOUT.screenGutter`).
+          // Outer horizontal inset comes from PlayScaffold (topic-card screen padding).
           paddingHorizontal: 0,
           alignItems: 'center',
         },
@@ -835,7 +835,7 @@ const styles = StyleSheet.create({
     minHeight: 0,
     minWidth: 0,
     width: '100%',
-    // Outer horizontal inset comes from PlayScaffold (`LAYOUT.screenGutter`).
+    // Outer horizontal inset comes from PlayScaffold (topic-card screen padding).
     paddingHorizontal: 0,
     paddingBottom: 0,
   },
@@ -1214,10 +1214,10 @@ const styles = StyleSheet.create({
   floatingButtonWrapTight: {
     paddingTop: SPACING.xs,
     /**
-     * Phone / narrow: PlayScaffold SafeAreaView already applies the home-indicator
-     * inset. Extra paddingBottom here double-stacked (~32pt cream under Continue).
+     * Phone / narrow: SafeAreaView clears the home indicator. Keep a small extra
+     * dead zone so Continue is not flush against the bezel on zero-inset devices.
      */
-    paddingBottom: 0,
+    paddingBottom: SPACING.md,
   },
   footerInner: {
     width: '100%',

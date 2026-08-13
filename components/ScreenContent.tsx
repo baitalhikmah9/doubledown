@@ -3,15 +3,17 @@ import {
   Platform,
   ScrollView,
   View,
+  useWindowDimensions,
   type ScrollViewProps,
   type StyleProp,
   type ViewProps,
   type ViewStyle,
   StyleSheet,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LAYOUT, SPACING, getStandardChromeTopPadding } from '@/constants';
 import { HOME_SOFT_UI } from '@/themes';
+import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 
 export type ScreenContentProps = ViewProps & {
   /**
@@ -50,7 +52,7 @@ export function Screen({
   children,
   header,
   scroll = false,
-  edges = ['top', 'bottom', 'left', 'right'],
+  edges = ['top', 'bottom'],
   backgroundColor = HOME_SOFT_UI.colors.canvas,
   fullWidth = true,
   maxWidth,
@@ -72,6 +74,13 @@ export function Screen({
     <View style={[styles.body, contentStyle]}>{children}</View>
   );
 
+  const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const { paddingLeft, paddingRight } = topicCardScreenPadding(
+    windowWidth,
+    insets,
+    Platform.OS === 'web'
+  );
   const includeTopChromePad = edges.includes('top');
   const chromeTopPad = includeTopChromePad
     ? getStandardChromeTopPadding(Platform.OS === 'web')
@@ -82,7 +91,12 @@ export function Screen({
       <ScreenContent
         fullWidth={fullWidth}
         maxWidth={maxWidth}
-        style={[styles.shell, chromeTopPad > 0 ? { paddingTop: chromeTopPad } : null, style]}
+        style={[
+          styles.shell,
+          { paddingLeft, paddingRight },
+          chromeTopPad > 0 ? { paddingTop: chromeTopPad } : null,
+          style,
+        ]}
       >
         {header}
         {body}
@@ -127,7 +141,6 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 0,
     minWidth: 0,
-    paddingHorizontal: LAYOUT.screenGutter,
   },
   scroll: {
     flex: 1,
@@ -135,7 +148,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: LAYOUT.screenGutter,
     paddingBottom: SPACING.xxl,
   },
   root: {

@@ -6,7 +6,6 @@ import {
   FlatList,
   useWindowDimensions,
   Platform,
-  type ImageStyle,
   type ListRenderItem,
 } from 'react-native';
 import { Pressable } from '@/components/ui/Pressable';
@@ -18,7 +17,7 @@ import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeaderBackButton } from '@/components/HeaderBackButton';
-import { BREAKPOINTS, SPACING, FONTS, FONT_SIZES, LAYOUT, BORDER_RADIUS } from '@/constants';
+import { BREAKPOINTS, SPACING, FONTS, FONT_SIZES, BORDER_RADIUS } from '@/constants';
 import {
   getCategoryPictureSource,
   MISSING_CATEGORY_PICTURE_LABEL,
@@ -48,14 +47,10 @@ import { getGameTokenCost } from '@/features/play/tokenCosts';
 import { usePlayStore } from '@/store/play';
 import { useThemeStore } from '@/store/theme';
 import { useResponsivePlayFontSizes } from '@/utils/responsiveTypography';
+import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 
 // ── Grid constants ──────────────────────────────────────────────────────
 
-const WEB_GRID_MAX_WIDTH = LAYOUT.playWideMaxWidth;
-const WEB_GRID_GAP = 24;
-const NATIVE_GRID_GAP = 16;
-const NATIVE_COMPACT_GRID_GAP = 8;
-const WEB_GRID_INNER_PAD = 40; // padding inside the max-width container
 const WEB_CARD_HEIGHT = 190;
 const NATIVE_CARD_ASPECT = 0.82; // Taller cards preserve artwork size across five columns.
 /** Artwork share of the base card height; residual was too short for two-line titles. */
@@ -107,7 +102,7 @@ function buildCategoryListData(
   sections.forEach((section, sectionIndex) => {
     // Clear break between sections (General Knowledge → History, etc.) —
     // larger than the in-section row gap so groups don't read as one list.
-    const marginTop = sectionIndex > 0 ? gridGap * 2 + SPACING.xl : 0;
+    const marginTop = sectionIndex > 0 ? gridGap * 2 + SPACING.xxl : 0;
     const sectionCols = Math.min(cols, section.categories.length);
     const sectionWidth = cardW * sectionCols + gridGap * Math.max(0, sectionCols - 1);
 
@@ -194,6 +189,9 @@ const CategoryCard = memo(function CategoryCard({
   const imageSource = getCategoryPictureSource(category.id);
   const isAndroid = Platform.OS === 'android';
   const darkModeFlatTop = useDarkModeFlatTop();
+  // Pixel square: Android expo-image ignores contentFit when width/height are 100%
+  // in a landscape slot, which stretches square topic art into wide ellipses.
+  const artSide = Math.min(cardW, imageAreaH);
 
   return (
     <Pressable
@@ -241,7 +239,7 @@ const CategoryCard = memo(function CategoryCard({
             // Web: avoid eager-fetch of offscreen cards (FlatList still mounts a window).
             loading="lazy"
             priority="low"
-            style={styles.cardImage as ImageStyle}
+            style={{ width: artSide, height: artSide }}
             contentFit={topicImageContentFit}
             transition={isAndroid ? ANDROID_LIST_IMAGE_TRANSITION : WEB_LIST_IMAGE_TRANSITION}
           />
@@ -360,33 +358,14 @@ export default function CategorySelectionScreen() {
   const isLandscape = windowWidth > windowHeight;
   const compactHeader = !useWebLayout && isLandscape;
 
-  // ── Grid dimension calculations ─────────────────────────────────────
-  // Always five columns per row as requested.
-  const gridGap = useWebLayout
-    ? WEB_GRID_GAP
-    : windowWidth < 430
-      ? NATIVE_COMPACT_GRID_GAP
-      : NATIVE_GRID_GAP;
-  const gridInnerPad = useWebLayout ? WEB_GRID_INNER_PAD : 0;
-  const maxGridW = useWebLayout ? WEB_GRID_MAX_WIDTH : windowWidth;
-  const horizontalSafeGutters =
-    Math.max(insets.left, LAYOUT.screenGutter) + Math.max(insets.right, LAYOUT.screenGutter);
-  const availableGridW = Math.max(COLS, windowWidth - horizontalSafeGutters);
-
-  // Available inner width for the grid:
-  //   Web: body width after PlayScaffold safe gutters, clamped to maxGridW, then subtract
-  //        the grid's own inner padding so it matches the rendered grid area.
-  //   Native: body width after PlayScaffold contentSafeAreaHorizontal gutters.
-  const innerW = Math.max(
-    COLS,
-    Math.min(maxGridW, availableGridW) - (useWebLayout ? gridInnerPad * 2 : 0)
+  const topicLayout = topicCardScreenPadding(
+    windowWidth,
+    { left: insets.left, right: insets.right },
+    isWeb
   );
-
-  // Card width fills exactly five columns.
-  const cardW = Math.max(
-    1,
-    Math.min(320, Math.floor((innerW - gridGap * (COLS - 1)) / COLS))
-  );
+  const gridGap = topicLayout.gap;
+  const innerW = topicLayout.contentWidth;
+  const cardW = topicLayout.cardW;
 
   const baseCardH = useWebLayout
     ? WEB_CARD_HEIGHT
@@ -443,7 +422,7 @@ export default function CategorySelectionScreen() {
   const selectedCount = (session?.selectedCategoryIds ?? []).length;
   const isVeryDense = selectedCount >= 5;
   const selectedPillGap = selectedCount >= 5 ? 6 : 10;
-  const selectedStripInnerW = Math.max(1, availableGridW - SPACING.sm * 2);
+  const selectedStripInnerW = Math.max(1, innerW);
   const selectedPillWidth =
     selectedCount > 0
       ? Math.max(
@@ -491,7 +470,9 @@ export default function CategorySelectionScreen() {
   // Grow the card only when the two-line label needs more than the old residual.
   const cardH = Math.max(baseCardH, minImageAreaH + titleBarH);
   const imageAreaH = cardH - titleBarH;
-  const sectionTitleHeight = Math.round(fontSizes.subtitle * 1.2);
+  // Section headers sit between the page title and body text.
+  const sectionTitleSize = Math.round(fontSizes.subtitle * 1.2);
+  const sectionTitleHeight = Math.round(sectionTitleSize * 1.2);
   const { categoryListRows, categoryItemLayouts, categorySlugToIndex } = useMemo(() => {
     if (!categorySections.length) {
       return {
@@ -562,7 +543,7 @@ export default function CategorySelectionScreen() {
                 styles.sectionTitle,
                 {
                   color: textPrimary,
-                  fontSize: fontSizes.subtitle,
+                  fontSize: sectionTitleSize,
                   height: sectionTitleHeight,
                   width: item.sectionWidth,
                 },
@@ -617,12 +598,12 @@ export default function CategorySelectionScreen() {
     [
       cardH,
       cardW,
-      fontSizes.subtitle,
       gridGap,
       handleToggleCategory,
       imageAreaH,
       required,
       sectionTitleHeight,
+      sectionTitleSize,
       selectedCategoryIds,
       selectedCount,
       surface,
@@ -713,6 +694,29 @@ export default function CategorySelectionScreen() {
                 >
                   {t('play.pickTopicsTitle').toUpperCase()}
                 </Text>
+
+                {/* Subtitle - always directly under the title so it stays attached */}
+                <Text
+                  style={[
+                    styles.subtitle,
+                    compactHeader && styles.subtitleCompact,
+                    { color: textPrimary },
+                    getTextStyle(undefined, 'body', 'center'),
+                    {
+                      fontSize: compactHeader
+                        ? Math.round(fontSizes.subtitle * 0.9)
+                        : fontSizes.subtitle,
+                      lineHeight: Math.round(
+                        (compactHeader
+                          ? Math.round(fontSizes.subtitle * 0.9)
+                          : fontSizes.subtitle) * 1.25
+                      ),
+                    },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {t('play.pickTopicsSubtitle', { count: required })}
+                </Text>
               </View>
 
               <View style={styles.headerRight}>
@@ -752,29 +756,6 @@ export default function CategorySelectionScreen() {
                 </Pressable>
               </View>
             </View>
-
-            {/* Subtitle - compact, directly below title */}
-            <Text
-              style={[
-                styles.subtitle,
-                compactHeader && styles.subtitleCompact,
-                { color: textPrimary },
-                getTextStyle(undefined, 'body', 'center'),
-                {
-                  fontSize: compactHeader
-                    ? Math.round(fontSizes.subtitle * 0.9)
-                    : fontSizes.subtitle,
-                  lineHeight: Math.round(
-                    (compactHeader
-                      ? Math.round(fontSizes.subtitle * 0.9)
-                      : fontSizes.subtitle) * 1.25
-                  ),
-                },
-              ]}
-              numberOfLines={1}
-            >
-              {t('play.pickTopicsSubtitle', { count: required })}
-            </Text>
           </View>
         )
       }
@@ -785,7 +766,7 @@ export default function CategorySelectionScreen() {
           <Text style={{ color: textPrimary }}>{t('common.loading')}</Text>
         </View>
       ) : (
-        <View style={styles.contentRoot}>
+        <View style={[styles.contentRoot, styles.topicGridBleed]}>
           {/* Selected topics strip - above the grid */}
           {selectedCategories.length > 0 && (
             <View style={styles.selectedStrip}>
@@ -876,13 +857,9 @@ export default function CategorySelectionScreen() {
               removeClippedSubviews={false}
               contentContainerStyle={[
                 styles.gridScrollContent,
-                useWebLayout && styles.gridScrollContentWeb,
                 { paddingBottom: 160 },
               ]}
-              style={[
-                styles.categoryList,
-                useWebLayout && { maxWidth: WEB_GRID_MAX_WIDTH, alignSelf: 'center' as const },
-              ]}
+              style={styles.categoryList}
             />
           </View>
         </View>
@@ -995,13 +972,14 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     position: 'relative',
-    minHeight: 44,
+    // Title + subtitle stack, so the row must clear both lines.
+    minHeight: 68,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
   },
   headerRowCompact: {
-    minHeight: 44,
+    minHeight: 56,
     gap: SPACING.xs,
   },
   headerLeft: {
@@ -1020,6 +998,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'column',
     paddingHorizontal: SPACING.xs,
   },
   headerRight: {
@@ -1049,13 +1028,13 @@ const styles = StyleSheet.create({
     opacity: 0.65,
     textAlign: 'center',
     marginTop: 0,
-    marginBottom: SPACING.xs,
+    marginBottom: 0,
   },
   subtitleCompact: {
     fontSize: 11,
     lineHeight: 14,
     marginTop: 0,
-    marginBottom: SPACING.xs,
+    marginBottom: 0,
   },
   // ── Header controls (match HeaderBackButton icon / standard raised controls) ──
   counterBadge: {
@@ -1102,13 +1081,13 @@ const styles = StyleSheet.create({
     flexWrap: 'nowrap',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: SPACING.sm,
+    paddingHorizontal: 0,
     height: 44,
     minWidth: 0,
   },
   selectedStripContentCompact: {
     height: 36,
-    paddingHorizontal: SPACING.xs,
+    paddingHorizontal: 0,
   },
   selectedTopicPill: {
     borderRadius: BORDER_RADIUS.button,
@@ -1176,6 +1155,10 @@ const styles = StyleSheet.create({
     minHeight: 0,
     minWidth: 0,
   },
+  // Keep the established topic-card position. The shared outer inset is for chrome.
+  topicGridBleed: {
+    marginHorizontal: -SPACING.xl,
+  },
   loadingWrap: {
     flex: 1,
     alignItems: 'center',
@@ -1191,9 +1174,6 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.xl,
     paddingTop: SPACING.xs,
     width: '100%',
-  },
-  gridScrollContentWeb: {
-    paddingHorizontal: WEB_GRID_INNER_PAD,
   },
   categoryList: {
     width: '100%',
@@ -1226,10 +1206,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-  },
-  cardImage: {
-    width: '100%',
-    height: '100%',
   },
   missingPictureLabel: {
     fontFamily: FONTS.uiBold,
@@ -1277,8 +1253,8 @@ const styles = StyleSheet.create({
   // ── Floating action panel ────────────────────────────────────────────
   floatingPanel: {
     position: 'absolute',
-    left: SPACING.lg,
-    right: SPACING.lg,
+    left: 0,
+    right: 0,
     alignItems: 'center',
     zIndex: 100,
   },

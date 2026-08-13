@@ -12,7 +12,7 @@ import {
 import { Pressable } from '@/components/ui/Pressable';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useAction } from 'convex/react';
 import {
@@ -21,7 +21,6 @@ import {
   BORDER_RADIUS,
   COLORS,
   FONTS,
-  LAYOUT,
   SOFT_SURFACE_FACE as LIGHT_SURFACE_FACE,
   softSurfaceLift,
   getStandardChromeTopPadding,
@@ -35,7 +34,7 @@ import {
 } from '@/lib/i18n/config';
 import { getRowDirection } from '@/lib/i18n/direction';
 import { useI18n } from '@/lib/i18n/useI18n';
-import { useViewportLayout } from '@/lib/hooks/useViewportLayout';
+import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 import { isAuthDisabled } from '@/lib/authMode';
 import { PublicAuthEntry } from '@/components/PublicAuthEntry';
 import { ScreenContent } from '@/components/ScreenContent';
@@ -62,7 +61,9 @@ function formatTokens(n: number, locale: string) {
 
 export default function SettingsScreen() {
   const { width } = useWindowDimensions();
-  const hubMaxWidth = useViewportLayout().contentMaxWidth('hub');
+  const insets = useSafeAreaInsets();
+  const { paddingLeft, paddingRight } = topicCardScreenPadding(width, insets, Platform.OS === 'web');
+  const horizontalPad = { paddingLeft, paddingRight };
   const { isSignedIn } = useAuth();
   const { user } = useUser();
   const { signOut } = useClerk();
@@ -166,12 +167,12 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView
       collapsable={false}
-      edges={['top', 'bottom', 'left', 'right']}
+      edges={['top', 'bottom']}
       style={[styles.safeArea, { backgroundColor: canvas }]}
     >
       <ScreenContent fullWidth style={styles.settingsViewport}>
         {/* One frame owns outer gutter so header controls and content cards share edges. */}
-        <View style={[styles.contentFrame, { maxWidth: hubMaxWidth }]}>
+        <View style={[styles.contentFrame, horizontalPad]}>
         <View style={styles.header}>
           <View style={styles.headerSide}>
             <Pressable
@@ -889,11 +890,9 @@ const styles = StyleSheet.create({
   contentFrame: {
     flex: 1,
     width: '100%',
-    maxWidth: LAYOUT.hubMaxWidth,
     alignSelf: 'center',
     minWidth: 0,
     minHeight: 0,
-    paddingHorizontal: LAYOUT.screenGutter,
   },
   settingsScroll: {
     flex: 1,

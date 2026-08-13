@@ -1,21 +1,21 @@
 import { useCallback } from 'react';
-import { Platform, View, Text, StyleSheet, ScrollView } from 'react-native';
+import { Platform, View, Text, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/components/ui/Pressable';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   SPACING,
   BORDER_RADIUS,
   FONTS,
   TYPE_SCALE,
-  LAYOUT,
   getStandardChromeTopPadding,
 } from '@/constants';
 import { SHOW_HOT_SEAT_UI } from '@/constants/featureFlags';
 import { ScreenContent } from '@/components/ScreenContent';
 import { PillCollapsibleSection } from '@/components/PillCollapsibleSection';
 import { PublicAuthEntry } from '@/components/PublicAuthEntry';
+import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 import { useTheme } from '@/lib/hooks/useTheme';
 import { HOME_SOFT_UI } from '@/themes';
 import { useI18n } from '@/lib/i18n/useI18n';
@@ -66,6 +66,10 @@ export default function HowToPlayScreen() {
   const router = useRouter();
   const colors = useTheme();
   const { direction, t, uiLocale } = useI18n();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const { paddingLeft, paddingRight } = topicCardScreenPadding(width, insets, Platform.OS === 'web');
+  const horizontalPad = { paddingLeft, paddingRight };
   const rowDir = getRowDirection(direction);
   const backIcon: keyof typeof Ionicons.glyphMap =
     direction === 'rtl' ? 'chevron-forward' : 'chevron-back';
@@ -80,13 +84,13 @@ export default function HowToPlayScreen() {
 
   return (
     <SafeAreaView
-      edges={['top', 'bottom', 'left', 'right']}
+      edges={['top', 'bottom']}
       style={[styles.safeArea, { backgroundColor: HOME_SOFT_UI.colors.canvas }]}
     >
       <ScreenContent fullWidth style={styles.viewport}>
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, horizontalPad]}
           showsVerticalScrollIndicator={false}
         >
           <View style={[styles.topBar, { flexDirection: rowDir }]}>
@@ -202,7 +206,6 @@ const styles = StyleSheet.create({
     minHeight: 0,
   },
   scrollContent: {
-    paddingHorizontal: LAYOUT.screenGutter,
     paddingTop: getStandardChromeTopPadding(Platform.OS === 'web'),
     paddingBottom: SPACING.xxl,
     gap: SPACING.lg,

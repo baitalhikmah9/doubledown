@@ -1,7 +1,7 @@
-import { Platform, View, Text, StyleSheet } from 'react-native';
+import { Platform, View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/components/ui/Pressable';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   SPACING,
   FONT_SIZES,
@@ -15,6 +15,7 @@ import { SHOW_HOT_SEAT_UI } from '@/constants/featureFlags';
 import { useI18n } from '@/lib/i18n/useI18n';
 import { useDarkModeFlatTop } from '@/lib/hooks/useTheme';
 import { goBackOrReplace } from '@/lib/navigation/goBackOrReplace';
+import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 import { HOME_SOFT_UI } from '@/themes';
 
 const T = HOME_SOFT_UI;
@@ -29,9 +30,14 @@ export default function RulesModal() {
   const surface = T.colors.surface;
   const textPrimary = T.colors.textPrimary;
   const textMuted = T.colors.textMuted;
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const { paddingLeft, paddingRight } = topicCardScreenPadding(width, insets, Platform.OS === 'web');
+  const horizontalPad = { paddingLeft, paddingRight };
 
   return (
-    <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.safeArea, { backgroundColor: canvas }]}>
+    <SafeAreaView edges={['top', 'bottom']} style={[styles.safeArea, { backgroundColor: canvas }]}>
+      <View style={[styles.pageColumn, horizontalPad]}>
       <View
         style={[
           styles.header,
@@ -40,7 +46,6 @@ export default function RulesModal() {
           softSurfaceLift(),
           {
             backgroundColor: surface,
-            marginHorizontal: LAYOUT.screenGutter,
             marginTop: getStandardChromeTopPadding(Platform.OS === 'web'),
             borderRadius: 14,
           },
@@ -90,6 +95,7 @@ export default function RulesModal() {
           </Text>
         </View>
       </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -97,6 +103,11 @@ export default function RulesModal() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+  },
+  pageColumn: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 0,
   },
   header: {
     flexDirection: 'row',
@@ -124,7 +135,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     gap: SPACING.lg,
-    padding: LAYOUT.screenGutter,
+    paddingVertical: LAYOUT.screenGutter,
     minHeight: 0,
   },
   column: {

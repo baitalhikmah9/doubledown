@@ -1,0 +1,12 @@
+# Taste
+- Prefers driving store/release work through CLI tools (e.g., `asc` for App Store Connect) instead of the web UI. Confidence: 0.8
+- Prefers using MCP servers for third-party services (RevenueCat, App Store Connect) and proactively asks whether a service has an MCP or CLI before falling back to manual/browser work; uses browser automation for web-only setup when no MCP/CLI exists. Confidence: 0.8
+- Wants end-to-end setup verified before acting — e.g., check that code, external services, and CLI config are all correctly wired before proceeding with builds/submissions. Confidence: 0.8
+- Handles manual login/auth steps himself and reports back ("i've logged into revenuecat", "done"), expecting the agent to continue from that point rather than doing auth itself. Confidence: 0.7
+- Tests on a real phone and expects the agent to debug device-reported errors, including driving the phone via mobile tools when asked. Confidence: 0.8
+- Installs Android debug builds on a physical device via adb, built with sandbox (dev) env vars baked in (Expo `EXPO_PUBLIC_*` keys: Clerk test key, Convex dev instance, RevenueCat test store keys). Confidence: 0.7
+- Attaches/invokes the strategic-compact skill to compact context at phase boundaries during long sessions. Confidence: 0.5
+- Wants commits/pushes that exclude secrets and other inappropriate content ("don't include things that are inappropriate"). Confidence: 0.7
+- Keeps final control over irreversible actions: wants a readiness check and an explicit go-ahead before submitting to App Review ("Let's submit."). Confidence: 0.7
+- Issues terse, imperative system-maintenance commands (e.g., "kill all android processes and eject ssd") and expects the agent to autonomously investigate (check running processes, find what's holding the drive), resolve blockers (e.g., force-kill holding processes), and complete the task without step-by-step confirmation — responds "continue" to keep the agent moving. Confidence: 0.6
+- Tracks expected quantities and challenges reported numbers that don't match ("i thought there was 82 pngs? why only 78 staged?"); wants the agent to state verified, fully-contextualized counts up front (e.g., "82 files: 78 PNG + 4 WebP") rather than partial figures that invite confusion. Confidence: 0.5

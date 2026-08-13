@@ -1,4 +1,4 @@
-import { BREAKPOINTS, LAYOUT } from '@/constants';
+import { BREAKPOINTS, LAYOUT, SPACING } from '@/constants';
 
 /** Content column kinds for hybrid large-viewport placement. */
 export type ContentWidthKind = 'form' | 'hub' | 'play' | 'playWide' | 'setup';
@@ -83,6 +83,72 @@ export function getViewportLayout(width: number, height: number): ViewportLayout
     isTall,
     mainJustify,
     scale,
+  };
+}
+
+/**
+ * Safe-area floor used by the topic-card column. Prefer `topicCardScreenPadding`
+ * for page chrome so headers line up with topic-card faces.
+ */
+export function horizontalScreenPadding(insets: { left: number; right: number }) {
+  return {
+    paddingLeft: Math.max(insets.left, LAYOUT.screenGutter),
+    paddingRight: Math.max(insets.right, LAYOUT.screenGutter),
+  };
+}
+
+const TOPIC_COLS = 5;
+const TOPIC_CARD_MAX_WIDTH = 320;
+const TOPIC_WEB_INNER_PAD = 40;
+const TOPIC_WEB_GAP = 28;
+const TOPIC_NATIVE_GAP = 16;
+const TOPIC_NATIVE_COMPACT_GAP = 8;
+const TOPIC_COMPACT_WIDTH = 430;
+
+/**
+ * Screen-to-content inset of a full Choose Topics row (5 cards, centered).
+ * Use this as the outer padding on every page so chrome matches those card faces.
+ */
+export function topicCardScreenPadding(
+  windowWidth: number,
+  insets: { left: number; right: number },
+  isWeb: boolean
+) {
+  const useWebLayout = isWeb && windowWidth >= BREAKPOINTS.wide;
+  const gap = useWebLayout
+    ? TOPIC_WEB_GAP
+    : windowWidth < TOPIC_COMPACT_WIDTH
+      ? TOPIC_NATIVE_COMPACT_GAP
+      : TOPIC_NATIVE_GAP;
+  const { paddingLeft: safeLeft, paddingRight: safeRight } = horizontalScreenPadding(insets);
+  // The topic list already sits inside the safe-area gutter and its own 24pt
+  // content inset. Page chrome must use that combined inset, not the safe area alone.
+  const topicInset = useWebLayout ? 0 : SPACING.xl;
+  const paddingBaseLeft = safeLeft + topicInset;
+  const paddingBaseRight = safeRight + topicInset;
+  const available = Math.max(TOPIC_COLS, windowWidth - paddingBaseLeft - paddingBaseRight);
+  const listWidth = useWebLayout ? Math.min(LAYOUT.playWideMaxWidth, available) : available;
+  const innerPad = useWebLayout ? TOPIC_WEB_INNER_PAD : 0;
+  const innerW = Math.max(TOPIC_COLS, listWidth - innerPad * 2);
+  const cardW = Math.max(
+    1,
+    Math.min(
+      TOPIC_CARD_MAX_WIDTH,
+      Math.floor((innerW - gap * (TOPIC_COLS - 1)) / TOPIC_COLS)
+    )
+  );
+  const contentWidth = cardW * TOPIC_COLS + gap * (TOPIC_COLS - 1);
+  const listOrigin = paddingBaseLeft + (available - listWidth) / 2;
+  const rowOrigin = listOrigin + innerPad + Math.max(0, innerW - contentWidth) / 2;
+  const paddingLeft = Math.max(0, Math.round(rowOrigin));
+  const paddingRight = Math.max(0, windowWidth - paddingLeft - contentWidth);
+  return {
+    paddingLeft,
+    paddingRight,
+    contentWidth,
+    cardW,
+    gap,
+    useWebLayout,
   };
 }
 

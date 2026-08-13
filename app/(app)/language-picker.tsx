@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
   },
   header: {
     height: 72,
-    paddingHorizontal: LAYOUT.screenGutter,
+    paddingHorizontal: 0,
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',

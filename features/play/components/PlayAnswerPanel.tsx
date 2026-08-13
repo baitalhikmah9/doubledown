@@ -1155,6 +1155,7 @@ export function PlayAnswerPanel({
       bodyScrollEnabled={false}
       bodyFrame={false}
       bodyEdgeToEdge
+      contentSafeAreaHorizontal
       onBack={confirmLeaveMatch}
       footer={footer}
     >

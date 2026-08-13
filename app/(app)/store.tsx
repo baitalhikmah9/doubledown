@@ -7,6 +7,7 @@ import {
   useWindowDimensions,
   ActivityIndicator,
   Platform,
+  Linking,
 } from 'react-native';
 import { showThemedAlert } from '@/store/themedAlert';
 import { Pressable } from '@/components/ui/Pressable';
@@ -15,17 +16,17 @@ import { useAuth } from '@clerk/clerk-expo';
 import { Redirect, useRouter } from 'expo-router';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   SPACING,
   FONTS,
-  LAYOUT,
   SOFT_SURFACE_FACE,
   softSurfaceLift,
   getStandardChromeTopPadding,
 } from '@/constants';
 import { ScreenContent } from '@/components/ScreenContent';
 import { HubTokenChip } from '@/components/HubTokenChip';
+import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 import {
   formatTokens,
   buildDisplayBundles,
@@ -33,7 +34,6 @@ import {
 } from '@/features/play/storeBundles';
 import { getRowDirection } from '@/lib/i18n/direction';
 import { useI18n } from '@/lib/i18n/useI18n';
-import { useViewportLayout } from '@/lib/hooks/useViewportLayout';
 import { useDarkModeFlatTop } from '@/lib/hooks/useTheme';
 import { isAuthDisabled } from '@/lib/authMode';
 import { usePlayStore } from '@/store/play';
@@ -67,7 +67,11 @@ function getPromoErrorMessage(error?: string) {
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const IS_IOS_PLATFORM = Platform.OS === 'ios';
-const IS_NATIVE_PLATFORM = IS_IOS_PLATFORM || Platform.OS === 'android';
+const IS_ANDROID_PLATFORM = Platform.OS === 'android';
+const IS_NATIVE_PLATFORM = IS_IOS_PLATFORM || IS_ANDROID_PLATFORM;
+/** Promo redeem UI is web-only. Android deep-links to the site; iOS shows neither. */
+const IS_WEB_PLATFORM = Platform.OS === 'web';
+const PLAYBACKFIRE_SITE_URL = 'https://playbackfire.com';
 // Web is purchaseable when a RevenueCat Web Billing key is configured.
 const IS_WEB_PURCHASE_ENABLED =
   Platform.OS === 'web' &&
@@ -166,7 +170,9 @@ export default function StoreScreen() {
   const rowDir = getRowDirection(direction);
   const router = useRouter();
   const { width, height } = useWindowDimensions();
-  const hubMaxWidth = useViewportLayout().contentMaxWidth('hub');
+  const insets = useSafeAreaInsets();
+  const { paddingLeft, paddingRight } = topicCardScreenPadding(width, insets, Platform.OS === 'web');
+  const horizontalPad = { paddingLeft, paddingRight };
   const darkModeFlatTop = useDarkModeFlatTop();
   const isDarkTheme = useThemeStore((s) => s.paletteId) === 'dark';
   const isCompactViewport = height < 740 || width < 390;
@@ -263,7 +269,7 @@ export default function StoreScreen() {
           const tokens = outcome.tokensGranted || bundle.tokensGranted;
           showThemedAlert(
             'Purchase Complete',
-            `${formatTokens(tokens)} tokens have been added to your balance.`
+            `${formatTokens(tokens)} tokens added to your balance.`
           );
         } else {
           showThemedAlert(
@@ -338,11 +344,15 @@ export default function StoreScreen() {
         return;
       }
 
-      const tokenHint =
+      const granted =
         typeof result.tokensGranted === 'number' && result.tokensGranted > 0
-          ? ` ${formatTokens(result.tokensGranted)} tokens added.`
-          : '';
-      setPromoSuccess(`${t('store.voucherSuccess')}${tokenHint}`);
+          ? result.tokensGranted
+          : null;
+      setPromoSuccess(
+        granted != null
+          ? `${formatTokens(granted)} tokens added to your balance.`
+          : t('store.voucherSuccess')
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
       setPromoError(
@@ -389,7 +399,7 @@ export default function StoreScreen() {
   return (
     <SafeAreaView
       collapsable={false}
-      edges={['top', 'bottom', 'left', 'right']}
+      edges={['top', 'bottom']}
       style={[styles.safeArea, { backgroundColor: canvas }]}
     >
       <ScreenContent fullWidth style={styles.viewport}>
@@ -398,7 +408,7 @@ export default function StoreScreen() {
           outer pad above STORE matches pad below redeem; free height splits evenly
           between header↔cards and cards↔redeem.
         */}
-        <View style={[styles.contentFrame, { maxWidth: hubMaxWidth }]}>
+        <View style={[styles.contentFrame, horizontalPad]}>
           {/* ── Header ─────────────────────────────────────── */}
           <View style={styles.header}>
             <View style={styles.headerSide}>
@@ -443,6 +453,7 @@ export default function StoreScreen() {
           <View
             style={[
               styles.storeBody,
+              // iOS has no redeem footer or site CTA strip.
               IS_IOS_PLATFORM && styles.storeBodyWithoutRedeem,
               isCompactViewport && styles.storeBodyCompact,
               isTightViewport && styles.storeBodyTight,
@@ -454,7 +465,7 @@ export default function StoreScreen() {
                 <Ionicons name="information-circle-outline" size={16} color={textMuted} />
                 <Text style={[styles.statusBannerText, { color: textMuted }]}>
                   In-app purchases are only available on iOS, Android, and the web app. Promo codes can be
-                  redeemed on any platform.
+                  redeemed on the web at playbackfire.com.
                 </Text>
               </View>
             )}
@@ -505,9 +516,9 @@ export default function StoreScreen() {
             </Text>
           </View>
 
-          {/* Apple guideline 3.1.1: promo codes cannot grant paid digital tokens on iOS. */}
-          {!IS_IOS_PLATFORM && (
-          <View style={styles.redeemSection}>
+          {/* Web: redeem. Android: external site CTA. iOS: neither (Apple 3.1.1). */}
+          {IS_WEB_PLATFORM ? (
+          <View style={styles.redeemSection} testID="store-redeem-section">
             <Text style={[styles.redeemTitle, isCompactViewport && styles.redeemTitleCompact, { color: textPrimary }]}>REDEEM CODE</Text>
             <View
               style={[
@@ -562,7 +573,42 @@ export default function StoreScreen() {
             {promoError ? <Text style={styles.promoErrorText}>{promoError}</Text> : null}
             {promoSuccess ? <Text style={styles.promoSuccessText}>{promoSuccess}</Text> : null}
           </View>
-          )}
+          ) : null}
+          {IS_ANDROID_PLATFORM ? (
+          <View style={styles.redeemSection} testID="store-android-promo-cta">
+            <Text
+              style={[
+                styles.nativePromoCtaText,
+                isCompactViewport && styles.nativePromoCtaTextCompact,
+                { color: textMuted },
+              ]}
+            >
+              To input promo/coupon codes, head over to playbackfire.com.
+            </Text>
+            <Pressable
+              onPress={() => {
+                void Linking.openURL(PLAYBACKFIRE_SITE_URL);
+              }}
+              accessibilityRole="link"
+              accessibilityLabel="Open playbackfire.com to redeem promo codes"
+              style={({ pressed }) => [
+                styles.nativePromoCtaButton,
+                SOFT_SURFACE_FACE,
+                darkModeFlatTop,
+                softSurfaceLift(),
+                {
+                  backgroundColor: surface,
+                  opacity: pressed ? 0.92 : 1,
+                  transform: pressed ? [{ scale: 0.98 }] : [{ scale: 1 }],
+                },
+              ]}
+            >
+              <Text style={[styles.nativePromoCtaButtonText, { color: textPrimary }]}>
+                OPEN PLAYBACKFIRE.COM
+              </Text>
+            </Pressable>
+          </View>
+          ) : null}
         </View>
       </ScreenContent>
     </SafeAreaView>
@@ -586,11 +632,9 @@ const styles = StyleSheet.create({
   contentFrame: {
     flex: 1,
     width: '100%',
-    maxWidth: LAYOUT.hubMaxWidth,
     alignSelf: 'center',
     minWidth: 0,
     minHeight: 0,
-    paddingHorizontal: LAYOUT.screenGutter,
     paddingTop: getStandardChromeTopPadding(Platform.OS === 'web'),
     paddingBottom: getStandardChromeTopPadding(Platform.OS === 'web'),
     justifyContent: 'space-between',
@@ -785,6 +829,32 @@ const styles = StyleSheet.create({
   redeemSection: {
     width: '100%',
     alignItems: 'center',
+  },
+  nativePromoCtaText: {
+    fontFamily: FONTS.ui,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  nativePromoCtaTextCompact: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: SPACING.xs,
+  },
+  nativePromoCtaButton: {
+    minHeight: 44,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nativePromoCtaButtonText: {
+    fontFamily: FONTS.uiBold,
+    fontSize: 13,
+    letterSpacing: 0.8,
   },
   redeemTitle: {
     fontFamily: FONTS.uiBold,
