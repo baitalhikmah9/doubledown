@@ -4,7 +4,10 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import type { GameConfig, GameSessionState, QuestionCard } from '@/features/shared';
 
 import { StyleSheet } from 'react-native';
-import PlayQuestionScreen, { getQuestionTextSafeWidth } from '@/app/(app)/play/question';
+import PlayQuestionScreen, {
+  getQuestionTextSafeWidth,
+  getQuestionViewportScale,
+} from '@/app/(app)/play/question';
 import { PALETTES } from '@/constants/theme';
 import { usePlayStore } from '@/store/play';
 import { useThemeStore } from '@/store/theme';
@@ -159,10 +162,16 @@ function createSession(overrides: Partial<GameSessionState> = {}): GameSessionSt
   };
 }
 
-describe('question text safe width', () => {
+describe('question viewport sizing', () => {
   it('keeps text clear of landscape cutout and navigation insets', () => {
     expect(getQuestionTextSafeWidth(844, 42, 48, 16)).toBe(738);
     expect(getQuestionTextSafeWidth(844, 0, 0, 16)).toBe(812);
+  });
+
+  it('scales web question chrome proportionally with viewport area', () => {
+    expect(getQuestionViewportScale(1200, 675)).toBe(1);
+    expect(getQuestionViewportScale(1800, 1012.5)).toBe(1.5);
+    expect(getQuestionViewportScale(320, 480)).toBe(0.8);
   });
 });
 

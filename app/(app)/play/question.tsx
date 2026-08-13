@@ -57,6 +57,11 @@ export function getQuestionTextSafeWidth(
   return Math.max(1, windowWidth - left - right);
 }
 
+export function getQuestionViewportScale(width: number, height: number): number {
+  const viewportArea = Math.max(1, width) * Math.max(1, height);
+  return Math.max(0.8, Math.min(1.6, Math.sqrt(viewportArea / (1200 * 675))));
+}
+
 function getQuestionPromptSizing(contentWidthPx: number): { maxFont: number; lineHeight: number } {
   const w = Math.max(200, Math.floor(contentWidthPx));
   const scale = w < 480 ? 0.056 : 0.048;
@@ -118,14 +123,20 @@ const UNREVEALED_QUESTION_TYPE_SCALE = 1.28;
 /** Display size for pre-reveal question + Show Answer control (1 = original). */
 const UNREVEALED_QA_DISPLAY_SCALE = 0.8;
 
-function scaleUpQuestionEmphasis(phase: { fontSize: number; lineHeight: number }): {
-  fontSize: number;
-  lineHeight: number;
-} {
+function scaleUpQuestionEmphasis(
+  phase: { fontSize: number; lineHeight: number },
+  viewportScale = 1
+): { fontSize: number; lineHeight: number } {
   const scale = UNREVEALED_QUESTION_TYPE_SCALE * UNREVEALED_QA_DISPLAY_SCALE;
   return {
-    fontSize: Math.min(Math.round(46 * UNREVEALED_QA_DISPLAY_SCALE), Math.round(phase.fontSize * scale)),
-    lineHeight: Math.min(Math.round(60 * UNREVEALED_QA_DISPLAY_SCALE), Math.round(phase.lineHeight * scale)),
+    fontSize: Math.min(
+      Math.round(46 * UNREVEALED_QA_DISPLAY_SCALE * viewportScale),
+      Math.round(phase.fontSize * scale)
+    ),
+    lineHeight: Math.min(
+      Math.round(60 * UNREVEALED_QA_DISPLAY_SCALE * viewportScale),
+      Math.round(phase.lineHeight * scale)
+    ),
   };
 }
 
@@ -296,12 +307,16 @@ export default function PlayQuestionScreen() {
 
   /** Center weighted responsive layout - must run before any early return (Rules of Hooks). */
   const viewportShortSide = Math.min(windowWidth, windowHeight);
+  const questionViewportScale =
+    Platform.OS === 'web' ? getQuestionViewportScale(windowWidth, windowHeight) : 1;
   const isCompactHeader = windowWidth < 760 || viewportShortSide < 430;
   const isVeryCompactHeader = viewportShortSide < 390;
-  /** Match play-stack HeaderBackButton: labeled pill when there is room, icon squircle when tight. */
-  const backVariant = isCompactHeader ? 'icon' : 'labeled';
+  /** Match the other play screens: compact chevron-only back control. */
+  const backVariant = 'icon' as const;
   const topicPad = topicCardScreenPadding(windowWidth, insets, Platform.OS === 'web');
-  const chromeSideWidth = isVeryCompactHeader ? 70 : isCompactHeader ? 78 : 112;
+  const chromeSideWidth = Math.round(
+    (isVeryCompactHeader ? 70 : isCompactHeader ? 78 : 112) * questionViewportScale
+  );
   /** Matches shared non-home chrome (manual inset - no SafeAreaView top edge). */
   const questionChromePaddingTop = getChromeTopPaddingWithInsets(
     insets.top,
@@ -342,17 +357,21 @@ export default function PlayQuestionScreen() {
     const max = questionPromptSizing.maxFont;
     if (Platform.OS === 'web') {
       const min = getWebMinQuestionFontSize(viewportShortSide);
-      return estimateWebSingleLineFontSize(promptText, promptLayoutWidth, max, min);
+      const typography = estimateWebSingleLineFontSize(promptText, promptLayoutWidth, max, min);
+      return {
+        fontSize: Math.round(typography.fontSize * questionViewportScale),
+        lineHeight: Math.round(typography.lineHeight * questionViewportScale),
+      };
     }
     return {
       fontSize: max,
       lineHeight: questionPromptSizing.lineHeight,
     };
-  }, [promptText, promptLayoutWidth, questionPromptSizing, viewportShortSide]);
+  }, [promptText, promptLayoutWidth, questionPromptSizing, questionViewportScale, viewportShortSide]);
 
   const unrevealedActiveQuestionTypography = useMemo(
-    () => scaleUpQuestionEmphasis(compactQuestionPhaseTypography),
-    [compactQuestionPhaseTypography]
+    () => scaleUpQuestionEmphasis(compactQuestionPhaseTypography, questionViewportScale),
+    [compactQuestionPhaseTypography, questionViewportScale]
   );
 
   const isAnswerPhase = session?.step === 'answer';
@@ -370,21 +389,6 @@ export default function PlayQuestionScreen() {
     if (used >= session.wagersPerTeam) return false;
     return session.teams.length >= 2;
   }, [session]);
-
-  const answerQuestionFontSize = useMemo(() => {
-    const base = Math.min(
-      Platform.OS === 'web' ? 38 : 34,
-      Math.max(18, Math.round(promptLayoutWidth * (isCompactHeader ? 0.04 : 0.034)))
-    );
-    const scaledBase = base * playTextScale;
-    if (session?.phase === 'scoring' || session?.phase === 'answerLock') {
-      return Math.max(12, Math.round(scaledBase * 0.68));
-    }
-    if (isAnswerPhase) {
-      return Math.max(13, Math.round(scaledBase * 0.82));
-    }
-    return Math.max(12, Math.round(scaledBase));
-  }, [isAnswerPhase, isCompactHeader, playTextScale, promptLayoutWidth, session?.phase]);
 
   if (!session?.currentQuestion) {
     // After "Next Turn", store clears currentQuestion before the fade to board finishes.
@@ -455,13 +459,27 @@ export default function PlayQuestionScreen() {
           ? [
               styles.timerRingPill,
               darkModeFlatTop,
-              { backgroundColor: theme.cardBackground, borderColor: theme.border },
+              {
+                backgroundColor: theme.cardBackground,
+                borderColor: theme.border,
+                minWidth: Math.round(68 * questionViewportScale),
+                height: Math.round(40 * questionViewportScale),
+                borderRadius: Math.round(BORDER_RADIUS.button * questionViewportScale),
+                paddingHorizontal: Math.round(8 * questionViewportScale),
+              },
             ]
           : styles.timerRing
       }
     >
       <Text
-        style={[usePillHeader ? styles.timerValuePill : styles.timerValue, { color: BRAND.charcoal }]}
+        style={[
+          usePillHeader ? styles.timerValuePill : styles.timerValue,
+          {
+            color: BRAND.charcoal,
+            fontSize: Math.round((usePillHeader ? 13 : 14) * questionViewportScale),
+            lineHeight: Math.round((usePillHeader ? 16 : 18) * questionViewportScale),
+          },
+        ]}
         numberOfLines={1}
         adjustsFontSizeToFit={false}
       >
@@ -486,7 +504,13 @@ export default function PlayQuestionScreen() {
         SOFT_SURFACE_STYLES.face,
         darkModeFlatTop,
         SOFT_SURFACE_STYLES.raised,
-        { backgroundColor: theme.cardBackground },
+        {
+          backgroundColor: theme.cardBackground,
+          maxWidth: Math.round(560 * questionViewportScale),
+          minHeight: Math.round(44 * questionViewportScale),
+          paddingVertical: Math.round(8 * questionViewportScale),
+          paddingHorizontal: Math.round(SPACING.md * questionViewportScale),
+        },
       ]}
       accessibilityRole="summary"
     >
@@ -494,7 +518,12 @@ export default function PlayQuestionScreen() {
         style={[
           styles.metaPillText,
           isCompactHeader && styles.metaPillTextCompact,
-          { color: theme.textOnBackground },
+          {
+            color: theme.textOnBackground,
+            fontSize: Math.round((isCompactHeader ? 10.5 : 12) * questionViewportScale),
+            lineHeight: Math.round((isCompactHeader ? 13 : 15) * questionViewportScale),
+            letterSpacing: (isCompactHeader ? 0.55 : 0.75) * questionViewportScale,
+          },
         ]}
         numberOfLines={1}
         adjustsFontSizeToFit
@@ -581,8 +610,6 @@ export default function PlayQuestionScreen() {
     </View>
   ) : null;
 
-  const answerQuestionLineHeight = Math.round(answerQuestionFontSize * 1.14);
-
   const promptBlock = (
     <View style={[styles.revealPromptBlock, { width: questionContentWidth }]}>
       {q.promptImageUrl ? (
@@ -599,8 +626,8 @@ export default function PlayQuestionScreen() {
           getTextStyle(q.locale, 'display', 'center', q.prompt),
           {
             color: T.textPrimary,
-            fontSize: answerQuestionFontSize,
-            lineHeight: answerQuestionLineHeight,
+            fontSize: unrevealedActiveQuestionTypography.fontSize,
+            lineHeight: unrevealedActiveQuestionTypography.lineHeight,
             maxWidth: promptLayoutWidth,
             width: '100%',
             alignSelf: 'center',
@@ -753,7 +780,10 @@ export default function PlayQuestionScreen() {
               {
                 paddingBottom: Math.max(
                   insets.bottom,
-                  SPACING.lg + (showAnswerPhaseNextTurnDock ? 82 : 0)
+                  Math.round(
+                    (SPACING.lg + (showAnswerPhaseNextTurnDock ? 82 : 0)) *
+                      questionViewportScale
+                  )
                 ),
                 paddingHorizontal: answerPhaseScrollPaddingH,
               },
@@ -772,6 +802,7 @@ export default function PlayQuestionScreen() {
               <PlayAnswerPanel
                 embedded
                 scrollEmbedded
+                viewportScale={questionViewportScale}
                 suppressPostScoreWagerButton={answerPhaseCanWager}
                 suppressPostScoreActions={showAnswerPhaseNextTurnDock}
               />
@@ -790,7 +821,15 @@ export default function PlayQuestionScreen() {
               ]}
               pointerEvents="box-none"
             >
-              <View style={styles.answerNextTurnDockRow}>
+              <View
+                style={[
+                  styles.answerNextTurnDockRow,
+                  {
+                    maxWidth: Math.round(600 * questionViewportScale),
+                    gap: Math.round(SPACING.sm * questionViewportScale),
+                  },
+                ]}
+              >
                 <Pressable
                   onPress={() => {
                     continueAfterStandardQuestion();
@@ -806,13 +845,29 @@ export default function PlayQuestionScreen() {
                     SOFT_SURFACE_STYLES.face,
                     darkModeFlatTop,
                     {
+                      minHeight: Math.round(54 * questionViewportScale),
+                      maxWidth: Math.round(320 * questionViewportScale),
+                      borderRadius: Math.round(BORDER_RADIUS.button * questionViewportScale),
+                      paddingHorizontal: Math.round(SPACING.lg * questionViewportScale),
+                      paddingVertical: Math.round(SPACING.md * questionViewportScale),
                       opacity: pressed ? 0.94 : 1,
                       transform: [{ scale: pressed ? 0.98 : 1 }],
                     },
                     neumorphicLift3D('pill'),
                   ]}
                 >
-                  <Text style={styles.answerNextTurnText} numberOfLines={1} adjustsFontSizeToFit>
+                  <Text
+                    style={[
+                      styles.answerNextTurnText,
+                      {
+                        fontSize: Math.round(14 * questionViewportScale),
+                        lineHeight: Math.round(18 * questionViewportScale),
+                        letterSpacing: 1.2 * questionViewportScale,
+                      },
+                    ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
                     {(session.bonus.active ? t('play.finishMatch') : t('play.nextTurn')).toUpperCase()}
                   </Text>
                 </Pressable>
@@ -832,6 +887,12 @@ export default function PlayQuestionScreen() {
                       SOFT_SURFACE_STYLES.face,
                       darkModeFlatTop,
                       {
+                        minHeight: Math.round(54 * questionViewportScale),
+                        maxWidth: Math.round(220 * questionViewportScale),
+                        borderRadius: Math.round(BORDER_RADIUS.button * questionViewportScale),
+                        gap: Math.round(6 * questionViewportScale),
+                        paddingHorizontal: Math.round(SPACING.md * questionViewportScale),
+                        paddingVertical: Math.round(SPACING.md * questionViewportScale),
                         opacity: pressed ? 0.92 : 1,
                         transform: [{ scale: pressed ? 0.98 : 1 }],
                       },
@@ -841,12 +902,29 @@ export default function PlayQuestionScreen() {
                   >
                     <Image
                       source={WAGER_FAB_ICON}
-                      style={styles.answerDockWagerImage}
+                      style={[
+                        styles.answerDockWagerImage,
+                        {
+                          width: Math.round(22 * questionViewportScale),
+                          height: Math.round(22 * questionViewportScale),
+                        },
+                      ]}
                       contentFit="contain"
                       cachePolicy="memory-disk"
                       accessibilityIgnoresInvertColors
                     />
-                    <Text style={styles.answerDockWagerText} numberOfLines={1} adjustsFontSizeToFit>
+                    <Text
+                      style={[
+                        styles.answerDockWagerText,
+                        {
+                          fontSize: Math.round(13 * questionViewportScale),
+                          lineHeight: Math.round(17 * questionViewportScale),
+                          letterSpacing: questionViewportScale,
+                        },
+                      ]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                    >
                       {t('play.wagerCardTitle').toUpperCase()}
                     </Text>
                   </Pressable>
@@ -879,12 +957,24 @@ export default function PlayQuestionScreen() {
             bounces
             nestedScrollEnabled
             >
-              <View style={styles.questionBox}>
+              <View
+                style={[
+                  styles.questionBox,
+                  {
+                    gap: Math.round(SPACING.xl * questionViewportScale),
+                    paddingTop: Math.round(SPACING.sm * questionViewportScale),
+                    paddingBottom: Math.round(SPACING.md * questionViewportScale),
+                  },
+                ]}
+              >
                 {q.promptImageUrl ? (
                   <Image
                     testID="question-prompt-image"
                     source={{ uri: q.promptImageUrl }}
-                    style={styles.promptImage}
+                    style={[
+                      styles.promptImage,
+                      { height: Math.round(200 * questionViewportScale) },
+                    ]}
                     contentFit="contain"
                   />
                 ) : null}
@@ -924,6 +1014,12 @@ export default function PlayQuestionScreen() {
                   accessibilityState={{ disabled: !canShowAnswer }}
                   style={({ pressed }) => [
                     styles.answerButton,
+                    {
+                      width: Math.round(286 * UNREVEALED_QA_DISPLAY_SCALE * questionViewportScale),
+                      minHeight: Math.round(58 * UNREVEALED_QA_DISPLAY_SCALE * questionViewportScale),
+                      paddingHorizontal: Math.round(32 * UNREVEALED_QA_DISPLAY_SCALE * questionViewportScale),
+                      paddingVertical: Math.round(16 * UNREVEALED_QA_DISPLAY_SCALE * questionViewportScale),
+                    },
                     SOFT_SURFACE_STYLES.face,
                     darkModeFlatTop,
                     {
@@ -934,7 +1030,17 @@ export default function PlayQuestionScreen() {
                     neumorphicLift3D('pill'),
                   ]}
                 >
-                  <Text style={[styles.answerButtonText, { color: BRAND.charcoal }]}>
+                  <Text
+                    style={[
+                      styles.answerButtonText,
+                      {
+                        color: BRAND.charcoal,
+                        fontSize: Math.round(15 * UNREVEALED_QA_DISPLAY_SCALE * questionViewportScale),
+                        lineHeight: Math.round(19 * UNREVEALED_QA_DISPLAY_SCALE * questionViewportScale),
+                        letterSpacing: 1.2 * UNREVEALED_QA_DISPLAY_SCALE * questionViewportScale,
+                      },
+                    ]}
+                  >
                     {t('play.showAnswer').toUpperCase()}
                   </Text>
                 </Pressable>
@@ -1140,7 +1246,7 @@ const styles = StyleSheet.create({
   timerRingPill: {
     minWidth: 68,
     height: 40,
-    borderRadius: 20,
+    borderRadius: BORDER_RADIUS.button,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(51, 51, 51, 0.1)',
     alignItems: 'center',

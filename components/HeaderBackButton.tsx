@@ -101,6 +101,7 @@ const styles = StyleSheet.create({
   },
   backPill: {
     alignItems: 'center',
+    justifyContent: 'center',
     gap: SPACING.xs,
     minWidth: 96,
     paddingVertical: SPACING.sm,

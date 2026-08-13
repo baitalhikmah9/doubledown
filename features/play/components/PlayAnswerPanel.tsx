@@ -250,8 +250,8 @@ function getAnswerContentMaxWidth(
   const compactHeight = height < 430;
   const fromShort = short * (compactHeight ? 1.28 : 1.42) + 80;
   const fromWidth = width - 32;
-  const cap = compactHeight ? 620 : 700;
-  return Math.max(320, Math.min(cap, fromShort, fromWidth) * (0.92 + 0.08 * viewportScale));
+  const cap = (compactHeight ? 620 : 700) * Math.max(1, viewportScale);
+  return Math.max(320, Math.min(cap, fromShort * Math.max(1, viewportScale), fromWidth));
 }
 
 function shouldStackAwardLayout(
@@ -268,12 +268,15 @@ function shouldStackAwardLayout(
 export function PlayAnswerPanel({
   embedded = false,
   scrollEmbedded = false,
+  viewportScale,
   suppressPostScoreWagerButton = false,
   suppressPostScoreActions = false,
 }: {
   embedded?: boolean;
   /** Use inside a parent ScrollView: no nested flex-fill so the column sizes naturally. */
   scrollEmbedded?: boolean;
+  /** Parent-owned scale for proportional embedded layouts. */
+  viewportScale?: number;
   /** When the parent (e.g. question route) shows a floating wager CTA, hide the inline orange button. */
   suppressPostScoreWagerButton?: boolean;
   /** When the parent owns a sticky post-score CTA, hide the inline post-score row. */
@@ -302,8 +305,8 @@ export function PlayAnswerPanel({
   const scrollChain = embedded && scrollEmbedded;
 
   const answerViewportScale = useMemo(
-    () => getAnswerViewportScale(windowWidth, windowHeight),
-    [windowWidth, windowHeight]
+    () => viewportScale ?? getAnswerViewportScale(windowWidth, windowHeight),
+    [viewportScale, windowWidth, windowHeight]
   );
 
   const answerContentMaxWidth = useMemo(
@@ -332,7 +335,7 @@ export function PlayAnswerPanel({
   );
 
   const cardRadiusScaled = useMemo(
-    () => Math.max(18, Math.round(BORDER_RADIUS.lg * (0.72 + 0.28 * answerViewportScale))),
+    () => Math.max(10, Math.round(BORDER_RADIUS.button * answerViewportScale)),
     [answerViewportScale]
   );
 
@@ -388,6 +391,16 @@ export function PlayAnswerPanel({
   /** One rhythm for gaps between answer card, headings, awards, and action rows (matches question `chromeGap` × density). */
   const sectionGap = Math.min(Math.round(chromeGap * (0.75 + 0.25 * answerViewportScale)), layoutDensity.sheetGap);
   const pageColumnGap = sectionGap;
+  const actionButtonStyle = {
+    minHeight: Math.round(56 * answerViewportScale),
+    borderRadius: Math.round(BORDER_RADIUS.button * answerViewportScale),
+    paddingHorizontal: Math.round((SPACING.xl + 4) * answerViewportScale),
+  };
+  const actionButtonTextStyle = {
+    fontSize: Math.round(14 * answerViewportScale),
+    lineHeight: Math.round(18 * answerViewportScale),
+    letterSpacing: 2 * answerViewportScale,
+  };
 
   const confirmLeaveMatch = () => {
     const performLeave = async () => {
@@ -446,16 +459,6 @@ export function PlayAnswerPanel({
   const hideSubtitle = windowHeight < 360;
   const awardChoiceCommitted =
     session.phase === 'scoring' && session.lastAwardedTeamId !== undefined;
-  const awardedTeamName =
-    session.lastAwardedTeamId === null
-      ? t('play.neitherTeam')
-      : session.teams.find((team) => team.id === session.lastAwardedTeamId)?.name;
-  const awardConfirmationText = awardChoiceCommitted
-    ? session.lastAwardedTeamId === null
-      ? t('play.noPointsAwarded')
-      : `${awardedTeamName ?? 'Team'} gets ${pointsThisQuestion} points`
-    : null;
-
   const teamAwardSurface = (teamId: string, variant: 'stack' | 'rail' | 'tile'): string => {
     const idle = variant === 'rail' ? colors.backgroundSecondary : colors.cardBackground;
     if (awardChoiceCommitted) {
@@ -486,9 +489,15 @@ export function PlayAnswerPanel({
             resolveWager(true);
             router.replace('/play/board');
           }}
-          style={[styles.softUiBtn, darkModeFlatTop, { backgroundColor: colors.cardBackground }]}
+          style={[
+            styles.softUiBtn,
+            darkModeFlatTop,
+            actionButtonStyle,
+            { backgroundColor: colors.cardBackground },
+          ]}
           textStyle={[
             styles.softUiBtnText,
+            actionButtonTextStyle,
             { color: colors.textOnBackground },
             getTextStyle(undefined, 'bodySemibold', 'center'),
           ]}
@@ -504,19 +513,22 @@ export function PlayAnswerPanel({
           style={[
             styles.softUiBtn,
             darkModeFlatTop,
+            actionButtonStyle,
             { backgroundColor: surfaceColors.dangerSoftBackground },
           ]}
-          textStyle={[styles.softUiBtnText, { color: COLORS.error }, getTextStyle(undefined, 'bodySemibold', 'center')]}
+          textStyle={[
+            styles.softUiBtnText,
+            actionButtonTextStyle,
+            { color: COLORS.error },
+            getTextStyle(undefined, 'bodySemibold', 'center'),
+          ]}
         />
       </View>
     </View>
   ) : undefined;
 
-  const awardTileMinHeight = scrollChain
-    ? windowHeight < 430
-      ? 76
-      : 88
-    : 72;
+  const awardTileMinHeight =
+    (scrollChain ? (windowHeight < 430 ? 76 : 88) : 72) * Math.max(1, answerViewportScale);
   const awardTitleFontSize = Math.max(
     windowWidth >= 900 ? 15 : 12,
     Math.round(layoutDensity.segmentTitleSize * (scrollChain ? 1.14 : 1.05))
@@ -537,9 +549,15 @@ export function PlayAnswerPanel({
             continueAfterStandardQuestion();
             router.replace('/play/board');
           }}
-          style={[styles.softUiBtn, darkModeFlatTop, { backgroundColor: colors.cardBackground }]}
+          style={[
+            styles.softUiBtn,
+            darkModeFlatTop,
+            actionButtonStyle,
+            { backgroundColor: colors.cardBackground },
+          ]}
           textStyle={[
             styles.softUiBtnText,
+            actionButtonTextStyle,
             { color: colors.textOnBackground },
             getTextStyle(undefined, 'bodySemibold', 'center'),
           ]}
@@ -555,8 +573,18 @@ export function PlayAnswerPanel({
                 router.replace('/play/board');
               }
             }}
-            style={[styles.softUiBtn, darkModeFlatTop, { backgroundColor: COLORS.secondary }]}
-            textStyle={[styles.softUiBtnText, { color: '#FFFFFF' }, getTextStyle(undefined, 'bodySemibold', 'center')]}
+            style={[
+              styles.softUiBtn,
+              darkModeFlatTop,
+              actionButtonStyle,
+              { backgroundColor: COLORS.secondary },
+            ]}
+            textStyle={[
+              styles.softUiBtnText,
+              actionButtonTextStyle,
+              { color: '#FFFFFF' },
+              getTextStyle(undefined, 'bodySemibold', 'center'),
+            ]}
           />
         </View>
       ) : null}
@@ -984,6 +1012,7 @@ export function PlayAnswerPanel({
                     {
                       borderColor: colors.border,
                       borderWidth: layoutDensity.borderWidth,
+                      borderRadius: cardRadiusScaled,
                       backgroundColor: colors.cardBackground,
                       shadowColor: colors.primary,
                       paddingVertical: layoutDensity.answerCardPadV * 1.5,
@@ -1057,42 +1086,30 @@ export function PlayAnswerPanel({
                       },
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.whoGetsPointsHeading,
-                        {
-                          color: colors.textOnBackground,
-                          fontSize: Math.max(
-                            FONT_SIZES.xs,
-                            Math.round(
-                              Math.max(FONT_SIZES.sm, layoutDensity.sectionTitleSize - 1) *
-                                (scrollChain ? 0.9 : 1)
-                            )
-                          ),
-                          marginBottom: Math.max(
-                            SPACING.xs,
-                            Math.round(SPACING.lg * combinedCardLayoutScale)
-                          ),
-                        },
-                        getTextStyle(undefined, 'bodyBold', 'center'),
-                      ]}
-                      numberOfLines={2}
-                      accessibilityRole="header"
-                    >
-                      {session.phase === 'scoring' ? t('play.pointsAwarded') : t('play.whoGetsPoints')}
-                    </Text>
-                    {awardConfirmationText ? (
+                    {session.phase !== 'scoring' ? (
                       <Text
                         style={[
-                          styles.awardConfirmationText,
-                          { color: colors.textSecondaryOnBackground },
-                          getTextStyle(undefined, 'bodySemibold', 'center'),
+                          styles.whoGetsPointsHeading,
+                          {
+                            color: colors.textOnBackground,
+                            fontSize: Math.max(
+                              FONT_SIZES.xs,
+                              Math.round(
+                                Math.max(FONT_SIZES.sm, layoutDensity.sectionTitleSize - 1) *
+                                  (scrollChain ? 0.9 : 1)
+                              )
+                            ),
+                            marginBottom: Math.max(
+                              SPACING.xs,
+                              Math.round(SPACING.lg * combinedCardLayoutScale)
+                            ),
+                          },
+                          getTextStyle(undefined, 'bodyBold', 'center'),
                         ]}
-                        numberOfLines={1}
-                        adjustsFontSizeToFit
-                        minimumFontScale={0.82}
+                        numberOfLines={2}
+                        accessibilityRole="header"
                       >
-                        {awardConfirmationText}
+                        {t('play.whoGetsPoints')}
                       </Text>
                     ) : null}
                     <View style={styles.scoringPanelAwardRegion}>{renderAwardTargets()}</View>
@@ -1358,15 +1375,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: SPACING.lg,
     maxWidth: '100%',
-  },
-  awardConfirmationText: {
-    fontFamily: FONTS.uiSemibold,
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: 'center',
-    marginTop: -SPACING.sm,
-    marginBottom: SPACING.md,
-    opacity: 0.82,
   },
   answerCardTop: {
     width: '100%',
