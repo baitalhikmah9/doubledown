@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { Platform, View, Text, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import type { ViewStyle } from 'react-native';
 import { WebAwareModal } from '@/components/WebAwareModal';
 import { Pressable } from '@/components/ui/Pressable';
@@ -7,6 +7,7 @@ import { useI18n } from '@/lib/i18n/useI18n';
 import { useDarkModeFlatTop } from '@/lib/hooks/useTheme';
 import { HOME_SOFT_UI } from '@/themes';
 import { usePlayTextScale } from '@/store/display';
+import { getWebViewportScale } from '@/lib/layout/webViewportScale';
 
 const T = HOME_SOFT_UI.colors;
 
@@ -41,11 +42,24 @@ export function WagerInfoModal({ visible, onClose }: WagerInfoModalProps) {
   const { t, getTextStyle } = useI18n();
   const darkModeFlatTop = useDarkModeFlatTop();
   const textScale = usePlayTextScale();
-  const textSize = (size: number, minimum = 8) => Math.max(minimum, Math.round(size * textScale));
+  const { width, height } = useWindowDimensions();
+  const viewportScale =
+    Platform.OS === 'web' ? getWebViewportScale(width, height) * 1.2 : 1;
+  const scaled = (size: number) => Math.round(size * viewportScale);
+  const textSize = (size: number, minimum = 8) =>
+    Math.max(minimum, Math.round(size * textScale * viewportScale));
+  const cellSpacing = {
+    paddingVertical: scaled(SPACING.xs + 2),
+    paddingHorizontal: scaled(SPACING.xs),
+  };
 
   return (
     <WebAwareModal visible={visible} onRequestClose={onClose}>
-      <View accessibilityViewIsModal style={styles.overlay} testID="wager-info-overlay">
+      <View
+        accessibilityViewIsModal
+        style={[styles.overlay, { padding: scaled(SPACING.md) }]}
+        testID="wager-info-overlay"
+      >
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={onClose}
@@ -53,32 +67,87 @@ export function WagerInfoModal({ visible, onClose }: WagerInfoModalProps) {
           accessibilityRole="button"
         />
         <View
-          style={[styles.card, darkModeFlatTop, { backgroundColor: T.surface }, neumorphicLift(T.shadowStrong, 'header')]}
+          style={[
+            styles.card,
+            darkModeFlatTop,
+            {
+              backgroundColor: T.surface,
+              maxWidth: scaled(588),
+              borderRadius: scaled(28),
+            },
+            neumorphicLift(T.shadowStrong, 'header'),
+          ]}
         >
           <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
+            style={[styles.scroll, { maxHeight: scaled(504) }]}
+            contentContainerStyle={{
+              paddingHorizontal: scaled(SPACING.md),
+              paddingTop: scaled(SPACING.md),
+              paddingBottom: scaled(SPACING.sm),
+            }}
             showsVerticalScrollIndicator={false}
           >
-            <Text style={[styles.title, { color: T.textPrimary, fontSize: textSize(FONT_SIZES.lg) }, getTextStyle(undefined, 'display', 'start')]}>
+            <Text
+              style={[
+                styles.title,
+                {
+                  color: T.textPrimary,
+                  fontSize: textSize(FONT_SIZES.lg),
+                  marginBottom: scaled(SPACING.xs),
+                },
+                getTextStyle(undefined, 'display', 'start'),
+              ]}
+            >
               {t('play.wagerInfoTitle')}
             </Text>
-            <Text style={[styles.para, { color: T.textMuted, fontSize: textSize(FONT_SIZES.sm), lineHeight: textSize(18) }, getTextStyle()]}>
+            <Text
+              style={[
+                styles.para,
+                {
+                  color: T.textMuted,
+                  fontSize: textSize(FONT_SIZES.sm),
+                  lineHeight: textSize(18),
+                  marginBottom: scaled(SPACING.xs),
+                },
+                getTextStyle(),
+              ]}
+            >
               {t('play.wagerInfoParagraph1')}
             </Text>
-            <Text style={[styles.para, { color: T.textMuted, fontSize: textSize(FONT_SIZES.sm), lineHeight: textSize(18) }, getTextStyle()]}>
+            <Text
+              style={[
+                styles.para,
+                {
+                  color: T.textMuted,
+                  fontSize: textSize(FONT_SIZES.sm),
+                  lineHeight: textSize(18),
+                  marginBottom: scaled(SPACING.xs),
+                },
+                getTextStyle(),
+              ]}
+            >
               {t('play.wagerInfoParagraph2')}
             </Text>
 
-            <View style={[styles.table, { borderColor: T.shadow }]}>
+            <View
+              style={[
+                styles.table,
+                {
+                  borderColor: T.shadow,
+                  borderRadius: scaled(14),
+                  marginTop: scaled(SPACING.sm),
+                  marginBottom: scaled(SPACING.sm),
+                },
+              ]}
+            >
               <View style={[styles.tableRow, styles.tableHeaderRow, { borderBottomColor: T.shadow }]}>
-                <Text style={[styles.cell, styles.headerCell, { color: T.textPrimary, fontSize: textSize(10) }, getTextStyle()]}>
+                <Text style={[styles.cell, styles.headerCell, cellSpacing, { color: T.textPrimary, fontSize: textSize(10) }, getTextStyle()]}>
                   {t('play.wagerInfoColMultiplier')}
                 </Text>
-                <Text style={[styles.cell, styles.headerCell, { color: T.textPrimary, fontSize: textSize(10) }, getTextStyle()]}>
+                <Text style={[styles.cell, styles.headerCell, cellSpacing, { color: T.textPrimary, fontSize: textSize(10) }, getTextStyle()]}>
                   {t('play.wagerInfoColCorrect')}
                 </Text>
-                <Text style={[styles.cell, styles.headerCell, { color: T.textPrimary, fontSize: textSize(10) }, getTextStyle()]}>
+                <Text style={[styles.cell, styles.headerCell, cellSpacing, { color: T.textPrimary, fontSize: textSize(10) }, getTextStyle()]}>
                   {t('play.wagerInfoColWrong')}
                 </Text>
               </View>
@@ -90,14 +159,14 @@ export function WagerInfoModal({ visible, onClose }: WagerInfoModalProps) {
                 ] as const
               ).map((row) => (
                 <View key={row[0]} style={[styles.tableRow, { borderBottomColor: T.shadow }]}>
-                  <Text style={[styles.cell, { color: T.textPrimary, fontSize: textSize(FONT_SIZES.xs) }, getTextStyle()]}>{row[0]}</Text>
-                  <Text style={[styles.cell, styles.cellPos, { fontSize: textSize(FONT_SIZES.xs) }, getTextStyle()]}>{row[1]}</Text>
-                  <Text style={[styles.cell, styles.cellNeg, { fontSize: textSize(FONT_SIZES.xs) }, getTextStyle()]}>{row[2]}</Text>
+                  <Text style={[styles.cell, cellSpacing, { color: T.textPrimary, fontSize: textSize(FONT_SIZES.xs) }, getTextStyle()]}>{row[0]}</Text>
+                  <Text style={[styles.cell, styles.cellPos, cellSpacing, { fontSize: textSize(FONT_SIZES.xs) }, getTextStyle()]}>{row[1]}</Text>
+                  <Text style={[styles.cell, styles.cellNeg, cellSpacing, { fontSize: textSize(FONT_SIZES.xs) }, getTextStyle()]}>{row[2]}</Text>
                 </View>
               ))}
             </View>
 
-            <Text style={[styles.warning, { color: T.textMuted, fontSize: textSize(FONT_SIZES.xs), lineHeight: textSize(15) }, getTextStyle()]}>
+            <Text style={[styles.warning, { color: T.textMuted, fontSize: textSize(FONT_SIZES.xs), lineHeight: textSize(15), marginTop: scaled(SPACING.xs) }, getTextStyle()]}>
               {t('play.wagerInfoWarning')}
             </Text>
           </ScrollView>
