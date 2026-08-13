@@ -39,7 +39,9 @@ import { usePlayTextScale } from '@/store/display';
 
 /** Display label under the Web promo tile only (Android / iOS omit the URL). */
 const PROMO_WEB_URL_LABEL = 'PlaybackFire.com';
-const PROMO_QR_SOURCE = require('../../../assets/final-match/web-qr.png');
+const ANDROID_QR_SOURCE = require('../../../assets/final-match/android-qr.png');
+const IOS_QR_SOURCE = require('../../../assets/final-match/ios-qr.png');
+const WEB_QR_SOURCE = require('../../../assets/final-match/web-qr.png');
 
 const TEAM_COLORS = ['#CFF1C5', '#FFE8A8', '#FFD2A5', '#F7BFC4'];
 const ACTION_COLORS = {
@@ -385,20 +387,20 @@ export default function PlayEndScreen() {
           <View style={[styles.promoRow, { gap: promoGap }]}>
             <PromoCard
               platform="Android"
-              source={PROMO_QR_SOURCE}
+              source={ANDROID_QR_SOURCE}
               compact={compact}
               width={promoWidth}
             />
             <PromoCard
               platform="iOS"
-              source={PROMO_QR_SOURCE}
+              source={IOS_QR_SOURCE}
               compact={compact}
               width={promoWidth}
             />
             <PromoCard
               platform="Web"
               url={PROMO_WEB_URL_LABEL}
-              source={PROMO_QR_SOURCE}
+              source={WEB_QR_SOURCE}
               compact={compact}
               width={promoWidth}
             />
@@ -529,7 +531,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     minHeight: 96,
     padding: SPACING.sm,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: BORDER_RADIUS.button,
     flexDirection: 'row',
     alignItems: 'stretch',
     gap: SPACING.sm,
@@ -538,7 +540,7 @@ const styles = StyleSheet.create({
     minHeight: 72,
     padding: 6,
     gap: 6,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: BORDER_RADIUS.button,
   },
   scoreboardTiny: {
     minHeight: 58,
@@ -549,7 +551,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: BORDER_RADIUS.button,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.sm,
     minWidth: 0,
@@ -608,7 +610,7 @@ const styles = StyleSheet.create({
     marginLeft: -28,
     width: 56,
     height: 56,
-    borderRadius: 28,
+    borderRadius: BORDER_RADIUS.button,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2,
@@ -616,7 +618,7 @@ const styles = StyleSheet.create({
   vsBadgeCompact: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: BORDER_RADIUS.button,
     marginLeft: -20,
   },
   vsText: {
@@ -630,14 +632,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   promoCard: {
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: BORDER_RADIUS.button,
     padding: SPACING.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
   promoCardCompact: {
     padding: 6,
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: BORDER_RADIUS.button,
   },
   promoLabel: {
     marginTop: 4,
@@ -694,13 +696,13 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     minHeight: 64,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: BORDER_RADIUS.button,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.sm,
   },
   actionButtonCompact: {
     minHeight: 54,
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: BORDER_RADIUS.button,
     paddingVertical: SPACING.xs,
   },
   actionButtonTiny: {
