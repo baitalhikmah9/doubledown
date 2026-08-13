@@ -41,6 +41,7 @@ import { useThemeStore } from '@/store/theme';
 import { useTokenPurchases } from '@/lib/hooks/useTokenPurchases';
 import { resolveDisplayTokenBalance } from '@/lib/wallet/displayTokenBalance';
 import { HOME_SOFT_UI } from '@/themes';
+import { getWebViewportScale } from '@/lib/layout/webViewportScale';
 
 const T = HOME_SOFT_UI;
 
@@ -78,6 +79,8 @@ const IS_WEB_PURCHASE_ENABLED =
   !!(process.env.EXPO_PUBLIC_REVENUECAT_WEB_API_KEY ?? '').trim();
 const IS_PURCHASE_PLATFORM = IS_NATIVE_PLATFORM || IS_WEB_PURCHASE_ENABLED;
 
+export const getStoreViewportScale = getWebViewportScale;
+
 // ── Sub-components ─────────────────────────────────────────────────────────
 
 function BundleCard({
@@ -87,6 +90,7 @@ function BundleCard({
   isPurchaseUnavailable,
   compact,
   tight,
+  viewportScale,
 }: {
   bundle: DisplayBundle;
   onPress: () => void;
@@ -94,6 +98,7 @@ function BundleCard({
   isPurchaseUnavailable: boolean;
   compact: boolean;
   tight: boolean;
+  viewportScale: number;
 }) {
   const surface = T.colors.surface;
   const textPrimary = T.colors.textPrimary;
@@ -119,6 +124,10 @@ function BundleCard({
           darkModeFlatTop,
           softSurfaceLift(),
           {
+            minHeight: Math.round((tight ? 128 : compact ? 138 : 150) * viewportScale),
+            borderRadius: Math.round(14 * viewportScale),
+            paddingVertical: Math.round((compact ? 10 : 12) * viewportScale),
+            paddingHorizontal: Math.round((compact ? 6 : 8) * viewportScale),
             backgroundColor: surface,
             opacity: buyDisabled ? 0.6 : pressed ? 0.96 : 1,
             transform: pressed && !buyDisabled ? [{ scale: 0.98 }] : [{ scale: 1 }],
@@ -127,17 +136,40 @@ function BundleCard({
         onPress={buyDisabled ? undefined : onPress}
         disabled={buyDisabled}
       >
-        <Text style={[styles.bundleAmount, compact && styles.bundleAmountCompact, { color: textPrimary }]}>
+        <Text
+          style={[
+            styles.bundleAmount,
+            compact && styles.bundleAmountCompact,
+            { color: textPrimary, fontSize: Math.round((compact ? 21 : 24) * viewportScale) },
+          ]}
+        >
           {formatTokens(bundle.tokensGranted)}
         </Text>
-        <Text style={[styles.bundleLabel, compact && styles.bundleLabelCompact, { color: textMuted }]}>
+        <Text
+          style={[
+            styles.bundleLabel,
+            compact && styles.bundleLabelCompact,
+            { color: textMuted, fontSize: Math.round((compact ? 9 : 10) * viewportScale) },
+          ]}
+        >
           TOKENS
         </Text>
 
         {/* Bonus display not available from catalog; kept for layout parity */}
-        <View style={styles.bundleBonusSpacer} />
+        <View style={[styles.bundleBonusSpacer, { height: Math.round(10 * viewportScale) }]} />
 
-        <Text style={[styles.bundlePrice, compact && styles.bundlePriceCompact, { color: textPrimary }]}>
+        <Text
+          style={[
+            styles.bundlePrice,
+            compact && styles.bundlePriceCompact,
+            {
+              color: textPrimary,
+              fontSize: Math.round((compact ? 15 : 17) * viewportScale),
+              marginTop: Math.round((compact ? 2 : 4) * viewportScale),
+              marginBottom: Math.round((compact ? 4 : 6) * viewportScale),
+            },
+          ]}
+        >
           {bundle.priceLabel}
         </Text>
 
@@ -147,13 +179,27 @@ function BundleCard({
             compact && styles.buyButtonCompact,
             SOFT_SURFACE_FACE,
             darkModeFlatTop,
-            { backgroundColor: isPurchaseUnavailable ? textMuted : accentGlow },
+            {
+              height: Math.round((compact ? 28 : 30) * viewportScale),
+              borderRadius: Math.round(14 * viewportScale),
+              backgroundColor: isPurchaseUnavailable ? textMuted : accentGlow,
+            },
           ]}
         >
           {isPurchasing ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
-            <Text style={styles.buyButtonText}>{buyLabel}</Text>
+            <Text
+              style={[
+                styles.buyButtonText,
+                {
+                  fontSize: Math.round(10 * viewportScale),
+                  letterSpacing: 0.4 * viewportScale,
+                },
+              ]}
+            >
+              {buyLabel}
+            </Text>
           )}
         </View>
       </Pressable>
@@ -177,6 +223,7 @@ export default function StoreScreen() {
   const isDarkTheme = useThemeStore((s) => s.paletteId) === 'dark';
   const isCompactViewport = height < 740 || width < 390;
   const isTightViewport = height < 660;
+  const viewportScale = Platform.OS === 'web' ? getStoreViewportScale(width, height) : 1;
 
   // Local play store (fallback token display).
   const localTokens = usePlayStore((state) => state.tokens);
@@ -410,7 +457,7 @@ export default function StoreScreen() {
         */}
         <View style={[styles.contentFrame, horizontalPad]}>
           {/* ── Header ─────────────────────────────────────── */}
-          <View style={styles.header}>
+          <View style={[styles.header, { minHeight: Math.round(64 * viewportScale) }]}>
             <View style={styles.headerSide}>
               <Pressable
                 onPress={handleBack}
@@ -421,7 +468,12 @@ export default function StoreScreen() {
                   SOFT_SURFACE_FACE,
                   darkModeFlatTop,
                   softSurfaceLift(),
-                  { backgroundColor: surface },
+                  {
+                    width: Math.round(44 * viewportScale),
+                    height: Math.round(44 * viewportScale),
+                    borderRadius: Math.round(14 * viewportScale),
+                    backgroundColor: surface,
+                  },
                   {
                     opacity: pressed ? 0.9 : 1,
                     transform: pressed ? [{ scale: 0.98 }] : [{ scale: 1 }],
@@ -430,14 +482,25 @@ export default function StoreScreen() {
               >
                 <Ionicons
                   name={direction === 'rtl' ? 'chevron-forward' : 'chevron-back'}
-                  size={22}
+                  size={Math.round(22 * viewportScale)}
                   color={textPrimary}
                 />
               </Pressable>
             </View>
             {/* Absolute center so STORE lines up with the middle (30) token card. */}
             <View style={styles.headerCenter} pointerEvents="none">
-              <Text style={[styles.title, { color: textPrimary }]}>STORE</Text>
+              <Text
+                style={[
+                  styles.title,
+                  {
+                    color: textPrimary,
+                    fontSize: Math.round(20 * viewportScale),
+                    letterSpacing: 0.8 * viewportScale,
+                  },
+                ]}
+              >
+                STORE
+              </Text>
             </View>
             <View style={[styles.headerSide, styles.headerSideRight]}>
               <HubTokenChip
@@ -445,6 +508,7 @@ export default function StoreScreen() {
                 value={formattedDisplayTokens}
                 rowDirection={rowDir}
                 variant="softUi"
+                scale={viewportScale}
                 accessibilityLabel={`${t('common.tokens')}: ${formattedDisplayTokens}`}
               />
             </View>
@@ -506,12 +570,22 @@ export default function StoreScreen() {
                     isPurchaseUnavailable={isPurchaseUnavailable}
                     compact={isCompactViewport}
                     tight={isTightViewport}
+                    viewportScale={viewportScale}
                   />
                 ))}
               </View>
             )}
 
-            <Text style={[styles.tokenBalanceHint, { color: textMuted }]}>
+            <Text
+              style={[
+                styles.tokenBalanceHint,
+                {
+                  color: textMuted,
+                  fontSize: Math.round(15 * viewportScale),
+                  lineHeight: Math.round(21 * viewportScale),
+                },
+              ]}
+            >
               {t('store.typicalGameTokensHint')}
             </Text>
           </View>
@@ -519,13 +593,30 @@ export default function StoreScreen() {
           {/* Web: redeem. Android: external site CTA. iOS: neither (Apple 3.1.1). */}
           {IS_WEB_PLATFORM ? (
           <View style={styles.redeemSection} testID="store-redeem-section">
-            <Text style={[styles.redeemTitle, isCompactViewport && styles.redeemTitleCompact, { color: textPrimary }]}>REDEEM CODE</Text>
+            <Text
+              style={[
+                styles.redeemTitle,
+                isCompactViewport && styles.redeemTitleCompact,
+                {
+                  color: textPrimary,
+                  fontSize: Math.round(14 * viewportScale),
+                  letterSpacing: 1.2 * viewportScale,
+                },
+              ]}
+            >
+              REDEEM CODE
+            </Text>
             <View
               style={[
                 styles.redeemCard,
                 SOFT_SURFACE_FACE,
                 darkModeFlatTop,
-                { backgroundColor: surface },
+                {
+                  backgroundColor: surface,
+                  borderRadius: Math.round(14 * viewportScale),
+                  padding: Math.round(SPACING.sm * viewportScale),
+                  gap: Math.round(SPACING.sm * viewportScale),
+                },
                 softSurfaceLift(),
               ]}
             >
@@ -540,6 +631,10 @@ export default function StoreScreen() {
                   styles.redeemInput,
                   isCompactViewport && styles.redeemInputCompact,
                   {
+                    height: Math.round((isCompactViewport ? 44 : 48) * viewportScale),
+                    borderRadius: Math.round(14 * viewportScale),
+                    paddingHorizontal: Math.round(SPACING.md * viewportScale),
+                    fontSize: Math.round(14 * viewportScale),
                     color: textPrimary,
                     backgroundColor: redeemFieldBackground,
                     borderColor: promoError ? '#D32F2F' : redeemFieldBorder,
@@ -557,6 +652,11 @@ export default function StoreScreen() {
                   darkModeFlatTop,
                   softSurfaceLift(),
                   {
+                    height: Math.round((isCompactViewport ? 44 : 48) * viewportScale),
+                    borderRadius: Math.round(14 * viewportScale),
+                    paddingHorizontal: Math.round(
+                      (isCompactViewport ? SPACING.md : SPACING.lg) * viewportScale
+                    ),
                     backgroundColor: applyButtonBackground,
                     opacity: isRedeeming ? 0.65 : pressed ? 0.92 : 1,
                     transform: pressed && !isRedeeming ? [{ scale: 0.98 }] : [{ scale: 1 }],
@@ -566,7 +666,17 @@ export default function StoreScreen() {
                 {isRedeeming ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.applyButtonText}>APPLY CODE</Text>
+                  <Text
+                    style={[
+                      styles.applyButtonText,
+                      {
+                        fontSize: Math.round(12 * viewportScale),
+                        letterSpacing: 0.5 * viewportScale,
+                      },
+                    ]}
+                  >
+                    APPLY CODE
+                  </Text>
                 )}
               </Pressable>
             </View>
@@ -712,7 +822,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SPACING.sm,
     width: '100%',
-    borderRadius: 16,
+    borderRadius: 14,
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.md,
   },
@@ -757,7 +867,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   bundleCard: {
-    borderRadius: 16,
+    borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 8,
     alignItems: 'center',
@@ -847,7 +957,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
-    borderRadius: 24,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -868,7 +978,7 @@ const styles = StyleSheet.create({
   redeemCard: {
     flexDirection: 'row',
     alignSelf: 'stretch',
-    borderRadius: 24,
+    borderRadius: 14,
     padding: SPACING.sm,
     alignItems: 'center',
     gap: SPACING.sm,
@@ -876,7 +986,7 @@ const styles = StyleSheet.create({
   redeemInput: {
     flex: 1,
     height: 48,
-    borderRadius: 24,
+    borderRadius: 14,
     paddingHorizontal: SPACING.md,
     fontFamily: FONTS.ui,
     fontSize: 14,

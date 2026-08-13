@@ -48,6 +48,7 @@ import { useThemeStore } from '@/store/theme';
 import { useDisplayStore } from '@/store/display';
 import { useDisplayTokenBalance } from '@/lib/hooks/useDisplayTokenBalance';
 import { HOME_SOFT_UI } from '@/themes';
+import { getWebViewportScale } from '@/lib/layout/webViewportScale';
 
 const T = HOME_SOFT_UI;
 
@@ -60,10 +61,11 @@ function formatTokens(n: number, locale: string) {
 }
 
 export default function SettingsScreen() {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { paddingLeft, paddingRight } = topicCardScreenPadding(width, insets, Platform.OS === 'web');
   const horizontalPad = { paddingLeft, paddingRight };
+  const viewportScale = Platform.OS === 'web' ? getWebViewportScale(width, height) : 1;
   const { isSignedIn } = useAuth();
   const { user } = useUser();
   const { signOut } = useClerk();
@@ -173,7 +175,18 @@ export default function SettingsScreen() {
       <ScreenContent fullWidth style={styles.settingsViewport}>
         {/* One frame owns outer gutter so header controls and content cards share edges. */}
         <View style={[styles.contentFrame, horizontalPad]}>
-        <View style={styles.header}>
+        <View
+          style={[
+            styles.header,
+            {
+              minHeight: Math.round(
+                (Platform.OS === 'web' ? HEADER.heightWeb : HEADER.heightNative) * viewportScale
+              ),
+              paddingTop: getStandardChromeTopPadding(Platform.OS === 'web') * viewportScale,
+              paddingBottom: SPACING.xs * viewportScale,
+            },
+          ]}
+        >
           <View style={styles.headerSide}>
             <Pressable
               onPress={handleBack}
@@ -183,18 +196,37 @@ export default function SettingsScreen() {
                 styles.backButton,
                 SOFT_SURFACE_FACE,
                 softSurfaceLift(),
-                { backgroundColor: surface },
+                {
+                  width: Math.round(44 * viewportScale),
+                  height: Math.round(44 * viewportScale),
+                  borderRadius: Math.round(14 * viewportScale),
+                  backgroundColor: surface,
+                },
                 {
                   opacity: pressed ? 0.9 : 1,
                   transform: pressed ? [{ scale: 0.98 }] : [{ scale: 1 }],
                 },
               ]}
             >
-              <Ionicons name={direction === 'rtl' ? 'chevron-forward' : 'chevron-back'} size={22} color={textPrimary} />
+              <Ionicons
+                name={direction === 'rtl' ? 'chevron-forward' : 'chevron-back'}
+                size={Math.round(22 * viewportScale)}
+                color={textPrimary}
+              />
             </Pressable>
           </View>
           <View style={styles.headerCenter}>
-            <Text style={[styles.headerTitle, { color: textPrimary }]} accessibilityRole="header">
+            <Text
+              style={[
+                styles.headerTitle,
+                {
+                  color: textPrimary,
+                  fontSize: Math.round(20 * viewportScale),
+                  letterSpacing: 0.8 * viewportScale,
+                },
+              ]}
+              accessibilityRole="header"
+            >
               {t('common.settings').toUpperCase()}
             </Text>
           </View>
@@ -204,6 +236,7 @@ export default function SettingsScreen() {
               value={formattedTokens}
               rowDirection={rowDir}
               variant="softUi"
+              scale={viewportScale}
               onPress={() => router.push('/(app)/store')}
               accessibilityLabel={`${t('common.tokens')}: ${formattedTokens}`}
             />

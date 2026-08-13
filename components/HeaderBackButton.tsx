@@ -1,9 +1,10 @@
-import { type FlexStyle, Text, StyleSheet } from 'react-native';
+import { Platform, type FlexStyle, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable } from '@/components/ui/Pressable';
 import { SPACING, BORDER_RADIUS, FONTS, SOFT_SURFACE_FACE, softSurfaceLift } from '@/constants';
 import { HOME_SOFT_UI } from '@/themes';
 import { useDarkModeFlatTop } from '@/lib/hooks/useTheme';
+import { getWebViewportScale } from '@/lib/layout/webViewportScale';
 
 const T = HOME_SOFT_UI.colors;
 
@@ -45,6 +46,8 @@ export function HeaderBackButton({
   variant = 'labeled',
 }: HeaderBackButtonProps) {
   const darkModeFlatTop = useDarkModeFlatTop();
+  const { width, height } = useWindowDimensions();
+  const scale = Platform.OS === 'web' ? getWebViewportScale(width, height) : 1;
   const backIcon: keyof typeof Ionicons.glyphMap =
     direction === 'rtl' ? 'chevron-forward' : 'chevron-back';
   const a11y = accessibilityLabel ?? label;
@@ -58,7 +61,12 @@ export function HeaderBackButton({
           SOFT_SURFACE_FACE,
           darkModeFlatTop,
           softSurfaceLift(),
-          { backgroundColor: T.surface },
+          {
+            width: Math.round(44 * scale),
+            height: Math.round(44 * scale),
+            borderRadius: Math.round(14 * scale),
+            backgroundColor: T.surface,
+          },
           {
             opacity: pressed ? 0.9 : 1,
             transform: pressed ? [{ scale: 0.98 }] : [{ scale: 1 }],
@@ -67,7 +75,7 @@ export function HeaderBackButton({
         accessibilityRole="button"
         accessibilityLabel={a11y}
       >
-        <Ionicons name={backIcon} size={22} color={T.textPrimary} />
+        <Ionicons name={backIcon} size={Math.round(22 * scale)} color={T.textPrimary} />
       </Pressable>
     );
   }
@@ -79,14 +87,29 @@ export function HeaderBackButton({
         styles.backPill,
         darkModeFlatTop,
         BACK_PILL_SHADOW,
-        { backgroundColor: T.surface, flexDirection: rowDirection },
+        {
+          minWidth: Math.round(96 * scale),
+          gap: Math.round(SPACING.xs * scale),
+          paddingVertical: Math.round(SPACING.sm * scale),
+          paddingHorizontal: Math.round(SPACING.md * scale),
+          borderRadius: Math.round(BORDER_RADIUS.button * scale),
+          backgroundColor: T.surface,
+          flexDirection: rowDirection,
+        },
         { opacity: pressed ? 0.92 : 1 },
       ]}
       accessibilityRole="button"
       accessibilityLabel={a11y}
     >
-      <Ionicons name={backIcon} size={20} color={T.textPrimary} />
-      <Text style={[styles.backLabel, { color: T.textPrimary }]}>{label}</Text>
+      <Ionicons name={backIcon} size={Math.round(20 * scale)} color={T.textPrimary} />
+      <Text
+        style={[
+          styles.backLabel,
+          { color: T.textPrimary, fontSize: Math.round(14 * scale) },
+        ]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }

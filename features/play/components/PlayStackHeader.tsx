@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { Platform, View, StyleSheet, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { GameHeader, type GameHeaderTopPad } from '@/components/GameHeader';
 import {
@@ -11,6 +11,7 @@ import { SPACING } from '@/constants';
 import { getRowDirection } from '@/lib/i18n/direction';
 import { useI18n } from '@/lib/i18n/useI18n';
 import { useDisplayTokenBalance } from '@/lib/hooks/useDisplayTokenBalance';
+import { getWebViewportScale } from '@/lib/layout/webViewportScale';
 
 function formatTokens(n: number, locale: string) {
   return n.toLocaleString(locale, { maximumFractionDigits: 0 });
@@ -50,6 +51,8 @@ export function PlayStackHeader({
   const router = useRouter();
   const { direction, t, uiLocale } = useI18n();
   const tokens = useDisplayTokenBalance();
+  const { width, height } = useWindowDimensions();
+  const viewportScale = Platform.OS === 'web' ? getWebViewportScale(width, height) : 1;
   const rowDir = getRowDirection(direction);
 
   const handleBack = useCallback(() => {
@@ -67,7 +70,7 @@ export function PlayStackHeader({
   const formatted = formatTokens(tokens, uiLocale);
 
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, { marginBottom: SPACING.md * viewportScale }]}>
       <GameHeader
         variant="title"
         title={title}
@@ -88,6 +91,7 @@ export function PlayStackHeader({
             value={formatted}
             rowDirection={rowDir}
             variant="softUi"
+            scale={viewportScale}
             onPress={() => router.push('/(app)/store')}
             accessibilityLabel={`${t('common.tokens')}: ${formatted}`}
           />

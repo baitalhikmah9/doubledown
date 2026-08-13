@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Platform, Pressable, useWindowDimensions } from
 import { BackfireTitleLogo } from '@/components/BackfireTitleLogo';
 import { HEADER, SPACING, FONTS, FONT_SIZES, getStandardChromeTopPadding } from '@/constants';
 import { getGameHeaderLogoDisplayWidth } from '@/lib/layout/backfireTitleLogoWidth';
+import { getWebViewportScale } from '@/lib/layout/webViewportScale';
 import { useTheme } from '@/lib/hooks/useTheme';
 import type { ReactNode } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
@@ -91,8 +92,9 @@ export function GameHeader({
   const colors = useTheme();
   const isWeb = Platform.OS === 'web';
   const compact = windowHeight < 560;
+  const viewportScale = isWeb ? getWebViewportScale(windowWidth, windowHeight) : 1;
 
-  const headerHeight = isWeb ? HEADER.heightWeb : HEADER.heightNative;
+  const headerHeight = (isWeb ? HEADER.heightWeb : HEADER.heightNative) * viewportScale;
   const topPad =
     topPadVariant === 'none'
       ? 0
@@ -116,8 +118,8 @@ export function GameHeader({
           {
             minHeight: compact ? 44 : headerHeight,
             // Home: base HEADER pad. Everything else: standard (question) chrome pad.
-            paddingTop: topPad,
-            paddingBottom: compact ? 2 : SPACING.xs,
+            paddingTop: topPad * viewportScale,
+            paddingBottom: (compact ? 2 : SPACING.xs) * viewportScale,
             // Outer horizontal inset is owned by screen shells (topic-card screen padding).
             paddingHorizontal: 0,
           },
@@ -143,12 +145,17 @@ export function GameHeader({
                   style={styles.logoWrap}
                 >
                   <BackfireTitleLogo
-                    width={getGameHeaderLogoDisplayWidth(windowWidth, windowHeight, logoWidth)}
+                    width={
+                      getGameHeaderLogoDisplayWidth(windowWidth, windowHeight, logoWidth) *
+                      viewportScale
+                    }
                   />
                 </Pressable>
               ) : (
                 <BackfireTitleLogo
-                  width={getGameHeaderLogoDisplayWidth(windowWidth, windowHeight, logoWidth)}
+                  width={
+                    getGameHeaderLogoDisplayWidth(windowWidth, windowHeight, logoWidth) * viewportScale
+                  }
                   containerStyle={styles.logoWrap}
                 />
               )
@@ -160,6 +167,11 @@ export function GameHeader({
                   styles.centerTitle,
                   { color: colors.textOnBackground },
                   compact && styles.centerTitleCompact,
+                  {
+                    fontSize: Math.round((compact ? FONT_SIZES.sm : FONT_SIZES.md) * viewportScale),
+                    lineHeight: Math.round((compact ? 18 : 22) * viewportScale),
+                    letterSpacing: (compact ? 1 : 1.2) * viewportScale,
+                  },
                 ]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
@@ -177,13 +189,24 @@ export function GameHeader({
 
       {/* Title below logo (logoTitle variant) */}
       {showTitleBelow ? (
-        <View style={styles.subtitleRow}>
+        <View
+          style={[
+            styles.subtitleRow,
+            { paddingTop: HEADER.titleBelowGap * viewportScale },
+          ]}
+        >
           <Text
             accessibilityRole="header"
             style={[
               styles.subtitle,
               { color: colors.textOnBackground },
               compact && styles.subtitleCompact,
+              {
+                fontSize: Math.round((compact ? 11 : FONT_SIZES.sm) * viewportScale),
+                lineHeight: Math.round((compact ? 14 : 18) * viewportScale),
+                letterSpacing: (compact ? 1.2 : 1.4) * viewportScale,
+                paddingHorizontal: Math.round(SPACING.sm * viewportScale),
+              },
             ]}
             numberOfLines={1}
           >

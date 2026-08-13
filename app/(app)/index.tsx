@@ -33,6 +33,7 @@ import { isAuthDisabled } from '@/lib/authMode';
 import { useViewportLayout } from '@/lib/hooks/useViewportLayout';
 import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 import { getHomeModeCopyLayout, getHomeModeRowLayout } from '@/lib/layout/homeModeLayout';
+import { getWebViewportScale } from '@/lib/layout/webViewportScale';
 import { usePlayStore } from '@/store/play';
 import { useDisplayTokenBalance } from '@/lib/hooks/useDisplayTokenBalance';
 import { refundGameEntry } from '@/lib/wallet/gameEntry';
@@ -156,6 +157,7 @@ export default function AppHubScreen() {
   /** Tighter chrome when vertical space is limited (e.g. phone landscape). */
   const compact = viewport.isCompact;
   const hybridScale = viewport.isWide ? viewport.scale : 1;
+  const headerScale = isWeb ? getWebViewportScale(viewport.width, viewport.height) : 1;
   const modeRowLayout = useMemo(
     () =>
       getHomeModeRowLayout({
@@ -323,6 +325,7 @@ export default function AppHubScreen() {
                     value={formattedTokens}
                     rowDirection={rowDir}
                     variant="softUi"
+                    scale={headerScale}
                     outerStyle={{ alignSelf: 'flex-start' }}
                     onPress={() => router.push('/(app)/store')}
                     accessibilityLabel={`${t('common.tokens')}: ${formattedTokens}`}
@@ -336,12 +339,16 @@ export default function AppHubScreen() {
                     accessibilityLabel={t('common.settings')}
                     style={({ pressed }) => [
                       styles.settingsImageButton,
+                      { width: 52 * headerScale, height: 52 * headerScale },
                       { opacity: pressed ? 0.92 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
                     ]}
                   >
                     <Image
                       source={require('../../assets/qf-settings-button.webp')}
-                      style={styles.settingsImage}
+                      style={[
+                        styles.settingsImage,
+                        { width: 52 * headerScale, height: 52 * headerScale },
+                      ]}
                       contentFit="contain"
                       cachePolicy="memory-disk"
                     />

@@ -36,38 +36,69 @@ type HubTokenChipProps = {
   /** Merged onto the outer wrapper (e.g. `alignSelf: 'flex-start'` for home leading column). */
   outerStyle?: ViewStyle;
   artworkSource?: ImageSourcePropType;
+  /** Optional proportional scale for large web headers. */
+  scale?: number;
 };
 
 function TokenMark({
   artworkSource,
   isDark,
   iconColor,
+  scale = 1,
 }: {
   artworkSource?: ImageSourcePropType;
   isDark: boolean;
   iconColor: string;
+  scale?: number;
 }) {
   /** Wordmark PNG has an opaque black matte - use accent diamond on dark surfaces. */
   if (isDark) {
     return (
-      <View style={styles.darkDiamondMark} accessible={false}>
+      <View
+        style={[
+          styles.darkDiamondMark,
+          { width: Math.round(28 * scale), height: Math.round(28 * scale) },
+        ]}
+        accessible={false}
+      >
         <Ionicons
           name="diamond"
-          size={24}
+          size={Math.round(24 * scale)}
           color="#FFFFFF"
           style={styles.darkDiamondUnderlay}
           accessibilityIgnoresInvertColors
         />
-        <Ionicons name="diamond" size={24} color={iconColor} accessibilityIgnoresInvertColors />
+        <Ionicons
+          name="diamond"
+          size={Math.round(24 * scale)}
+          color={iconColor}
+          accessibilityIgnoresInvertColors
+        />
       </View>
     );
   }
 
   if (!artworkSource) {
-    return <Ionicons name="diamond" size={14} color={iconColor} accessibilityIgnoresInvertColors />;
+    return (
+      <Ionicons
+        name="diamond"
+        size={Math.round(14 * scale)}
+        color={iconColor}
+        accessibilityIgnoresInvertColors
+      />
+    );
   }
 
-  return <Image source={artworkSource} style={styles.artwork} resizeMode="contain" />;
+  return (
+    <Image
+      source={artworkSource}
+      style={[
+        styles.artwork,
+        { width: Math.round(28 * scale), height: Math.round(28 * scale) },
+      ]}
+      resizeMode="contain"
+    />
+  );
 }
 
 /**
@@ -83,6 +114,7 @@ export function HubTokenChip({
   variant = 'default',
   outerStyle,
   artworkSource,
+  scale = 1,
 }: HubTokenChipProps) {
   useThemeStore((state) => state.paletteId);
   const soft = HOME_SOFT_UI.colors;
@@ -111,11 +143,39 @@ export function HubTokenChip({
     const innerSoft = (
       <View
         testID="hub-token-chip-face"
-        style={[styles.softFace, SOFT_SURFACE_FACE, softSurfaceLift(), softFaceStyle]}
+        style={[
+          styles.softFace,
+          SOFT_SURFACE_FACE,
+          softSurfaceLift(),
+          softFaceStyle,
+          {
+            height: Math.round(SOFT_SQUIRCLE_SIZE * scale),
+            minHeight: Math.round(SOFT_SQUIRCLE_SIZE * scale),
+            borderRadius: Math.round(SOFT_SQUIRCLE_RADIUS * scale),
+            paddingHorizontal: Math.round(SPACING.md * scale),
+          },
+        ]}
       >
-        <View style={[styles.row, styles.softRow, { flexDirection: rowDirection }]}>
-          <TokenMark artworkSource={artworkSource} isDark={isDark} iconColor={tokenIconColor} />
-          <Text testID="hub-token-chip-value" style={[styles.softValue, { color: soft.textPrimary }]}>
+        <View
+          style={[
+            styles.row,
+            styles.softRow,
+            { flexDirection: rowDirection, gap: Math.round(8 * scale) },
+          ]}
+        >
+          <TokenMark
+            artworkSource={artworkSource}
+            isDark={isDark}
+            iconColor={tokenIconColor}
+            scale={scale}
+          />
+          <Text
+            testID="hub-token-chip-value"
+            style={[
+              styles.softValue,
+              { color: soft.textPrimary, fontSize: Math.round(16 * scale) },
+            ]}
+          >
             {value}
           </Text>
         </View>
