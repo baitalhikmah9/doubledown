@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { Platform, View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { WebAwareModal } from '@/components/WebAwareModal';
 import { Pressable } from '@/components/ui/Pressable';
 import { COLORS, FONTS, SPACING } from '@/constants';
@@ -7,6 +7,11 @@ import { useDarkModeFlatTop } from '@/lib/hooks/useTheme';
 import { getPlaySurfaceColors } from '@/features/play/playSurfaceColors';
 import { SOFT_SURFACE_STYLES } from '@/features/play/styles/softSurface';
 import { usePlayTextScale } from '@/store/display';
+
+export function getMatchMenuViewportScale(width: number, height: number): number {
+  const viewportArea = Math.max(1, width) * Math.max(1, height);
+  return Math.max(0.8, Math.min(1.6, Math.sqrt(viewportArea / (1200 * 675))));
+}
 
 export type PlayMatchMenuModalProps = {
   visible: boolean;
@@ -27,13 +32,15 @@ export function PlayMatchMenuModal({
   const { t } = useI18n();
   const surfaceColors = getPlaySurfaceColors();
   const darkModeFlatTop = useDarkModeFlatTop();
-  const textSize = Math.round(15 * usePlayTextScale());
+  const { width, height } = useWindowDimensions();
+  const viewportScale = Platform.OS === 'web' ? getMatchMenuViewportScale(width, height) : 1;
+  const textSize = Math.round(15 * usePlayTextScale() * viewportScale);
 
   return (
     <WebAwareModal visible={visible} onRequestClose={onClose}>
       <View
         accessibilityViewIsModal
-        style={styles.overlay}
+        style={[styles.overlay, { padding: Math.round(SPACING.md * viewportScale) }]}
         testID="play-match-menu-modal"
       >
         <Pressable
@@ -48,7 +55,13 @@ export function PlayMatchMenuModal({
             SOFT_SURFACE_STYLES.face,
             darkModeFlatTop,
             SOFT_SURFACE_STYLES.raised,
-            { backgroundColor: surfaceColors.surface },
+            {
+              backgroundColor: surfaceColors.surface,
+              maxWidth: Math.round(320 * viewportScale),
+              borderRadius: Math.round(28 * viewportScale),
+              padding: Math.round(SPACING.lg * viewportScale),
+              gap: Math.round(SPACING.md * viewportScale),
+            },
           ]}
         >
           <Pressable
@@ -62,11 +75,24 @@ export function PlayMatchMenuModal({
                 backgroundColor: surfaceColors.isDark
                   ? 'rgba(255,255,255,0.12)'
                   : '#F2F2F7',
+                borderRadius: Math.round(16 * viewportScale),
+                minHeight: Math.round(52 * viewportScale),
+                paddingVertical: Math.round(SPACING.md * viewportScale),
+                paddingHorizontal: Math.round(SPACING.lg * viewportScale),
                 opacity: pressed ? 0.85 : 1,
               },
             ]}
           >
-            <Text style={[styles.actionButtonText, { color: surfaceColors.textPrimary, fontSize: textSize }]}>
+            <Text
+              style={[
+                styles.actionButtonText,
+                {
+                  color: surfaceColors.textPrimary,
+                  fontSize: textSize,
+                  lineHeight: Math.round(20 * viewportScale),
+                },
+              ]}
+            >
               {t('common.settings').toUpperCase()}
             </Text>
           </Pressable>
@@ -77,10 +103,18 @@ export function PlayMatchMenuModal({
             style={({ pressed }) => [
               styles.actionButton,
               styles.exitButton,
-              { opacity: pressed ? 0.85 : 1 },
+              {
+                borderRadius: Math.round(16 * viewportScale),
+                minHeight: Math.round(52 * viewportScale),
+                paddingVertical: Math.round(SPACING.md * viewportScale),
+                paddingHorizontal: Math.round(SPACING.lg * viewportScale),
+                opacity: pressed ? 0.85 : 1,
+              },
             ]}
           >
-            <Text style={[styles.exitButtonText, { fontSize: textSize }]}>{t('play.exitGame').toUpperCase()}</Text>
+            <Text style={[styles.exitButtonText, { fontSize: textSize, lineHeight: Math.round(20 * viewportScale) }]}>
+              {t('play.exitGame').toUpperCase()}
+            </Text>
           </Pressable>
         </View>
       </View>

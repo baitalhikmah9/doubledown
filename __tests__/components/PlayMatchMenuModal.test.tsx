@@ -1,7 +1,10 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { PlayMatchMenuModal } from '@/features/play/components/PlayMatchMenuModal';
+import {
+  getMatchMenuViewportScale,
+  PlayMatchMenuModal,
+} from '@/features/play/components/PlayMatchMenuModal';
 
 jest.mock('@/lib/i18n/useI18n', () => ({
   useI18n: () => ({
@@ -25,6 +28,11 @@ jest.mock('@/features/play/playSurfaceColors', () => ({
 }));
 
 describe('PlayMatchMenuModal', () => {
+  it('scales proportionally with web viewport area', () => {
+    expect(getMatchMenuViewportScale(1200, 675)).toBe(1);
+    expect(getMatchMenuViewportScale(1800, 1012.5)).toBe(1.5);
+  });
+
   it('dims the full host viewport behind Settings and Exit Game', () => {
     const onClose = jest.fn();
     render(
