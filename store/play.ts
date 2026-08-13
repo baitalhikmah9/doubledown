@@ -579,6 +579,7 @@ interface PlayStore {
   tokens: number;
   session: GameSessionState | null;
   rapidFire: RapidFireState | null;
+  askedCanonicalKeys: string[];
   hydrate: () => Promise<void>;
   ensureDraft: () => void;
   resetSession: () => void;
@@ -633,12 +634,16 @@ function mergePersistedPlayState(
     typeof partialState.tokens === 'number' && Number.isFinite(partialState.tokens)
       ? partialState.tokens
       : currentState.tokens;
+  const nextAskedCanonicalKeys = Array.isArray(partialState.askedCanonicalKeys)
+    ? [...new Set(partialState.askedCanonicalKeys.filter((key): key is string => typeof key === 'string'))]
+    : currentState.askedCanonicalKeys;
 
   if (partialState.session === null) {
     return {
       ...currentState,
       tokens: nextTokens,
       session: null,
+      askedCanonicalKeys: nextAskedCanonicalKeys,
     };
   }
 
@@ -669,6 +674,7 @@ function mergePersistedPlayState(
     session: nextSession,
     rapidFire: nextRapidFire,
     entryReservationId: nextEntryReservationId,
+    askedCanonicalKeys: nextAskedCanonicalKeys,
   };
 }
 
@@ -682,6 +688,7 @@ function createPlayStore() {
       tokens: 0,
       session: null,
       rapidFire: null,
+      askedCanonicalKeys: [],
       entryReservationId: null,
       hydrate: async () => {
         await usePlayStore.persist.rehydrate();
@@ -986,7 +993,8 @@ function createPlayStore() {
         }));
         const rawBoard = buildBoard(
           session.selectedCategoryIds,
-          session.contentLocaleChain
+          session.contentLocaleChain,
+          new Set(state.askedCanonicalKeys)
         );
         const rumbleAssignment =
           session.mode === 'rumble' ? assignRumbleQuestionParties(rawBoard, teams) : null;
@@ -1038,6 +1046,9 @@ function createPlayStore() {
           const usedQuestionIds = new Set(state.session.usedQuestionIds);
           usedQuestionIds.add(question.id);
           return {
+            askedCanonicalKeys: state.askedCanonicalKeys.includes(question.canonicalKey)
+              ? state.askedCanonicalKeys
+              : [...state.askedCanonicalKeys, question.canonicalKey],
             session: {
               ...state.session,
               currentQuestion: question,
@@ -1305,12 +1316,16 @@ function createPlayStore() {
               const bonusQuestion = getBonusQuestion(
                 session.selectedCategoryIds,
                 session.usedQuestionIds,
-                session.contentLocaleChain
+                session.contentLocaleChain,
+                new Set(state.askedCanonicalKeys)
               );
               if (bonusQuestion) {
                 const usedQuestionIds = new Set(session.usedQuestionIds);
                 usedQuestionIds.add(bonusQuestion.id);
                 return {
+                  askedCanonicalKeys: state.askedCanonicalKeys.includes(bonusQuestion.canonicalKey)
+                    ? state.askedCanonicalKeys
+                    : [...state.askedCanonicalKeys, bonusQuestion.canonicalKey],
                   session: {
                     ...session,
                     currentQuestion: bonusQuestion,
@@ -1370,6 +1385,9 @@ function createPlayStore() {
                 };
 
                 return {
+                  askedCanonicalKeys: state.askedCanonicalKeys.includes(hotSeatQuestion.canonicalKey)
+                    ? state.askedCanonicalKeys
+                    : [...state.askedCanonicalKeys, hotSeatQuestion.canonicalKey],
                   session: {
                     ...session,
                     hotSeat: {
@@ -1537,6 +1555,9 @@ function createPlayStore() {
           const usedQuestionIds = new Set(session.usedQuestionIds);
           usedQuestionIds.add(question.id);
           return {
+            askedCanonicalKeys: state.askedCanonicalKeys.includes(question.canonicalKey)
+              ? state.askedCanonicalKeys
+              : [...state.askedCanonicalKeys, question.canonicalKey],
             session: {
               ...session,
               currentQuestion: question,
@@ -1593,6 +1614,7 @@ function createPlayStore() {
         tokens: state.tokens,
         session: serializeGameSession(state.session),
         rapidFire: serializeRapidFire(state.rapidFire),
+        askedCanonicalKeys: state.askedCanonicalKeys,
         entryReservationId: state.entryReservationId,
       }),
       merge: (persistedState, currentState) =>
@@ -1613,7 +1635,7 @@ const existingPlayStore = playStoreSingletonHolder.__DOUBLEPLAY_USE_PLAY_STORE__
 export const usePlayStore =
   // Check the newest store method so a stale cached instance from before a code
   // update is discarded instead of reused across Fast Refresh.
-  existingPlayStore && typeof existingPlayStore.getState().skipRumbleWait === 'function'
+  existingPlayStore && Array.isArray(existingPlayStore.getState().askedCanonicalKeys)
     ? existingPlayStore
     : (playStoreSingletonHolder.__DOUBLEPLAY_USE_PLAY_STORE__ = createPlayStore());
 

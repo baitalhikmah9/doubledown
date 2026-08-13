@@ -190,7 +190,8 @@ function pickGroupsForBoard(categoryGroups: SourceGroup[]): SourceGroup[] {
 
 export function buildBoard(
   categorySlugs: string[],
-  localeChain: SupportedLocale[] = ['en']
+  localeChain: SupportedLocale[] = ['en'],
+  askedCanonicalKeys: ReadonlySet<string> = new Set()
 ): QuestionCard[] {
   const board: QuestionCard[] = [];
 
@@ -201,12 +202,19 @@ export function buildBoard(
     const groupsForBoard = pickGroupsForBoard(categoryGroups);
 
     for (const group of groupsForBoard) {
-      const pool = group.questionAndanswer;
-      const [iLeft, iRight] = pickTwoDistinctIndices(pool.length);
+      const unaskedIndices = group.questionAndanswer
+        .map((_, index) => index)
+        .filter((index) => !askedCanonicalKeys.has(getCanonicalKey(slug, group.points, index)));
+      const poolIndices = unaskedIndices.length >= 2
+        ? unaskedIndices
+        : group.questionAndanswer.map((_, index) => index);
+      const [leftPoolIndex, rightPoolIndex] = pickTwoDistinctIndices(poolIndices.length);
+      const iLeft = poolIndices[leftPoolIndex]!;
+      const iRight = poolIndices[rightPoolIndex]!;
       const categoryTranslation = resolveCategoryTranslation(slug, group.name, localeChain);
 
       const pushSide = (index: number, side: 'left' | 'right') => {
-        const qa = pool[index]!;
+        const qa = group.questionAndanswer[index]!;
         const canonicalKey = getCanonicalKey(slug, group.points, index);
         const resolvedQuestion = resolveQuestionTranslation(canonicalKey, qa, localeChain);
         board.push({
@@ -235,7 +243,8 @@ export function buildBoard(
 export function getBonusQuestion(
   categorySlugs: string[],
   usedQuestionIds: Set<string>,
-  localeChain: SupportedLocale[] = ['en']
+  localeChain: SupportedLocale[] = ['en'],
+  askedCanonicalKeys: ReadonlySet<string> = new Set()
 ): QuestionCard | null {
   const candidates: QuestionCard[] = [];
 
@@ -246,7 +255,7 @@ export function getBonusQuestion(
       const qa = group.questionAndanswer[index];
       const canonicalKey = getCanonicalKey(slug, group.points, index);
       const id = `${group.categoryId}:${canonicalKey}:bonus`;
-      if (usedQuestionIds.has(id)) continue;
+      if (usedQuestionIds.has(id) || askedCanonicalKeys.has(canonicalKey)) continue;
       const resolvedQuestion = resolveQuestionTranslation(
         canonicalKey,
         qa,
