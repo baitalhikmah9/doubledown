@@ -538,8 +538,8 @@ export default function PlayBoardScreen() {
     bottomInset: Math.max(insets.bottom, 0),
     headerReserve: matchHeaderReserve,
   });
-  /** Prefer measured width; height always uses the window body floor for layout. */
-  const layoutViewportHeight = Math.max(boardBodyHeight, gridViewport.height);
+  /** Use the scaffold's actual body height when it is smaller than the window estimate. */
+  const layoutViewportHeight = gridViewport.height || boardBodyHeight;
   const verticalLayout = useMemo(
     () =>
       computeBoardVerticalLayout({
@@ -1005,7 +1005,7 @@ export default function PlayBoardScreen() {
               backgroundColor: T.colors.canvas,
               // Give Android a definite body height so the topic block can center reliably.
               flexGrow: 0,
-              flexShrink: 0,
+              flexShrink: 1,
               height: boardBodyHeight,
               paddingLeft: bodyPadLeft,
               paddingRight: bodyPadRight,
@@ -1373,6 +1373,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
     overflow: 'visible',
+    zIndex: 1,
   },
   categoryBlock: {
     flexGrow: 0,
