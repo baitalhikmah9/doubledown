@@ -26,19 +26,33 @@ export default function WalletDetailScreen() {
     limit: 20,
   });
   const adjustWallet = useMutation(api.admin.adjustWallet);
+  const currentUser = useQuery(api.users.getCurrentProfile, {});
 
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const [confirming, setConfirming] = useState(false);
+  const [idempotencyKey, setIdempotencyKey] = useState('');
+
   const walletData = wallet;
 
-  const handleAdjust = async () => {
+  const numericAmount = parseInt(amount, 10);
+  const resultingBalance = walletData ? walletData.wallet.balance + (Number.isNaN(numericAmount) ? 0 : numericAmount) : 0;
+  const willBeNegative = walletData ? walletData.wallet.balance + (Number.isNaN(numericAmount) ? 0 : numericAmount) < 0 : false;
+
+  const makeIdempotencyKey = () =>
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+  const handleReview = () => {
     setError('');
-    const num = parseInt(amount, 10);
-    if (Number.isNaN(num)) {
+    if (Number.isNaN(numericAmount)) {
       setError('Enter a valid number.');
+      return;
+    }
+    if (numericAmount === 0) {
+      setError('Adjustment amount must be non-zero.');
       return;
     }
     if (!reason.trim()) {
@@ -49,21 +63,39 @@ export default function WalletDetailScreen() {
       setError('Wallet has no purchaser account id.');
       return;
     }
+    setIdempotencyKey(makeIdempotencyKey());
+    setConfirming(true);
+  };
 
+  const handleConfirm = async () => {
+    setError('');
+    const purchaserAccountId = walletData?.wallet.purchaserAccountId;
+    if (!purchaserAccountId) {
+      setError('Wallet has no purchaser account id.');
+      return;
+    }
     try {
       setSubmitting(true);
       await adjustWallet({
-        purchaserAccountId: walletData.wallet.purchaserAccountId,
-        amount: num,
+        purchaserAccountId,
+        amount: numericAmount,
         reason: reason.trim(),
+        idempotencyKey,
       });
       setAmount('');
       setReason('');
+      setConfirming(false);
+      setIdempotencyKey('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Adjustment failed');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleCancelReview = () => {
+    setConfirming(false);
+    setIdempotencyKey('');
   };
 
   if (wallet === undefined) {
@@ -144,19 +176,62 @@ export default function WalletDetailScreen() {
           </View>
         </View>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        <Pressable
-          style={({ pressed }) => [
-            styles.submitButton,
-            submitting && styles.disabledButton,
-            { opacity: pressed && !submitting ? 0.92 : 1 },
-          ]}
-          onPress={handleAdjust}
-          disabled={submitting}
-        >
-          <Text style={styles.submitButtonText}>
-            {submitting ? 'Applying...' : 'Apply Adjustment'}
-          </Text>
-        </Pressable>
+
+        {confirming ? (
+          <View style={styles.confirmPanel}>
+            <Text style={styles.confirmTitle}>Confirm Adjustment</Text>
+            <View style={styles.confirmRow}>
+              <Text style={styles.confirmLabel}>Current balance</Text>
+              <Text style={styles.confirmValue}>{walletData!.wallet.balance} tokens</Text>
+            </View>
+            <View style={styles.confirmRow}>
+              <Text style={styles.confirmLabel}>Adjustment</Text>
+              <Text style={styles.confirmValue}>{numericAmount}</Text>
+            </View>
+            <View style={styles.confirmRow}>
+              <Text style={styles.confirmLabel}>Resulting balance</Text>
+              <Text style={[styles.confirmValue, willBeNegative && styles.confirmValueDanger]}>
+                {resultingBalance} tokens
+              </Text>
+            </View>
+            <View style={styles.confirmRow}>
+              <Text style={styles.confirmLabel}>Acting admin</Text>
+              <Text style={styles.confirmValue}>
+                {currentUser?.email ?? currentUser?.name ?? currentUser?.clerkId ?? 'Unknown'}
+              </Text>
+            </View>
+            {willBeNegative && (
+              <Text style={styles.warningText}>
+                Warning: the resulting balance would be negative. The backend rejects debits that
+                drive a wallet below zero, so this adjustment will fail unless you add tokens first.
+              </Text>
+            )}
+            <View style={styles.buttonRow}>
+              <Pressable style={styles.secondaryButton} onPress={handleCancelReview}>
+                <Text style={styles.secondaryButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.submitButton, submitting && styles.disabledButton]}
+                onPress={handleConfirm}
+                disabled={submitting}
+              >
+                <Text style={styles.submitButtonText}>
+                  {submitting ? 'Applying...' : 'Confirm'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <Pressable
+            style={({ pressed }) => [
+              styles.submitButton,
+              { opacity: pressed ? 0.92 : 1 },
+            ]}
+            onPress={handleReview}
+          >
+            <Text style={styles.submitButtonText}>Review Adjustment</Text>
+          </Pressable>
+        )}
       </View>
 
       <View style={styles.panel}>
@@ -289,6 +364,64 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 0.6,
     color: '#FFFFFF',
+  },
+  confirmPanel: {
+    borderWidth: 1,
+    borderColor: BRAND_ADMIN_TABLE.inputBorder,
+    borderRadius: 12,
+    padding: SPACING.md,
+    gap: SPACING.sm,
+    backgroundColor: BRAND_ADMIN_TABLE.inputBackground,
+  },
+  confirmTitle: {
+    fontFamily: FONTS.uiBold,
+    fontSize: 14,
+    color: SOFT.textPrimary,
+    marginBottom: 4,
+  },
+  confirmRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  confirmLabel: {
+    fontFamily: FONTS.uiSemibold,
+    fontSize: 12,
+    color: SOFT.textMuted,
+  },
+  confirmValue: {
+    fontFamily: FONTS.ui,
+    fontSize: 13,
+    color: SOFT.textPrimary,
+    textAlign: 'right',
+    flexShrink: 1,
+  },
+  confirmValueDanger: {
+    color: COLORS.error,
+    fontFamily: FONTS.uiBold,
+  },
+  warningText: {
+    fontFamily: FONTS.uiSemibold,
+    fontSize: 13,
+    color: COLORS.warning,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    justifyContent: 'flex-end',
+    marginTop: SPACING.xs,
+  },
+  secondaryButton: {
+    ...BRAND_RAISED_SURFACE,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+  },
+  secondaryButtonText: {
+    fontFamily: FONTS.uiBold,
+    fontSize: 12,
+    letterSpacing: 0.8,
+    color: SOFT.textPrimary,
   },
   empty: {
     fontFamily: FONTS.ui,

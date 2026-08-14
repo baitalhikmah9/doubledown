@@ -13,11 +13,23 @@ export default function PromoCodeDetailScreen() {
   const { promoCodeId } = useLocalSearchParams<{ promoCodeId: string }>();
   const promo = useQuery(api.admin.getPromoCode, { promoCodeId: promoCodeId as any });
   const deactivate = useMutation(api.admin.deactivatePromoCode);
+  const updatePromo = useMutation(api.admin.updatePromoCode);
 
   const [showDisable, setShowDisable] = useState(false);
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const [showEdit, setShowEdit] = useState(false);
+  const [editRewardAmount, setEditRewardAmount] = useState('');
+  const [editUsageCap, setEditUsageCap] = useState('');
+  const [editPerUserLimit, setEditPerUserLimit] = useState('');
+  const [editCampaignName, setEditCampaignName] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editActiveFrom, setEditActiveFrom] = useState('');
+  const [editActiveTo, setEditActiveTo] = useState('');
+  const [editError, setEditError] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   const handleDeactivate = async () => {
     setError('');
@@ -34,6 +46,89 @@ export default function PromoCodeDetailScreen() {
       setError(e instanceof Error ? e.message : 'Failed to deactivate');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleReactivate = async () => {
+    setError('');
+    try {
+      setSubmitting(true);
+      await updatePromo({ promoCodeId: promoCodeId as any, active: true });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to reactivate');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openEdit = () => {
+    if (!promo) return;
+    const { promoCode } = promo;
+    setEditRewardAmount(String(promoCode.rewardAmount));
+    setEditUsageCap(String(promoCode.usageCap));
+    setEditPerUserLimit(String(promoCode.perUserLimit ?? ''));
+    setEditCampaignName(promoCode.metadata?.campaignName ?? '');
+    setEditNotes(promoCode.metadata?.notes ?? '');
+    setEditActiveFrom(toLocalInput(promoCode.activeFrom));
+    setEditActiveTo(toLocalInput(promoCode.activeTo));
+    setEditError('');
+    setShowEdit(true);
+  };
+
+  const handleSave = async () => {
+    setEditError('');
+    const payload: Record<string, unknown> = {};
+    const reward = parseInt(editRewardAmount, 10);
+    if (!Number.isNaN(reward) && reward !== promo!.promoCode.rewardAmount) payload.rewardAmount = reward;
+    const cap = parseInt(editUsageCap, 10);
+    if (!Number.isNaN(cap) && cap !== promo!.promoCode.usageCap) payload.usageCap = cap;
+    if (editPerUserLimit.trim()) {
+      const perUser = parseInt(editPerUserLimit, 10);
+      if (!Number.isNaN(perUser) && perUser !== promo!.promoCode.perUserLimit) payload.perUserLimit = perUser;
+    } else if (promo!.promoCode.perUserLimit !== undefined) {
+      // Convex drops undefined optional args, so clear via an explicit flag.
+      payload.clearPerUserLimit = true;
+    }
+
+    const activeFrom = parseInputToEpoch(editActiveFrom);
+    const activeTo = parseInputToEpoch(editActiveTo);
+    if (activeFrom === 'invalid') {
+      setEditError('Active-from must be a valid date/time or empty.');
+      return;
+    }
+    if (activeTo === 'invalid') {
+      setEditError('Active-to must be a valid date/time or empty.');
+      return;
+    }
+    if (activeFrom !== undefined && activeTo !== undefined && activeFrom >= activeTo) {
+      setEditError('Active-from must be before active-to.');
+      return;
+    }
+    if (activeFrom !== undefined && activeFrom !== promo!.promoCode.activeFrom) payload.activeFrom = activeFrom;
+    if (activeTo !== undefined && activeTo !== promo!.promoCode.activeTo) payload.activeTo = activeTo;
+    if (activeFrom === undefined && promo!.promoCode.activeFrom !== undefined) payload.clearActiveFrom = true;
+    if (activeTo === undefined && promo!.promoCode.activeTo !== undefined) payload.clearActiveTo = true;
+
+    const currentMetadata = promo!.promoCode.metadata ?? {};
+    const metadata: Record<string, string> = {};
+    const campaignName = editCampaignName.trim();
+    const notes = editNotes.trim();
+    if (campaignName !== (currentMetadata.campaignName ?? '')) metadata.campaignName = campaignName;
+    if (notes !== (currentMetadata.notes ?? '')) metadata.notes = notes;
+    if (Object.keys(metadata).length > 0) payload.metadata = metadata;
+
+    if (Object.keys(payload).length === 0) {
+      setShowEdit(false);
+      return;
+    }
+    try {
+      setEditSubmitting(true);
+      await updatePromo({ promoCodeId: promoCodeId as any, ...(payload as any) });
+      setShowEdit(false);
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : 'Failed to update promo code');
+    } finally {
+      setEditSubmitting(false);
     }
   };
 
@@ -79,14 +174,28 @@ export default function PromoCodeDetailScreen() {
       />
 
       <View style={styles.panel}>
-        {isActive ? (
-          <View style={styles.panelHeader}>
-            <View style={styles.panelHeaderSpacer} />
+        <View style={styles.panelHeader}>
+          <View style={styles.panelHeaderSpacer} />
+          {!isActive && (
+            <Pressable
+              style={[styles.secondaryButton, submitting && styles.disabledButton]}
+              onPress={handleReactivate}
+              disabled={submitting}
+            >
+              <Text style={styles.secondaryButtonText}>
+                {submitting ? 'Reactivating...' : 'Reactivate'}
+              </Text>
+            </Pressable>
+          )}
+          <Pressable style={styles.secondaryButton} onPress={openEdit}>
+            <Text style={styles.secondaryButtonText}>Edit</Text>
+          </Pressable>
+          {isActive ? (
             <Pressable style={styles.dangerButton} onPress={() => setShowDisable(true)}>
               <Text style={styles.dangerButtonText}>Disable</Text>
             </Pressable>
-          </View>
-        ) : null}
+          ) : null}
+        </View>
 
         <View style={styles.detailsGrid}>
           <DetailItem label="Mode" value={formatPromoMode(promoCode.mode)} />
@@ -127,6 +236,112 @@ export default function PromoCodeDetailScreen() {
           <DetailItem label="Deactivation Reason" value={promoCode.metadata.deactivationReason} />
         )}
       </View>
+
+      {showEdit && (
+        <View style={styles.panel}>
+          <Text style={styles.panelTitle}>Edit Promo Code</Text>
+          {(promoCode.usedCount ?? 0) > 0 && (
+            <Text style={styles.warningText}>
+              Warning: this code has {promoCode.usedCount} redemption(s). Changing some fields
+              (such as reward amount) may be rejected or affect future redemptions.
+            </Text>
+          )}
+          <View style={styles.formRow}>
+            <View style={styles.formField}>
+              <Text style={styles.formLabel}>Reward Amount</Text>
+              <TextInput
+                value={editRewardAmount}
+                onChangeText={setEditRewardAmount}
+                style={styles.input}
+                keyboardType="numeric"
+              />
+            </View>
+            <View style={styles.formField}>
+              <Text style={styles.formLabel}>Usage Cap</Text>
+              <TextInput
+                value={editUsageCap}
+                onChangeText={setEditUsageCap}
+                style={styles.input}
+                keyboardType="numeric"
+              />
+            </View>
+            <View style={styles.formField}>
+              <Text style={styles.formLabel}>Per-User Limit</Text>
+              <TextInput
+                value={editPerUserLimit}
+                onChangeText={setEditPerUserLimit}
+                style={styles.input}
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+          <View style={styles.formRow}>
+            <View style={styles.formField}>
+              <Text style={styles.formLabel}>Campaign Name</Text>
+              <TextInput
+                value={editCampaignName}
+                onChangeText={setEditCampaignName}
+                style={styles.input}
+                placeholder="e.g. Spring 2025"
+                placeholderTextColor={COLORS.disabled}
+              />
+            </View>
+            <View style={styles.formField}>
+              <Text style={styles.formLabel}>Notes</Text>
+              <TextInput
+                value={editNotes}
+                onChangeText={setEditNotes}
+                style={styles.input}
+                placeholder="Internal notes"
+                placeholderTextColor={COLORS.disabled}
+                multiline
+              />
+            </View>
+          </View>
+          <View style={styles.formRow}>
+            <View style={styles.formField}>
+              <Text style={styles.formLabel}>Active From (YYYY-MM-DDTHH:MM)</Text>
+              <TextInput
+                value={editActiveFrom}
+                onChangeText={setEditActiveFrom}
+                style={styles.input}
+                placeholder="e.g. 2025-01-01T09:00"
+                placeholderTextColor={COLORS.disabled}
+                autoCapitalize="none"
+              />
+            </View>
+            <View style={styles.formField}>
+              <Text style={styles.formLabel}>Active To (YYYY-MM-DDTHH:MM)</Text>
+              <TextInput
+                value={editActiveTo}
+                onChangeText={setEditActiveTo}
+                style={styles.input}
+                placeholder="e.g. 2025-12-31T23:59"
+                placeholderTextColor={COLORS.disabled}
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
+          <Text style={styles.formHint}>
+            Leave Active From / Active To empty to remove the schedule window.
+          </Text>
+          {editError ? <Text style={styles.errorText}>{editError}</Text> : null}
+          <View style={styles.buttonRow}>
+            <Pressable style={styles.secondaryButton} onPress={() => setShowEdit(false)}>
+              <Text style={styles.secondaryButtonText}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.submitButton, editSubmitting && styles.disabledButton]}
+              onPress={handleSave}
+              disabled={editSubmitting}
+            >
+              <Text style={styles.submitButtonText}>
+                {editSubmitting ? 'Saving...' : 'Save Changes'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
 
       {showDisable && (
         <View style={styles.panel}>
@@ -210,6 +425,20 @@ function DetailItem({ label, value }: { label: string; value: string }) {
   );
 }
 
+function toLocalInput(epoch?: number): string {
+  if (epoch === undefined) return '';
+  const d = new Date(epoch);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function parseInputToEpoch(value: string): number | undefined | 'invalid' {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const time = new Date(trimmed).getTime();
+  return Number.isNaN(time) ? 'invalid' : time;
+}
+
 function formatPromoMode(mode?: string) {
   switch (mode) {
     case 'public_single_use':
@@ -284,6 +513,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: SOFT.textMuted,
     marginBottom: 4,
+  },
+  formHint: {
+    fontFamily: FONTS.ui,
+    fontSize: 12,
+    color: SOFT.textMuted,
+  },
+  formRow: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+  },
+  formField: {
+    flex: 1,
+  },
+  warningText: {
+    fontFamily: FONTS.uiSemibold,
+    fontSize: 13,
+    color: COLORS.warning,
+  },
+  submitButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+  },
+  submitButtonText: {
+    fontFamily: FONTS.uiBold,
+    fontSize: 13,
+    letterSpacing: 0.6,
+    color: '#FFFFFF',
   },
   input: {
     borderWidth: 1,

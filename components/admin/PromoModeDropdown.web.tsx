@@ -10,7 +10,12 @@ const SOFT = HOME_SOFT_UI.colors;
 /**
  * Web admin: Radix Dropdown Menu (same primitive family as shadcn/ui DropdownMenu).
  */
-export default function PromoModeDropdown({ value, options, onValueChange }: PromoModeDropdownProps) {
+export default function PromoModeDropdown({
+  value,
+  options,
+  onValueChange,
+  accessibilityLabel = 'Select coupon mode',
+}: PromoModeDropdownProps) {
   const selected = options.find((o) => o.value === value);
   const selectedLabel = selected?.label ?? value;
 
@@ -19,7 +24,7 @@ export default function PromoModeDropdown({ value, options, onValueChange }: Pro
       <DropdownMenu.Trigger asChild>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Select coupon mode"
+          accessibilityLabel={accessibilityLabel}
           style={({ pressed }) => [
             styles.trigger,
             { cursor: 'pointer' },

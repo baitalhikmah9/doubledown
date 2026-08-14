@@ -13,6 +13,9 @@ import AdminLayout, { AdminAccessBoundary } from '@/app/(admin)/_layout';
 import AdminIndexScreen from '@/app/(admin)/index';
 import PromoCodesScreen from '@/app/(admin)/promo-codes';
 import WalletsScreen from '@/app/(admin)/wallets';
+import TransactionsScreen, { exclusiveNextDay, parseDateInput } from '@/app/(admin)/transactions';
+import PurchasesScreen from '@/app/(admin)/purchases';
+import AuditScreen from '@/app/(admin)/audit';
 import AdminRouteIndexScreen from '@/app/admin';
 import AdminSignInScreen from '@/app/admin/sign-in';
 import AdminSignOutScreen from '@/app/(admin)/sign-out';
@@ -636,5 +639,416 @@ describe('Admin web routes', () => {
 
     expect(mockRedirect).toHaveBeenCalledWith('/(app)/');
     expect(screen.queryByText('ADMIN ACCESS')).toBeNull();
+  });
+});
+
+describe('TransactionsScreen', () => {
+  beforeEach(() => {
+    mockUseQuery.mockReturnValue({
+      _id: 'user_123',
+      role: 'admin',
+      email: 'admin@example.com',
+      items: [],
+      nextCursor: null,
+    });
+  });
+
+  it('renders the transaction ledger title', () => {
+    render(<TransactionsScreen />);
+    expect(screen.getByText('TRANSACTIONS')).toBeTruthy();
+  });
+
+  it('renders an empty ledger message', () => {
+    render(<TransactionsScreen />);
+    expect(screen.getByText('No transactions found.')).toBeTruthy();
+  });
+
+  it('offers canonical source filter values, not the legacy store/game labels', () => {
+    render(<TransactionsScreen />);
+    fireEvent.press(screen.getByLabelText('Select source filter'));
+    expect(screen.getByText('Purchase')).toBeTruthy();
+    expect(screen.getByText('Gameplay')).toBeTruthy();
+    expect(screen.getByText('System')).toBeTruthy();
+    expect(screen.getByText('Admin')).toBeTruthy();
+    expect(screen.getByText('Promo')).toBeTruthy();
+    expect(screen.queryByText('Store')).toBeNull();
+    expect(screen.queryByText('Game')).toBeNull();
+  });
+
+  it('pages forward with the returned cursor and resets pagination when a filter changes', () => {
+    const calls: unknown[][] = [];
+    mockUseQuery.mockImplementation((...args: unknown[]) => {
+      calls.push(args);
+      return {
+        _id: 'user_123',
+        role: 'admin',
+        email: 'admin@example.com',
+        items: [
+          {
+            transaction: {
+              _id: 'tx_1',
+              type: 'purchase_grant',
+              amount: 10,
+              source: 'purchase',
+              createdAt: 123,
+            },
+            wallet: null,
+            userEmail: null,
+          },
+        ],
+        nextCursor: 456,
+      };
+    });
+
+    render(<TransactionsScreen />);
+    fireEvent.press(screen.getByText('Next'));
+    const afterNext = calls[calls.length - 1][1] as { cursor?: number };
+    expect(afterNext.cursor).toBe(456);
+
+    fireEvent.press(screen.getByLabelText('Select source filter'));
+    fireEvent.press(screen.getByText('Purchase'));
+    const afterFilter = calls[calls.length - 1][1] as { cursor?: number; source?: string };
+    expect(afterFilter.cursor).toBeUndefined();
+    expect(afterFilter.source).toBe('purchase');
+  });
+
+  it('goes back with Previous using the cursor stack', () => {
+    const calls: unknown[][] = [];
+    mockUseQuery.mockImplementation((...args: unknown[]) => {
+      calls.push(args);
+      return {
+        _id: 'user_123',
+        role: 'admin',
+        email: 'admin@example.com',
+        items: [
+          {
+            transaction: { _id: 'tx_1', type: 'purchase_grant', amount: 10, source: 'purchase', createdAt: 123 },
+            wallet: null,
+            userEmail: null,
+          },
+        ],
+        nextCursor: 789,
+      };
+    });
+
+    render(<TransactionsScreen />);
+    fireEvent.press(screen.getByText('Next'));
+    fireEvent.press(screen.getByText('Previous'));
+    const afterPrevious = calls[calls.length - 1][1] as { cursor?: number };
+    expect(afterPrevious.cursor).toBeUndefined();
+  });
+
+  it('wires inclusive date range args when dates are applied', () => {
+    const calls: unknown[][] = [];
+    mockUseQuery.mockImplementation((...args: unknown[]) => {
+      calls.push(args);
+      return {
+        _id: 'user_123',
+        role: 'admin',
+        email: 'admin@example.com',
+        items: [],
+        nextCursor: null,
+      };
+    });
+
+    render(<TransactionsScreen />);
+    fireEvent.changeText(screen.getByPlaceholderText('e.g. 2025-01-01'), '2025-01-01');
+    fireEvent.changeText(screen.getByPlaceholderText('e.g. 2025-12-31'), '2025-01-01');
+    fireEvent.press(screen.getByText('Apply Dates'));
+    const args = calls[calls.length - 1][1] as { from?: number; to?: number };
+    expect(args.from).toBe(new Date(2025, 0, 1).getTime());
+    // To is the exclusive start of the next day, so 23:59:59.999 of Jan 1
+    // satisfies createdAt < to and the selected day is fully included.
+    expect(args.to).toBe(new Date(2025, 0, 2).getTime());
+  });
+
+  it('keeps Previous reachable on an empty final page', () => {
+    const calls: unknown[][] = [];
+    let callCount = 0;
+    mockUseQuery.mockImplementation((...args: unknown[]) => {
+      calls.push(args);
+      callCount += 1;
+      if (callCount === 1) {
+        return {
+          _id: 'user_123',
+          role: 'admin',
+          email: 'admin@example.com',
+          items: [
+            {
+              transaction: { _id: 'tx_1', type: 'purchase_grant', amount: 10, source: 'purchase', createdAt: 123 },
+              wallet: null,
+              userEmail: null,
+            },
+          ],
+          nextCursor: 456,
+        };
+      }
+      return { _id: 'user_123', role: 'admin', email: 'admin@example.com', items: [], nextCursor: null };
+    });
+
+    render(<TransactionsScreen />);
+    fireEvent.press(screen.getByText('Next'));
+    // Page 2 is empty with no next cursor, but Previous must remain visible.
+    expect(screen.getByText('No transactions found.')).toBeTruthy();
+    fireEvent.press(screen.getByText('Previous'));
+    const afterPrevious = calls[calls.length - 1][1] as { cursor?: number };
+    expect(afterPrevious.cursor).toBeUndefined();
+  });
+
+  it('renders Next when an empty result still carries a cursor', () => {
+    const calls: unknown[][] = [];
+    mockUseQuery.mockImplementation((...args: unknown[]) => {
+      calls.push(args);
+      return {
+        _id: 'user_123',
+        role: 'admin',
+        email: 'admin@example.com',
+        items: [],
+        nextCursor: 789,
+      };
+    });
+
+    render(<TransactionsScreen />);
+    expect(screen.getByText('No transactions found.')).toBeTruthy();
+    fireEvent.press(screen.getByText('Next'));
+    const afterNext = calls[calls.length - 1][1] as { cursor?: number };
+    expect(afterNext.cursor).toBe(789);
+  });
+
+  it('rejects malformed and reversed date ranges', () => {
+    render(<TransactionsScreen />);
+
+    fireEvent.changeText(screen.getByPlaceholderText('e.g. 2025-01-01'), '2025-13-99');
+    fireEvent.press(screen.getByText('Apply Dates'));
+    expect(screen.getByText('Dates must be valid YYYY-MM-DD values.')).toBeTruthy();
+
+    fireEvent.changeText(screen.getByPlaceholderText('e.g. 2025-01-01'), '2025-02-01');
+    fireEvent.changeText(screen.getByPlaceholderText('e.g. 2025-12-31'), '2025-01-01');
+    fireEvent.press(screen.getByText('Apply Dates'));
+    expect(screen.getByText('From must be on or before To.')).toBeTruthy();
+  });
+});
+
+describe('parseDateInput', () => {
+  it('parses valid dates, rejects malformed input, and treats empty as unset', () => {
+    expect(parseDateInput('')).toBeUndefined();
+    expect(parseDateInput('   ')).toBeUndefined();
+    expect(parseDateInput('2025-01-02')).toBe(new Date(2025, 0, 2).getTime());
+    expect(parseDateInput('2025-02-30')).toBe('invalid');
+    expect(parseDateInput('2025/01/01')).toBe('invalid');
+    expect(parseDateInput('not-a-date')).toBe('invalid');
+  });
+
+  it('bounds the To day exclusively so its last millisecond is included', () => {
+    const toDayStart = new Date(2025, 0, 1).getTime();
+    const toExclusive = exclusiveNextDay(toDayStart);
+    // A transaction at the very last millisecond of the selected day must pass
+    // the backend's createdAt < to filter.
+    expect(new Date(2025, 0, 1, 23, 59, 59, 999).getTime()).toBeLessThan(toExclusive);
+    // The bound is exactly local midnight of the following day.
+    expect(toExclusive).toBe(new Date(2025, 0, 2).getTime());
+    // A transaction at the start of the next day is excluded.
+    expect(new Date(2025, 0, 2).getTime()).toBe(toExclusive);
+  });
+});
+
+describe('PurchasesScreen', () => {
+  beforeEach(() => {
+    mockUseQuery.mockReturnValue({
+      _id: 'user_123',
+      role: 'admin',
+      email: 'admin@example.com',
+      items: [],
+      nextCursor: null,
+    });
+  });
+
+  it('renders the purchases title', () => {
+    render(<PurchasesScreen />);
+    expect(screen.getByText('PURCHASES')).toBeTruthy();
+  });
+
+  it('pages forward with the returned cursor and resets on search', () => {
+    const calls: unknown[][] = [];
+    mockUseQuery.mockImplementation((...args: unknown[]) => {
+      calls.push(args);
+      return {
+        _id: 'user_123',
+        role: 'admin',
+        email: 'admin@example.com',
+        items: [
+          {
+            _id: 'purchase_1',
+            store: 'app_store',
+            productKey: 'tokens_100',
+            status: 'granted',
+            storeTransactionId: 'txn_1',
+            purchasedAt: 123,
+          },
+        ],
+        nextCursor: 321,
+      };
+    });
+
+    render(<PurchasesScreen />);
+    fireEvent.press(screen.getByText('Next'));
+    const afterNext = calls[calls.length - 1][1] as { cursor?: number };
+    expect(afterNext.cursor).toBe(321);
+
+    fireEvent.press(screen.getByText('Search'));
+    const afterSearch = calls[calls.length - 1][1] as { cursor?: number };
+    expect(afterSearch.cursor).toBeUndefined();
+  });
+
+  it('keeps Previous reachable on an empty paged result', () => {
+    const calls: unknown[][] = [];
+    let callCount = 0;
+    mockUseQuery.mockImplementation((...args: unknown[]) => {
+      calls.push(args);
+      callCount += 1;
+      if (callCount === 1) {
+        return {
+          _id: 'user_123',
+          role: 'admin',
+          email: 'admin@example.com',
+          items: [
+            {
+              _id: 'purchase_1',
+              store: 'app_store',
+              productKey: 'tokens_100',
+              status: 'granted',
+              storeTransactionId: 'txn_1',
+              purchasedAt: 123,
+            },
+          ],
+          nextCursor: 321,
+        };
+      }
+      return { _id: 'user_123', role: 'admin', email: 'admin@example.com', items: [], nextCursor: null };
+    });
+
+    render(<PurchasesScreen />);
+    fireEvent.press(screen.getByText('Next'));
+    expect(screen.getByText('No purchases found.')).toBeTruthy();
+    fireEvent.press(screen.getByText('Previous'));
+    const afterPrevious = calls[calls.length - 1][1] as { cursor?: number };
+    expect(afterPrevious.cursor).toBeUndefined();
+  });
+});
+
+describe('AuditScreen', () => {
+  beforeEach(() => {
+    mockUseQuery.mockReturnValue({
+      _id: 'user_123',
+      role: 'admin',
+      email: 'admin@example.com',
+      items: [],
+      nextCursor: null,
+    });
+  });
+
+  it('renders the audit log title', () => {
+    render(<AuditScreen />);
+    expect(screen.getByText('AUDIT LOG')).toBeTruthy();
+  });
+
+  it('expands a record to show before/after snapshots', () => {
+    mockUseQuery.mockReturnValue({
+      _id: 'user_123',
+      role: 'admin',
+      email: 'admin@example.com',
+      items: [
+        {
+          _id: 'log_1',
+          timestamp: 123,
+          actorEmail: 'admin@example.com',
+          actorUserId: 'user_1',
+          action: 'wallet.adjust',
+          targetType: 'wallet',
+          targetId: 'wallet_1',
+          reason: 'compensation',
+          before: { balance: 10 },
+          after: { balance: 15 },
+        },
+      ],
+      nextCursor: null,
+    });
+
+    render(<AuditScreen />);
+    expect(screen.queryByText(/"balance": 10/)).toBeNull();
+    fireEvent.press(screen.getAllByLabelText('Show audit details')[0]);
+    expect(screen.getByText(/"balance": 10/)).toBeTruthy();
+    expect(screen.getByText(/"balance": 15/)).toBeTruthy();
+  });
+
+  it('pages forward with the returned cursor and resets pagination when a filter changes', () => {
+    const calls: unknown[][] = [];
+    mockUseQuery.mockImplementation((...args: unknown[]) => {
+      calls.push(args);
+      return {
+        _id: 'user_123',
+        role: 'admin',
+        email: 'admin@example.com',
+        items: [
+          {
+            _id: 'log_1',
+            timestamp: 123,
+            actorEmail: 'admin@example.com',
+            actorUserId: 'user_1',
+            action: 'promo.create',
+            targetType: 'promo_code',
+            targetId: 'promo_1',
+          },
+        ],
+        nextCursor: 654,
+      };
+    });
+
+    render(<AuditScreen />);
+    fireEvent.press(screen.getByText('Next'));
+    const afterNext = calls[calls.length - 1][1] as { cursor?: number };
+    expect(afterNext.cursor).toBe(654);
+
+    fireEvent.press(screen.getByLabelText('Select action filter'));
+    fireEvent.press(screen.getByText('Promo Created'));
+    const afterFilter = calls[calls.length - 1][1] as { cursor?: number; action?: string };
+    expect(afterFilter.cursor).toBeUndefined();
+    expect(afterFilter.action).toBe('promo.create');
+  });
+
+  it('keeps Previous reachable on an empty paged result', () => {
+    const calls: unknown[][] = [];
+    let callCount = 0;
+    mockUseQuery.mockImplementation((...args: unknown[]) => {
+      calls.push(args);
+      callCount += 1;
+      if (callCount === 1) {
+        return {
+          _id: 'user_123',
+          role: 'admin',
+          email: 'admin@example.com',
+          items: [
+            {
+              _id: 'log_1',
+              timestamp: 123,
+              actorEmail: 'admin@example.com',
+              actorUserId: 'user_1',
+              action: 'promo.create',
+              targetType: 'promo_code',
+              targetId: 'promo_1',
+            },
+          ],
+          nextCursor: 654,
+        };
+      }
+      return { _id: 'user_123', role: 'admin', email: 'admin@example.com', items: [], nextCursor: null };
+    });
+
+    render(<AuditScreen />);
+    fireEvent.press(screen.getByText('Next'));
+    expect(screen.getByText(/No audit records found/)).toBeTruthy();
+    fireEvent.press(screen.getByText('Previous'));
+    const afterPrevious = calls[calls.length - 1][1] as { cursor?: number };
+    expect(afterPrevious.cursor).toBeUndefined();
   });
 });

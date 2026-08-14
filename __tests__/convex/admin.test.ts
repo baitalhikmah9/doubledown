@@ -1,11 +1,16 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+  applyPromoCodeUpdate,
   derivePromoModeDefaults,
   derivePromoCodeStatus,
   validateCreatePromoCodeArgs,
   validateUpdatePromoCodeArgs,
   validateWalletAdjustment,
 } from '@/convex/lib/adminValidation';
+import {
+  WALLET_TRANSACTION_SOURCES,
+  WALLET_TRANSACTION_TYPES,
+} from '@/convex/lib/walletTransactionTypes';
 
 describe('adminValidation', () => {
   describe('derivePromoModeDefaults', () => {
@@ -299,5 +304,184 @@ describe('adminValidation', () => {
         })
       ).toEqual({ ok: false, reason: 'insufficient_balance' });
     });
+  });
+});
+
+describe('applyPromoCodeUpdate', () => {
+  const promo = {
+    rewardAmount: 100,
+    usageCap: 50,
+    perUserLimit: 5,
+    activeFrom: 1_000,
+    activeTo: 2_000,
+    usedCount: 3,
+    metadata: { campaignName: 'Camp', deactivationReason: 'abuse' },
+  };
+
+  it('preserves unrelated metadata (deactivationReason) when campaign/notes are edited', () => {
+    const result = applyPromoCodeUpdate(promo, { metadata: { campaignName: 'Renamed' } });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.patch.metadata).toEqual({
+        campaignName: 'Renamed',
+        deactivationReason: 'abuse',
+      });
+    }
+  });
+
+  it('clears activeFrom/activeTo via explicit flags', () => {
+    const result = applyPromoCodeUpdate(promo, {
+      clearActiveFrom: true,
+      clearActiveTo: true,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.patch).toHaveProperty('activeFrom', undefined);
+      expect(result.patch).toHaveProperty('activeTo', undefined);
+    }
+  });
+
+  it('does not require an ordering check when both schedule fields are cleared', () => {
+    const result = applyPromoCodeUpdate(promo, {
+      clearActiveFrom: true,
+      clearActiveTo: true,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects activeFrom on or after activeTo when both exist', () => {
+    expect(applyPromoCodeUpdate(promo, { activeFrom: 2_000, activeTo: 1_500 })).toEqual({
+      ok: false,
+      reason: 'active_from_before_active_to',
+    });
+    expect(applyPromoCodeUpdate(promo, { activeFrom: 2_000, activeTo: 2_000 })).toEqual({
+      ok: false,
+      reason: 'active_from_before_active_to',
+    });
+  });
+
+  it('allows editing one schedule bound without touching the other', () => {
+    const result = applyPromoCodeUpdate(promo, { activeFrom: 500 });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.patch.activeFrom).toBe(500);
+      expect(result.patch.activeTo).toBeUndefined();
+    }
+  });
+
+  it('clears perUserLimit via explicit flag', () => {
+    const result = applyPromoCodeUpdate(promo, { clearPerUserLimit: true });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.patch).toHaveProperty('perUserLimit', undefined);
+    }
+  });
+
+  it('validates perUserLimit against the effective usage cap', () => {
+    expect(applyPromoCodeUpdate(promo, { perUserLimit: 51 })).toEqual({
+      ok: false,
+      reason: 'per_user_limit_exceeds_cap',
+    });
+    // Clearing the limit while lowering the cap below the old limit is allowed.
+    const result = applyPromoCodeUpdate(promo, { usageCap: 4, clearPerUserLimit: true });
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects non-finite, non-integer, zero, and negative perUserLimit values', () => {
+    expect(applyPromoCodeUpdate(promo, { perUserLimit: Infinity })).toEqual({
+      ok: false,
+      reason: 'per_user_limit_invalid',
+    });
+    expect(applyPromoCodeUpdate(promo, { perUserLimit: NaN })).toEqual({
+      ok: false,
+      reason: 'per_user_limit_invalid',
+    });
+    expect(applyPromoCodeUpdate(promo, { perUserLimit: 2.5 })).toEqual({
+      ok: false,
+      reason: 'per_user_limit_invalid',
+    });
+    expect(applyPromoCodeUpdate(promo, { perUserLimit: 0 })).toEqual({
+      ok: false,
+      reason: 'per_user_limit_invalid',
+    });
+    expect(applyPromoCodeUpdate(promo, { perUserLimit: -3 })).toEqual({
+      ok: false,
+      reason: 'per_user_limit_invalid',
+    });
+  });
+
+  it('accepts a positive integer perUserLimit within the cap', () => {
+    const result = applyPromoCodeUpdate(promo, { perUserLimit: 10 });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.patch.perUserLimit).toBe(10);
+    }
+  });
+
+  it('keeps rewardAmount locked once the code has redemptions', () => {
+    expect(applyPromoCodeUpdate(promo, { rewardAmount: 200 })).toEqual({
+      ok: false,
+      reason: 'reward_amount_locked',
+    });
+  });
+});
+
+describe('validateCreatePromoCodeArgs schedule', () => {
+  it('rejects activeFrom on or after activeTo', () => {
+    expect(
+      validateCreatePromoCodeArgs({
+        normalizedCode: 'WELCOME',
+        rewardAmount: 10,
+        usageCap: 5,
+        activeFrom: 2_000,
+        activeTo: 1_000,
+      })
+    ).toEqual({ ok: false, reason: 'active_from_before_active_to' });
+  });
+
+  it('accepts a valid schedule', () => {
+    expect(
+      validateCreatePromoCodeArgs({
+        normalizedCode: 'WELCOME',
+        rewardAmount: 10,
+        usageCap: 5,
+        activeFrom: 1_000,
+        activeTo: 2_000,
+      })
+    ).toEqual({ ok: true });
+  });
+});
+
+describe('wallet transaction source and type constants', () => {
+  it('exposes canonical source values used by the ledger', () => {
+    expect(WALLET_TRANSACTION_SOURCES).toEqual(
+      expect.arrayContaining(['purchase', 'gameplay', 'system', 'admin', 'promo'])
+    );
+    expect(WALLET_TRANSACTION_SOURCES).not.toEqual(
+      expect.arrayContaining(['store', 'game'])
+    );
+  });
+
+  it('covers every source/type value emitted by wallet_transactions inserts', () => {
+    // Emitters: grantConsumablePurchase (purchase), wallet.ts (gameplay/system),
+    // promo.ts (promo), admin.ts (admin), payments.ts (purchase/admin),
+    // purchaserAccountMerge (system), accountDeletion (account_deletion).
+    expect(WALLET_TRANSACTION_SOURCES).toEqual(
+      expect.arrayContaining(['account_deletion'])
+    );
+    expect(WALLET_TRANSACTION_TYPES).toEqual(
+      expect.arrayContaining([
+        'purchase_grant',
+        'purchase_reversal',
+        'admin_adjustment',
+        'starter_grant',
+        'game_entry_reserve',
+        'game_entry_adjust',
+        'promo_redemption',
+        'account_merge_debit',
+        'account_merge_credit',
+        'account_deletion_forfeit',
+      ])
+    );
   });
 });

@@ -56,8 +56,11 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const MAIN_NAV_ITEMS: { label: string; href: string; icon: IconName }[] = [
   { label: 'Overview', href: '/admin', icon: 'grid-outline' },
+  { label: 'Transactions', href: '/admin/transactions', icon: 'receipt-outline' },
+  { label: 'Purchases', href: '/admin/purchases', icon: 'cart-outline' },
   { label: 'Promo Codes', href: '/admin/promo-codes', icon: 'pricetags-outline' },
   { label: 'Wallets', href: '/admin/wallets', icon: 'wallet-outline' },
+  { label: 'Audit Log', href: '/admin/audit', icon: 'shield-checkmark-outline' },
 ];
 
 // ── Sidebar context ──────────────────────────────────────────────────
@@ -511,8 +514,12 @@ export default function AdminLayout() {
     <AdminAccessBoundary>
       <Stack screenOptions={landscapeStackScreenOptions}>
         <Stack.Screen name="index" />
+        <Stack.Screen name="transactions" />
+        <Stack.Screen name="purchases" />
+        <Stack.Screen name="purchases/[purchaseId]" />
         <Stack.Screen name="promo-codes" />
         <Stack.Screen name="wallets" />
+        <Stack.Screen name="audit" />
         <Stack.Screen name="sign-out" />
       </Stack>
     </AdminAccessBoundary>

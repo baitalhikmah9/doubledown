@@ -82,8 +82,12 @@ export default function PromoCodesScreen() {
   const { width } = useWindowDimensions();
   const isCompact = width < 768;
   const [filter, setFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [modeFilter, setModeFilter] = useState('');
   const promoCodes = useQuery(api.admin.listPromoCodes, {
     query: filter || undefined,
+    status: (statusFilter || undefined) as any,
+    mode: modeFilter || undefined,
     limit: 50,
   });
   const createPromo = useMutation(api.admin.createPromoCode);
@@ -320,7 +324,7 @@ export default function PromoCodesScreen() {
         </View>
       )}
 
-      <View style={styles.filterRow}>
+      <View style={[styles.filterRow, isCompact && styles.filterRowCompact]}>
         <TextInput
           value={filter}
           onChangeText={setFilter}
@@ -328,6 +332,28 @@ export default function PromoCodesScreen() {
           placeholder="Search codes..."
           placeholderTextColor={COLORS.disabled}
         />
+        <View style={styles.filterField}>
+          <PromoModeDropdown
+            value={statusFilter}
+            accessibilityLabel="Select status filter"
+            options={[
+              { value: '', label: 'All Statuses' },
+              ...Object.keys(STATUS_LABELS).map((key) => ({ value: key, label: STATUS_LABELS[key] })),
+            ]}
+            onValueChange={setStatusFilter}
+          />
+        </View>
+        <View style={styles.filterField}>
+          <PromoModeDropdown
+            value={modeFilter}
+            accessibilityLabel="Select mode filter"
+            options={[
+              { value: '', label: 'All Modes' },
+              ...COUPON_MODES.map((m) => ({ value: m.value, label: m.label })),
+            ]}
+            onValueChange={setModeFilter}
+          />
+        </View>
       </View>
 
       {promoCodes === undefined ? (
@@ -492,6 +518,15 @@ const styles = StyleSheet.create({
   filterRow: {
     flexDirection: 'row',
     gap: SPACING.md,
+    alignItems: 'center',
+  },
+  filterRowCompact: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+  },
+  filterField: {
+    flex: 1,
+    minWidth: 180,
   },
   filterInput: {
     flex: 1,

@@ -15,8 +15,11 @@ export default function AdminStandaloneLayout() {
   return (
     <Stack screenOptions={landscapeStackScreenOptions}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="transactions" />
+      <Stack.Screen name="purchases" />
       <Stack.Screen name="promo-codes" />
       <Stack.Screen name="wallets" />
+      <Stack.Screen name="audit" />
       <Stack.Screen name="sign-in" />
       <Stack.Screen name="sign-out" />
     </Stack>

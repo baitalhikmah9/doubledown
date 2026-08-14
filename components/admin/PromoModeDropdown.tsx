@@ -15,7 +15,12 @@ import { HOME_SOFT_UI } from '@/themes';
 const SOFT = HOME_SOFT_UI.colors;
 
 /** Native / Jest: modal menu. Web uses `PromoModeDropdown.web.tsx` (Radix - shadcn-style). */
-export default function PromoModeDropdown({ value, options, onValueChange }: PromoModeDropdownProps) {
+export default function PromoModeDropdown({
+  value,
+  options,
+  onValueChange,
+  accessibilityLabel = 'Select coupon mode',
+}: PromoModeDropdownProps) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
   const selectedLabel = selected?.label ?? value;
@@ -24,7 +29,7 @@ export default function PromoModeDropdown({ value, options, onValueChange }: Pro
     <View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Select coupon mode"
+        accessibilityLabel={accessibilityLabel}
         accessibilityState={{ expanded: open }}
         onPress={() => setOpen(true)}
         style={({ pressed }) => [styles.trigger, pressed && styles.triggerPressed]}

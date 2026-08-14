@@ -171,7 +171,8 @@ export default defineSchema({
     .index('by_wallet_created', ['walletId', 'createdAt'])
     .index('by_wallet_idempotency', ['walletId', 'idempotencyKey'])
     .index('by_reservation', ['reservationId'])
-    .index('by_purchase_id', ['purchaseId']),
+    .index('by_purchase_id', ['purchaseId'])
+    .index('by_created', ['createdAt']),
 
   token_products: defineTable({
     productKey: v.string(),
@@ -205,7 +206,8 @@ export default defineSchema({
     .index('by_purchaser_account', ['purchaserAccountId'])
     .index('by_store_transaction', ['store', 'storeTransactionId'])
     .index('by_original_store_transaction', ['store', 'originalStoreTransactionId'])
-    .index('by_revenuecat_event', ['revenueCatEventId']),
+    .index('by_revenuecat_event', ['revenueCatEventId'])
+    .index('by_purchased_at', ['purchasedAt']),
 
   payment_webhook_events: defineTable({
     eventId: v.string(),
@@ -271,4 +273,24 @@ export default defineSchema({
     userId: v.id('users'),
     attemptTimestamps: v.array(v.number()),
   }).index('by_user', ['userId']),
+
+  /**
+   * Immutable admin audit log. Records admin mutations (promo create/update/
+   * deactivate, wallet adjustments, purchase reversals). Append-only: no update
+   * or delete mutations are exposed for this table.
+   */
+  admin_audit_log: defineTable({
+    actorUserId: v.id('users'),
+    actorEmail: v.optional(v.string()),
+    timestamp: v.number(),
+    action: v.string(),
+    targetType: v.string(),
+    targetId: v.string(),
+    reason: v.optional(v.string()),
+    before: v.optional(v.any()),
+    after: v.optional(v.any()),
+  })
+    .index('by_timestamp', ['timestamp'])
+    .index('by_target', ['targetType', 'targetId'])
+    .index('by_action', ['action']),
 });

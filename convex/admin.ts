@@ -3,12 +3,19 @@ import { v } from 'convex/values';
 import { requireAdmin } from './lib/auth';
 import { ensureWalletDoc } from './lib/ensureWallet';
 import { normalizePromoCode } from './lib/promoRules';
+import { writeAudit } from './lib/audit';
+import { scanIndexPage, SCAN_BATCH } from './lib/boundedPagination';
 import {
+  WALLET_TRANSACTION_SOURCES,
+  WALLET_TRANSACTION_TYPES,
+} from './lib/walletTransactionTypes';
+import type { Doc, Id } from './_generated/dataModel';
+import {
+  applyPromoCodeUpdate,
   derivePromoModeDefaults,
   derivePromoCodeStatus,
   isAccountPromoMode,
   validateCreatePromoCodeArgs,
-  validateUpdatePromoCodeArgs,
   validateWalletAdjustment,
 } from './lib/adminValidation';
 
@@ -23,26 +30,39 @@ export const listPurchases = query({
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
     const limit = Math.min(args.limit ?? 50, 100);
-    const purchases = await ctx.db.query('store_purchases').collect();
+    const queryLower = args.purchaserQuery?.trim().toLowerCase();
 
-    const filtered = purchases
-      .filter((purchase) => (args.status ? purchase.status === args.status : true))
-      .filter((purchase) => (args.store ? purchase.store === args.store : true))
-      .filter((purchase) =>
-        args.purchaserQuery
-          ? purchase.purchaserAccountId.includes(args.purchaserQuery) ||
-            purchase.storeTransactionId.includes(args.purchaserQuery)
-          : true
-      )
-      .filter((purchase) => (args.cursor ? purchase.purchasedAt < args.cursor : true))
-      .sort((a, b) => b.purchasedAt - a.purchasedAt)
-      .slice(0, limit);
+    const fetchBatch = (upperBound: number | undefined) =>
+      ctx.db
+        .query('store_purchases')
+        .withIndex('by_purchased_at', (range) => {
+          const bound = upperBound ?? args.cursor;
+          if (bound !== undefined) return range.lt('purchasedAt', bound);
+          return range;
+        })
+        .order('desc')
+        .take(SCAN_BATCH);
 
-    return {
-      items: filtered,
-      nextCursor:
-        filtered.length === limit ? filtered[filtered.length - 1]?.purchasedAt ?? null : null,
-    };
+    const { items, nextCursor } = await scanIndexPage(
+      fetchBatch,
+      (purchase) => purchase.purchasedAt,
+      (purchase) => {
+        if (args.status !== undefined && purchase.status !== args.status) return false;
+        if (args.store !== undefined && purchase.store !== args.store) return false;
+        if (queryLower) {
+          if (
+            !purchase.purchaserAccountId.toLowerCase().includes(queryLower) &&
+            !purchase.storeTransactionId.toLowerCase().includes(queryLower)
+          ) {
+            return false;
+          }
+        }
+        return true;
+      },
+      limit
+    );
+
+    return { items, nextCursor };
   },
 });
 
@@ -85,6 +105,7 @@ export const listPromoCodes = query({
       v.literal('scheduled'),
       v.literal('exhausted')
     )),
+    mode: v.optional(v.string()),
     query: v.optional(v.string()),
     cursor: v.optional(v.number()),
     limit: v.optional(v.number()),
@@ -104,6 +125,10 @@ export const listPromoCodes = query({
 
     if (args.status) {
       filtered = filtered.filter((p) => p.status === args.status);
+    }
+
+    if (args.mode) {
+      filtered = filtered.filter((p) => p.mode === args.mode);
     }
 
     if (args.query) {
@@ -223,6 +248,8 @@ export const createPromoCode = mutation({
       rewardAmount: args.rewardAmount,
       usageCap: args.usageCap,
       mode: args.mode,
+      activeFrom: args.activeFrom,
+      activeTo: args.activeTo,
     });
     if (!validation.ok) {
       throw new Error(validation.reason);
@@ -276,6 +303,28 @@ export const createPromoCode = mutation({
       createdByAdminUserId: adminUser._id,
     });
 
+    await writeAudit(ctx, {
+      actorUserId: adminUser._id,
+      actorEmail: adminUser.email,
+      action: 'promo.create',
+      targetType: 'promo_code',
+      targetId: promoCodeId,
+      after: {
+        code: normalized,
+        rewardType: 'tokens',
+        rewardAmount: args.rewardAmount,
+        usageCap: modeDefaults.usageCap,
+        perUserLimit: modeDefaults.perUserLimit,
+        mode,
+        redemptionScope: modeDefaults.redemptionScope,
+        restrictedToUserId: args.restrictedToUserId,
+        restrictedToPurchaserAccountId: args.restrictedToPurchaserAccountId,
+        active: true,
+        activeFrom: args.activeFrom,
+        activeTo: args.activeTo,
+      },
+    });
+
     return { promoCodeId };
   },
 });
@@ -286,8 +335,11 @@ export const updatePromoCode = mutation({
     rewardAmount: v.optional(v.number()),
     usageCap: v.optional(v.number()),
     perUserLimit: v.optional(v.number()),
+    clearPerUserLimit: v.optional(v.boolean()),
     activeFrom: v.optional(v.number()),
     activeTo: v.optional(v.number()),
+    clearActiveFrom: v.optional(v.boolean()),
+    clearActiveTo: v.optional(v.boolean()),
     active: v.optional(v.boolean()),
     metadata: v.optional(
       v.object({
@@ -303,39 +355,48 @@ export const updatePromoCode = mutation({
       throw new Error('promo_code_not_found');
     }
 
-    const validation = validateUpdatePromoCodeArgs(promo, {
+    const result = applyPromoCodeUpdate(promo, {
       rewardAmount: args.rewardAmount,
       usageCap: args.usageCap,
+      perUserLimit: args.perUserLimit,
+      clearPerUserLimit: args.clearPerUserLimit,
+      activeFrom: args.activeFrom,
+      activeTo: args.activeTo,
+      clearActiveFrom: args.clearActiveFrom,
+      clearActiveTo: args.clearActiveTo,
+      active: args.active,
+      metadata: args.metadata,
     });
-    if (!validation.ok) {
-      throw new Error(validation.reason);
+    if (!result.ok) {
+      throw new Error(result.reason);
     }
 
-    // Validate perUserLimit <= usageCap when perUserLimit is set
-    const effectiveUsageCap = args.usageCap ?? promo.usageCap;
-    const effectivePerUserLimit = args.perUserLimit ?? promo.perUserLimit;
-    if (effectivePerUserLimit !== undefined) {
-      if (
-        effectiveUsageCap === undefined ||
-        !Number.isFinite(effectiveUsageCap) ||
-        effectivePerUserLimit > effectiveUsageCap
-      ) {
-        throw new Error('per_user_limit_exceeds_cap');
-      }
-    }
+    const patch: Record<string, unknown> = {
+      ...result.patch,
+      updatedAt: Date.now(),
+      updatedByAdminUserId: adminUser._id,
+    };
 
-    const patch: Record<string, unknown> = {};
-    if (args.rewardAmount !== undefined) patch.rewardAmount = args.rewardAmount;
-    if (args.usageCap !== undefined) patch.usageCap = args.usageCap;
-    if (args.perUserLimit !== undefined) patch.perUserLimit = args.perUserLimit;
-    if (args.activeFrom !== undefined) patch.activeFrom = args.activeFrom;
-    if (args.activeTo !== undefined) patch.activeTo = args.activeTo;
-    if (args.active !== undefined) patch.active = args.active;
-    if (args.metadata !== undefined) patch.metadata = args.metadata;
-    patch.updatedAt = Date.now();
-    patch.updatedByAdminUserId = adminUser._id;
+    const before = {
+      rewardAmount: promo.rewardAmount,
+      usageCap: promo.usageCap,
+      perUserLimit: promo.perUserLimit,
+      activeFrom: promo.activeFrom,
+      activeTo: promo.activeTo,
+      active: promo.active,
+      metadata: promo.metadata,
+    };
 
     await ctx.db.patch(args.promoCodeId, patch);
+    await writeAudit(ctx, {
+      actorUserId: adminUser._id,
+      actorEmail: adminUser.email,
+      action: 'promo.update',
+      targetType: 'promo_code',
+      targetId: args.promoCodeId,
+      before,
+      after: patch,
+    });
     return { promoCodeId: args.promoCodeId };
   },
 });
@@ -346,7 +407,10 @@ export const deactivatePromoCode = mutation({
     reason: v.string(),
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
+    const adminUser = await requireAdmin(ctx);
+    if (!args.reason || args.reason.trim().length === 0) {
+      throw new Error('reason_required');
+    }
     const promo = await ctx.db.get(args.promoCodeId);
     if (!promo) {
       throw new Error('promo_code_not_found');
@@ -357,6 +421,16 @@ export const deactivatePromoCode = mutation({
       active: false,
       updatedAt: Date.now(),
       metadata: { ...metadata, deactivationReason: args.reason },
+    });
+    await writeAudit(ctx, {
+      actorUserId: adminUser._id,
+      actorEmail: adminUser.email,
+      action: 'promo.deactivate',
+      targetType: 'promo_code',
+      targetId: args.promoCodeId,
+      reason: args.reason,
+      before: { active: promo.active !== false },
+      after: { active: false },
     });
     return { promoCodeId: args.promoCodeId };
   },
@@ -417,6 +491,16 @@ export const adjustWallet = mutation({
 
     const balance = wallet.balance + args.amount;
     await ctx.db.patch(wallet._id, { balance });
+    await writeAudit(ctx, {
+      actorUserId: adminUser._id,
+      actorEmail: adminUser.email,
+      action: 'wallet.adjust',
+      targetType: 'wallet',
+      targetId: wallet._id,
+      reason: args.reason,
+      before: { balance: wallet.balance, purchaserAccountId: wallet.purchaserAccountId },
+      after: { balance, transactionId },
+    });
     return { balance, transactionId };
   },
 });
@@ -585,6 +669,9 @@ export const reversePurchaseGrant = mutation({
   },
   handler: async (ctx, args) => {
     const adminUser = await requireAdmin(ctx);
+    if (!args.reason || args.reason.trim().length === 0) {
+      throw new Error('reason_required');
+    }
     const purchase = await ctx.db.get(args.purchaseId);
     if (!purchase) {
       throw new Error('Purchase not found');
@@ -627,6 +714,24 @@ export const reversePurchaseGrant = mutation({
     const balance = wallet.balance + reversalAmount;
     await ctx.db.patch(wallet._id, { balance });
     await ctx.db.patch(purchase._id, { status: 'reversed' });
+    await writeAudit(ctx, {
+      actorUserId: adminUser._id,
+      actorEmail: adminUser.email,
+      action: 'purchase.reverse',
+      targetType: 'store_purchase',
+      targetId: purchase._id,
+      reason: args.reason,
+      before: {
+        purchaseStatus: purchase.status,
+        balance: wallet.balance,
+        storeTransactionId: purchase.storeTransactionId,
+      },
+      after: {
+        purchaseStatus: 'reversed',
+        balance,
+        reversalAmount,
+      },
+    });
     return { duplicate: false as const, balance };
   },
 });
@@ -665,5 +770,161 @@ export const upsertTokenProduct = mutation({
       createdAt: now,
       updatedAt: now,
     });
+  },
+});
+
+// ───────────────────────────────────────────────
+// Global Transaction Ledger
+// ───────────────────────────────────────────────
+
+export const listTransactions = query({
+  args: {
+    query: v.optional(v.string()),
+    type: v.optional(v.union(...WALLET_TRANSACTION_TYPES.map((t) => v.literal(t)))),
+    source: v.optional(v.union(...WALLET_TRANSACTION_SOURCES.map((s) => v.literal(s)))),
+    from: v.optional(v.number()),
+    to: v.optional(v.number()),
+    cursor: v.optional(v.number()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const limit = Math.min(args.limit ?? 50, 100);
+    const q = args.query?.trim().toLowerCase();
+
+    // Bounds are inclusive on the low side and exclusive on the high side:
+    // from <= createdAt < to, with `cursor` narrowing the window for the next
+    // (older) page. The screen sends the exclusive start of the day after the
+    // selected To day, so every millisecond of that day is included.
+    const initialUpper =
+      args.cursor !== undefined
+        ? args.to !== undefined
+          ? Math.min(args.cursor, args.to)
+          : args.cursor
+        : args.to;
+
+    const walletById = new Map<string, Doc<'wallets'>>();
+    const emailByUserId = new Map<string, string>();
+
+    const enrich = async (rows: Doc<'wallet_transactions'>[]) => {
+      const freshWalletIds = [...new Set(rows.map((row) => row.walletId))].filter(
+        (id) => !walletById.has(id)
+      );
+      const freshWallets = await Promise.all(freshWalletIds.map((id) => ctx.db.get(id)));
+      freshWalletIds.forEach((id, index) => {
+        const wallet = freshWallets[index];
+        if (wallet) walletById.set(id, wallet);
+      });
+      const freshUserIds = [
+        ...new Set(freshWallets.map((wallet) => wallet?.userId).filter((id): id is Id<'users'> => id !== undefined)),
+      ].filter((id) => !emailByUserId.has(id));
+      const freshUsers = await Promise.all(freshUserIds.map((id) => ctx.db.get(id)));
+      freshUserIds.forEach((id, index) => {
+        const email = freshUsers[index]?.email;
+        if (email) emailByUserId.set(id, email);
+      });
+    };
+
+    const fetchBatch = (upperBound: number | undefined) =>
+      ctx.db
+        .query('wallet_transactions')
+        .withIndex('by_created', (range) => {
+          const bound = upperBound ?? initialUpper;
+          if (args.from !== undefined && bound !== undefined) {
+            return range.gte('createdAt', args.from).lt('createdAt', bound);
+          }
+          if (args.from !== undefined) return range.gte('createdAt', args.from);
+          if (bound !== undefined) return range.lt('createdAt', bound);
+          return range;
+        })
+        .order('desc')
+        .take(SCAN_BATCH);
+
+    const { items, nextCursor } = await scanIndexPage(
+      fetchBatch,
+      (transaction) => transaction.createdAt,
+      (transaction) => {
+        if (args.type !== undefined && transaction.type !== args.type) return false;
+        if (args.source !== undefined && transaction.source !== args.source) return false;
+        if (q) {
+          const wallet = walletById.get(transaction.walletId);
+          const email = wallet?.userId ? emailByUserId.get(wallet.userId) : undefined;
+          const haystack = [
+            email?.toLowerCase(),
+            wallet?.purchaserAccountId?.toLowerCase(),
+            transaction._id.toLowerCase(),
+            transaction.storeTransactionId?.toLowerCase(),
+            transaction.idempotencyKey?.toLowerCase(),
+          ]
+            .filter((value): value is string => Boolean(value))
+            .join(' ');
+          if (!haystack.includes(q)) return false;
+        }
+        return true;
+      },
+      limit,
+      q ? enrich : undefined
+    );
+
+    await enrich(items);
+
+    const mapped = items.map((transaction) => {
+      const wallet = walletById.get(transaction.walletId);
+      const email = wallet?.userId ? emailByUserId.get(wallet.userId) : undefined;
+      return {
+        transaction,
+        wallet: wallet
+          ? {
+              _id: wallet._id,
+              purchaserAccountId: wallet.purchaserAccountId ?? null,
+              userId: wallet.userId ?? null,
+            }
+          : null,
+        userEmail: email ?? null,
+      };
+    });
+
+    return { items: mapped, nextCursor };
+  },
+});
+
+// ───────────────────────────────────────────────
+// Admin Audit Log
+// ───────────────────────────────────────────────
+
+export const listAuditLog = query({
+  args: {
+    action: v.optional(v.string()),
+    targetType: v.optional(v.string()),
+    cursor: v.optional(v.number()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const limit = Math.min(args.limit ?? 50, 100);
+
+    const fetchBatch = (upperBound: number | undefined) =>
+      ctx.db
+        .query('admin_audit_log')
+        .withIndex('by_timestamp', (range) => {
+          const bound = upperBound ?? args.cursor;
+          if (bound !== undefined) return range.lt('timestamp', bound);
+          return range;
+        })
+        .order('desc')
+        .take(SCAN_BATCH);
+
+    const { items, nextCursor } = await scanIndexPage(
+      fetchBatch,
+      (log) => log.timestamp,
+      (log) => {
+        if (args.action !== undefined && log.action !== args.action) return false;
+        if (args.targetType !== undefined && log.targetType !== args.targetType) return false;
+        return true;
+      },
+      limit
+    );
+
+    return { items, nextCursor };
   },
 });

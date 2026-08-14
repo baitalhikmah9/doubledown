@@ -96,6 +96,8 @@ export function validateCreatePromoCodeArgs(args: {
   rewardAmount: number;
   usageCap: number;
   mode?: string;
+  activeFrom?: number;
+  activeTo?: number;
 }): { ok: true } | { ok: false; reason: string } {
   if (!args.normalizedCode) return { ok: false, reason: 'code_required' };
   if (args.rewardAmount <= 0) return { ok: false, reason: 'reward_amount_positive' };
@@ -113,7 +115,110 @@ export function validateCreatePromoCodeArgs(args: {
   if (args.mode !== undefined && !isPromoCodeMode(args.mode)) {
     return { ok: false, reason: 'mode_invalid' };
   }
+  if (
+    args.activeFrom !== undefined &&
+    args.activeTo !== undefined &&
+    args.activeFrom >= args.activeTo
+  ) {
+    return { ok: false, reason: 'active_from_before_active_to' };
+  }
   return { ok: true };
+}
+
+/**
+ * Build the patch for `updatePromoCode` from validated updates.
+ *
+ * Schedule fields are cleared with explicit `clear*` booleans instead of
+ * `undefined`, because Convex drops undefined optional args over the wire.
+ * `activeFrom`/`activeTo` must be clearable to `undefined` via `db.patch`,
+ * which removes a field when it is set to `undefined`.
+ */
+export function applyPromoCodeUpdate(
+  promo: {
+    rewardAmount: number;
+    usageCap: number;
+    perUserLimit?: number;
+    activeFrom?: number;
+    activeTo?: number;
+    usedCount?: number;
+    metadata?: unknown;
+  },
+  updates: {
+    rewardAmount?: number;
+    usageCap?: number;
+    perUserLimit?: number;
+    clearPerUserLimit?: boolean;
+    activeFrom?: number;
+    activeTo?: number;
+    clearActiveFrom?: boolean;
+    clearActiveTo?: boolean;
+    active?: boolean;
+    metadata?: { campaignName?: string; notes?: string };
+  }
+): { ok: true; patch: Record<string, unknown> } | { ok: false; reason: string } {
+  const baseValidation = validateUpdatePromoCodeArgs(promo, {
+    rewardAmount: updates.rewardAmount,
+    usageCap: updates.usageCap,
+  });
+  if (!baseValidation.ok) {
+    return baseValidation;
+  }
+
+  if (updates.perUserLimit !== undefined && !updates.clearPerUserLimit) {
+    if (
+      !Number.isFinite(updates.perUserLimit) ||
+      !Number.isInteger(updates.perUserLimit) ||
+      updates.perUserLimit <= 0
+    ) {
+      return { ok: false, reason: 'per_user_limit_invalid' };
+    }
+  }
+
+  const effectivePerUserLimit = updates.clearPerUserLimit
+    ? undefined
+    : (updates.perUserLimit ?? promo.perUserLimit);
+  if (effectivePerUserLimit !== undefined) {
+    const effectiveUsageCap = updates.usageCap ?? promo.usageCap;
+    if (
+      effectiveUsageCap === undefined ||
+      !Number.isFinite(effectiveUsageCap) ||
+      effectivePerUserLimit > effectiveUsageCap
+    ) {
+      return { ok: false, reason: 'per_user_limit_exceeds_cap' };
+    }
+  }
+
+  const effectiveActiveFrom = updates.clearActiveFrom
+    ? undefined
+    : (updates.activeFrom ?? promo.activeFrom);
+  const effectiveActiveTo = updates.clearActiveTo
+    ? undefined
+    : (updates.activeTo ?? promo.activeTo);
+  if (
+    effectiveActiveFrom !== undefined &&
+    effectiveActiveTo !== undefined &&
+    effectiveActiveFrom >= effectiveActiveTo
+  ) {
+    return { ok: false, reason: 'active_from_before_active_to' };
+  }
+
+  const patch: Record<string, unknown> = {};
+  if (updates.rewardAmount !== undefined) patch.rewardAmount = updates.rewardAmount;
+  if (updates.usageCap !== undefined) patch.usageCap = updates.usageCap;
+  if (updates.perUserLimit !== undefined) patch.perUserLimit = updates.perUserLimit;
+  if (updates.clearPerUserLimit) patch.perUserLimit = undefined;
+  if (updates.activeFrom !== undefined) patch.activeFrom = updates.activeFrom;
+  if (updates.clearActiveFrom) patch.activeFrom = undefined;
+  if (updates.activeTo !== undefined) patch.activeTo = updates.activeTo;
+  if (updates.clearActiveTo) patch.activeTo = undefined;
+  if (updates.active !== undefined) patch.active = updates.active;
+  if (updates.metadata !== undefined) {
+    const existing =
+      typeof promo.metadata === 'object' && promo.metadata !== null ? promo.metadata : {};
+    // Merge so unrelated metadata (e.g. deactivationReason) survives edits.
+    patch.metadata = { ...existing, ...updates.metadata };
+  }
+  return { ok: true, patch };
 }
 
 export function validateUpdatePromoCodeArgs(

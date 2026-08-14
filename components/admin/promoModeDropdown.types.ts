@@ -4,4 +4,6 @@ export type PromoModeDropdownProps = {
   value: string;
   options: readonly PromoModeDropdownOption[];
   onValueChange: (value: string) => void;
+  /** Accessibility label for the trigger. Defaults to "Select coupon mode". */
+  accessibilityLabel?: string;
 };
