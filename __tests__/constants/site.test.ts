@@ -1,7 +1,9 @@
 import {
   canonicalUrlForPath,
+  DEFAULT_PAGE_TITLE,
   DEFAULT_PUBLIC_SITE_ORIGIN,
   getPublicSiteOrigin,
+  pageTitleForPath,
 } from '@/constants/site';
 
 describe('site SEO helpers', () => {
@@ -30,5 +32,15 @@ describe('site SEO helpers', () => {
     delete process.env.EXPO_PUBLIC_SITE_ORIGIN;
     expect(canonicalUrlForPath('/')).toBe('https://playbackfire.com/');
     expect(canonicalUrlForPath('/play/mode')).toBe('https://playbackfire.com/play/mode');
+  });
+
+  it('builds distinct browser titles for known and detail pages', () => {
+    expect(pageTitleForPath('/')).toBe(DEFAULT_PAGE_TITLE);
+    expect(pageTitleForPath('/settings')).toBe('Settings | Backfire');
+    expect(pageTitleForPath('/play/team-setup/')).toBe('Team Setup | Backfire');
+    expect(pageTitleForPath('/admin/purchases/purchase_123')).toBe(
+      'Purchase Details | Backfire'
+    );
+    expect(pageTitleForPath('/unknown')).toBe(DEFAULT_PAGE_TITLE);
   });
 });

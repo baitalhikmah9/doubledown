@@ -3,6 +3,54 @@
  * Override per deployment with EXPO_PUBLIC_SITE_ORIGIN when previews should not canonicalize to prod.
  */
 export const DEFAULT_PUBLIC_SITE_ORIGIN = 'https://playbackfire.com';
+export const DEFAULT_PAGE_TITLE = 'Backfire | Competitive Trivia';
+
+const PAGE_TITLES: Record<string, string> = {
+  '/how-to-play': 'How to Play',
+  '/terms': 'Terms of Service',
+  '/privacy': 'Privacy Policy',
+  '/delete-account': 'Delete Account',
+  '/sso-callback': 'Signing In',
+  '/sign-in': 'Sign In',
+  '/sign-up': 'Sign Up',
+  '/forgot-password': 'Reset Password',
+  '/store': 'Store',
+  '/settings': 'Settings',
+  '/create-game': 'Create Game',
+  '/game': 'Game',
+  '/game-recap': 'Game Recap',
+  '/rules': 'Rules',
+  '/theme-picker': 'Choose Theme',
+  '/language-picker': 'Choose Language',
+  '/content-languages-picker': 'Content Languages',
+  '/lobby-settings': 'Lobby Settings',
+  '/play': 'Play',
+  '/play/mode': 'Choose Mode',
+  '/play/quick-length': 'Game Length',
+  '/play/team-setup': 'Team Setup',
+  '/play/categories': 'Choose Categories',
+  '/play/board': 'Game Board',
+  '/play/question': 'Question',
+  '/play/answer': 'Answer',
+  '/play/end': 'Match Complete',
+  '/admin': 'Dashboard',
+  '/admin/transactions': 'Transactions',
+  '/admin/purchases': 'Purchases',
+  '/admin/promo-codes': 'Promo Codes',
+  '/admin/wallets': 'Wallets',
+  '/admin/audit': 'Audit Log',
+  '/admin/sign-in': 'Admin Sign In',
+  '/admin/sign-out': 'Signing Out',
+};
+
+export function pageTitleForPath(pathname: string | undefined): string {
+  const normalized = pathname && pathname !== '/' ? pathname.replace(/\/+$/, '') : '/';
+  if (/^\/admin\/purchases\/[^/]+$/.test(normalized)) return 'Purchase Details | Backfire';
+  if (/^\/admin\/promo-codes\/[^/]+$/.test(normalized)) return 'Promo Code Details | Backfire';
+  if (/^\/admin\/wallets\/[^/]+$/.test(normalized)) return 'Wallet Details | Backfire';
+  const pageTitle = PAGE_TITLES[normalized];
+  return pageTitle ? `${pageTitle} | Backfire` : DEFAULT_PAGE_TITLE;
+}
 
 export function getPublicSiteOrigin(): string {
   const fromEnv =
