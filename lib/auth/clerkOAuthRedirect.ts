@@ -7,13 +7,16 @@ import * as Linking from 'expo-linking';
 /** Expo Router screen for Clerk native OAuth return (`app/sso-callback.tsx`). */
 export const CLERK_SSO_CALLBACK_PATH = 'sso-callback';
 
+const FALLBACK_ANDROID_PACKAGE = 'com.playbackfire.app';
+const FALLBACK_IOS_BUNDLE_IDENTIFIER = 'com.playbackfire.app';
+
 /** Clerk Native Applications auto-provisions `clerk://<package>.callback` for registered apps. */
 function clerkRegisteredNativeCallbackUrl(): string | null {
-  const androidPackage = Constants.expoConfig?.android?.package;
+  const androidPackage = Constants.expoConfig?.android?.package ?? FALLBACK_ANDROID_PACKAGE;
   if (Platform.OS === 'android' && androidPackage) {
     return `clerk://${androidPackage}.callback`;
   }
-  const iosBundle = Constants.expoConfig?.ios?.bundleIdentifier;
+  const iosBundle = Constants.expoConfig?.ios?.bundleIdentifier ?? FALLBACK_IOS_BUNDLE_IDENTIFIER;
   if (Platform.OS === 'ios' && iosBundle) {
     return `clerk://${iosBundle}.callback`;
   }

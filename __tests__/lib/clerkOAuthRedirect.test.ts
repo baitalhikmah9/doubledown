@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { Platform } from 'react-native';
 
 const mockMakeRedirectUri = jest.fn(
@@ -23,6 +24,10 @@ jest.mock('expo-constants', () => ({
   },
 }));
 
+// eslint-disable-next-line import/first
+import Constants from 'expo-constants';
+
+// eslint-disable-next-line import/first
 import {
   clerkNativeSsoCallbackRedirectUrl,
   clerkOAuthRedirectUrl,
@@ -84,6 +89,13 @@ describe('clerkNativeSsoCallbackRedirectUrl', () => {
     mockIsRunningInExpoGo.mockReturnValue(false);
     mockMakeRedirectUri.mockClear();
     Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOS });
+    Object.defineProperty(Constants, 'expoConfig', {
+      configurable: true,
+      value: {
+        android: { package: 'com.playbackfire.app' },
+        ios: { bundleIdentifier: 'com.playbackfire.app' },
+      },
+    });
   });
 
   it('uses AuthSession makeRedirectUri in Expo Go (not clerk:// package callback)', () => {
@@ -111,6 +123,16 @@ describe('clerkNativeSsoCallbackRedirectUrl', () => {
   it('uses clerk:// package callback outside Expo Go on Android', () => {
     mockIsRunningInExpoGo.mockReturnValue(false);
     Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
+
+    expect(clerkNativeSsoCallbackRedirectUrl()).toBe(
+      'clerk://com.playbackfire.app.callback'
+    );
+  });
+
+  it('falls back to the hardcoded package when expoConfig is missing on Android', () => {
+    mockIsRunningInExpoGo.mockReturnValue(false);
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
+    Object.defineProperty(Constants, 'expoConfig', { configurable: true, value: null });
 
     expect(clerkNativeSsoCallbackRedirectUrl()).toBe(
       'clerk://com.playbackfire.app.callback'
