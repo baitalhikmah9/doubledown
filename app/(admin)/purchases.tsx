@@ -19,6 +19,7 @@ import { AdminStatusBadge } from '@/components/admin/AdminStatusBadge';
 import PromoModeDropdown from '@/components/admin/PromoModeDropdown';
 import { ADMIN_THEME } from '@/constants/adminTheme';
 import { FONTS } from '@/constants/theme';
+import { adminHref } from '@/lib/admin/shell';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -170,7 +171,7 @@ export default function PurchasesScreen() {
             columns={columns}
             rows={purchases.items as PurchaseRow[]}
             rowKey={(row) => row._id}
-            onRowPress={(row) => router.push(`/admin/purchases/${row._id}`)}
+            onRowPress={(row) => router.push(adminHref(`/admin/purchases/${row._id}`) as any)}
             emptyText="No purchases found."
           />
           {(cursorStack.length > 0 || purchases.nextCursor != null) && (

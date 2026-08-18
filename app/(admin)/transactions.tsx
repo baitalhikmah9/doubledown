@@ -19,6 +19,7 @@ import PromoModeDropdown from '@/components/admin/PromoModeDropdown';
 import { ADMIN_THEME } from '@/constants/adminTheme';
 import { FONTS } from '@/constants/theme';
 import { Link } from 'expo-router';
+import { adminHref } from '@/lib/admin/shell';
 import {
   WALLET_TRANSACTION_SOURCES,
   WALLET_TRANSACTION_SOURCE_LABELS,
@@ -157,14 +158,14 @@ export default function TransactionsScreen() {
       render: (item) => (
         <View style={styles.cellActions}>
           {item.wallet && (
-            <Link href={`/admin/wallets/${item.wallet._id}`} asChild>
+            <Link href={adminHref(`/admin/wallets/${item.wallet._id}`) as any} asChild>
               <Pressable>
                 <Text style={styles.link}>Wallet</Text>
               </Pressable>
             </Link>
           )}
           {item.transaction.purchaseId && (
-            <Link href={`/admin/purchases/${item.transaction.purchaseId}`} asChild>
+            <Link href={adminHref(`/admin/purchases/${item.transaction.purchaseId}`) as any} asChild>
               <Pressable>
                 <Text style={styles.link}>Purchase</Text>
               </Pressable>

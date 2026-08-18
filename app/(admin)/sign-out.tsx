@@ -14,6 +14,7 @@ import { useAuth } from '@clerk/clerk-expo';
 import { FONTS, LAYOUT, SPACING } from '@/constants/theme';
 import { HOME_SOFT_UI } from '@/themes';
 import { useDarkModeFlatTop } from '@/lib/hooks/useTheme';
+import { adminHref } from '@/lib/admin/shell';
 
 const T = HOME_SOFT_UI;
 
@@ -86,7 +87,7 @@ export default function AdminSignOutScreen() {
             )}
           </Pressable>
 
-          <Link href="/admin" asChild>
+          <Link href={adminHref('/admin') as any} asChild>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Back to admin overview"

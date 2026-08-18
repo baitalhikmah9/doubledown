@@ -3,6 +3,28 @@
   "installCommand": "bun install --frozen-lockfile",
   "buildCommand": "bun run vercel-build",
   "outputDirectory": "dist",
+  "redirects": [
+    {
+      "source": "/admin/sign-in",
+      "destination": "https://admin.playbackfire.com/login",
+      "permanent": true
+    },
+    {
+      "source": "/admin/login",
+      "destination": "https://admin.playbackfire.com/login",
+      "permanent": true
+    },
+    {
+      "source": "/admin",
+      "destination": "https://admin.playbackfire.com",
+      "permanent": true
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "https://admin.playbackfire.com/:path*",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",

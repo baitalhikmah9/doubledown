@@ -7,6 +7,7 @@ import { ADMIN_THEME } from '@/constants/adminTheme';
 import { FONTS } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminCard, AdminCardHeader, AdminCardTitle, AdminCardDescription, AdminCardContent } from '@/components/admin/AdminCard';
+import { adminHref } from '@/lib/admin/shell';
 
 const STAT_COL_BREAKPOINT = 640;
 const DESKTOP_BREAKPOINT = 1024;
@@ -302,11 +303,11 @@ export default function AdminIndexScreen() {
 
   const handleTransactionPress = (tx: RecentTransaction) => {
     if (tx.purchaseId) {
-      router.push(`/admin/purchases/${tx.purchaseId}`);
+      router.push(adminHref(`/admin/purchases/${tx.purchaseId}`) as any);
     } else if (tx.walletId) {
-      router.push(`/admin/wallets/${tx.walletId}`);
+      router.push(adminHref(`/admin/wallets/${tx.walletId}`) as any);
     } else {
-      router.push('/admin/transactions');
+      router.push(adminHref('/admin/transactions') as any);
     }
   };
 
@@ -332,7 +333,7 @@ export default function AdminIndexScreen() {
             value={totalRev}
             subtitle={revDelta}
             icon={<Text style={styles.dollarIcon}>$</Text>}
-            onPress={() => router.push('/admin/purchases')}
+            onPress={() => router.push(adminHref('/admin/purchases') as any)}
           />
         </View>
         <View style={[styles.statCardWrapper, { width: cardWidth }]}>
@@ -341,7 +342,7 @@ export default function AdminIndexScreen() {
             value={`+${purchasesCount}`}
             subtitle={purchasesDelta}
             icon={<Ionicons name="cart-outline" size={16} color={ADMIN_THEME.colors.mutedForeground} />}
-            onPress={() => router.push('/admin/purchases')}
+            onPress={() => router.push(adminHref('/admin/purchases') as any)}
           />
         </View>
         <View style={[styles.statCardWrapper, { width: cardWidth }]}>
@@ -350,7 +351,7 @@ export default function AdminIndexScreen() {
             value={activePromoCount}
             subtitle={`${activePromoCount} of ${totalPromoCount} total codes`}
             icon={<Ionicons name="pricetags-outline" size={16} color={ADMIN_THEME.colors.mutedForeground} />}
-            onPress={() => router.push('/admin/promo-codes')}
+            onPress={() => router.push(adminHref('/admin/promo-codes') as any)}
           />
         </View>
         <View style={[styles.statCardWrapper, { width: cardWidth }]}>
@@ -359,7 +360,7 @@ export default function AdminIndexScreen() {
             value={redemptionsCount}
             subtitle={`across ${totalPromoCount} promo codes`}
             icon={<Ionicons name="pulse-outline" size={16} color={ADMIN_THEME.colors.mutedForeground} />}
-            onPress={() => router.push('/admin/promo-codes')}
+            onPress={() => router.push(adminHref('/admin/promo-codes') as any)}
           />
         </View>
       </View>

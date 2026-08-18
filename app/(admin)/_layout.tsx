@@ -33,7 +33,12 @@ import { isAuthDisabled } from '@/lib/authMode';
 import { ADMIN_THEME } from '@/constants/adminTheme';
 import { FONTS, SPACING } from '@/constants/theme';
 import { landscapeStackScreenOptions } from '@/lib/navigation/landscapeStack';
-import { breadcrumbsForAdminPath, useSidebarCollapsed } from '@/lib/admin/shell';
+import {
+  adminHref,
+  breadcrumbsForAdminPath,
+  normalizeAdminPath,
+  useSidebarCollapsed,
+} from '@/lib/admin/shell';
 
 // ── Sidebar constants ────────────────────────────────────────────────
 const SIDEBAR_WIDTH_EXPANDED = 256;
@@ -156,7 +161,7 @@ function UserNavPill({ expanded = true }: { expanded?: boolean }) {
             </View>
           </View>
           <View style={styles.userMenuDivider} />
-          <Link href="/admin/sign-out" asChild>
+          <Link href={adminHref('/admin/sign-out') as any} asChild>
             <Pressable
               accessibilityRole="menuitem"
               accessibilityLabel="Sign out"
@@ -217,7 +222,7 @@ function AdminSidebar({
   brandTitle?: string;
 }) {
   const { expanded, toggleExpanded } = useSidebarCtx();
-  const normalizedPath = pathname.replace('/(admin)', '/admin');
+  const normalizedPath = normalizeAdminPath(pathname);
 
   const isActive = (href: string) => {
     if (href === '/admin') return normalizedPath === '/admin';
@@ -232,7 +237,10 @@ function AdminSidebar({
         Platform.OS === 'web' ? SIDEBAR_WIDTH_TRANSITION_WEB : null,
       ]}
     >
-      <Link href={navGroups === AFFILIATE_NAV_GROUPS ? '/admin/affiliate' : '/admin'} asChild>
+      <Link
+        href={adminHref(navGroups === AFFILIATE_NAV_GROUPS ? '/admin/affiliate' : '/admin') as any}
+        asChild
+      >
         <Pressable
           accessibilityRole="link"
           accessibilityLabel={brandTitle}
@@ -271,7 +279,7 @@ function AdminSidebar({
             {group.items.map((item) => {
               const active = isActive(item.href);
               return (
-                <Link key={item.href} href={item.href as any} asChild>
+                <Link key={item.href} href={adminHref(item.href) as any} asChild>
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={item.label}
@@ -350,7 +358,7 @@ function MobileSidebarOverlay({
   const [presented, setPresented] = useState(false);
   const translateX = useRef(new Animated.Value(-SIDEBAR_WIDTH_EXPANDED)).current;
 
-  const normalizedPath = pathname.replace('/(admin)', '/admin');
+  const normalizedPath = normalizeAdminPath(pathname);
 
   const isActive = (href: string) => {
     if (href === '/admin') return normalizedPath === '/admin';
@@ -433,7 +441,7 @@ function MobileSidebarOverlay({
                 {group.items.map((item) => {
                   const active = isActive(item.href);
                   return (
-                    <Link key={item.href} href={item.href as any} asChild>
+                    <Link key={item.href} href={adminHref(item.href) as any} asChild>
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel={item.label}
@@ -517,7 +525,7 @@ function AdminTopBar({ pathname, affiliate = false }: { pathname: string; affili
                     {crumb.label}
                   </Text>
                 ) : (
-                  <Link href={crumb.href as any} asChild>
+                  <Link href={adminHref(crumb.href) as any} asChild>
                     <Pressable accessibilityRole="link" accessibilityLabel={crumb.label}>
                       <Text style={styles.breadcrumbLink} numberOfLines={1}>
                         {crumb.label}
@@ -607,7 +615,7 @@ export function AdminAccessBoundary({ children }: { children: React.ReactNode })
   }
 
   if (!isSignedIn && !authDisabled) {
-    return <Redirect href="/admin/sign-in" />;
+    return <Redirect href={adminHref('/admin/sign-in') as any} />;
   }
 
   if (userProfile === undefined) {
@@ -619,7 +627,7 @@ export function AdminAccessBoundary({ children }: { children: React.ReactNode })
   }
 
   if (userProfile === null) {
-    return <Redirect href="/admin/sign-in" />;
+    return <Redirect href={adminHref('/admin/sign-in') as any} />;
   }
 
   if (userProfile.role === 'admin') {
@@ -641,9 +649,9 @@ export function AdminAccessBoundary({ children }: { children: React.ReactNode })
   }
 
   if (isAffiliateDashboard(affiliateDashboard)) {
-    const normalizedPath = pathname.replace('/(admin)', '/admin');
+    const normalizedPath = normalizeAdminPath(pathname);
     if (normalizedPath !== '/admin/affiliate' && normalizedPath !== '/admin/sign-out') {
-      return <Redirect href="/admin/affiliate" />;
+      return <Redirect href={adminHref('/admin/affiliate') as any} />;
     }
     return (
       <AdminShell navGroups={AFFILIATE_NAV_GROUPS} brandTitle="Backfire" affiliate>
@@ -654,7 +662,7 @@ export function AdminAccessBoundary({ children }: { children: React.ReactNode })
     );
   }
 
-  return <Redirect href="/admin/sign-in" />;
+  return <Redirect href={adminHref('/admin/sign-in') as any} />;
 }
 
 // ── Error fallback ───────────────────────────────────────────────────

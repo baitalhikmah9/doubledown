@@ -4,6 +4,7 @@ import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ADMIN_THEME } from '@/constants/adminTheme';
 import { FONTS } from '@/constants/theme';
+import { adminHref } from '@/lib/admin/shell';
 
 export type AdminScreenHeaderProps = {
   title: string;
@@ -32,7 +33,7 @@ export function AdminScreenHeader({
       return;
     }
     if (fallbackHref) {
-      router.replace(fallbackHref);
+      router.replace(adminHref(String(fallbackHref)) as Href);
     }
   };
 

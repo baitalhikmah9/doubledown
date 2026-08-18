@@ -2,6 +2,22 @@ import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
 export const ADMIN_SIDEBAR_COLLAPSED_KEY = 'backfire:admin-sidebar-collapsed';
+export const ADMIN_HOSTNAME = 'admin.playbackfire.com';
+
+function browserHostname(): string {
+  return typeof globalThis.location === 'undefined' ? '' : globalThis.location.hostname;
+}
+
+export function isAdminHostname(hostname = browserHostname()): boolean {
+  return hostname === ADMIN_HOSTNAME;
+}
+
+export function adminHref(path: string, hostname = browserHostname()): string {
+  if (!isAdminHostname(hostname)) return path;
+  if (path === '/admin/sign-in') return '/login';
+  const cleanPath = path.replace(/^\/admin(?=\/|$)/, '');
+  return cleanPath || '/';
+}
 
 export function useSidebarCollapsed(): [boolean, (next: boolean) => void, () => void] {
   const [collapsed, setCollapsedState] = useState(false);
@@ -56,9 +72,10 @@ const ROUTE_LABELS: Record<string, string> = {
 };
 
 export function normalizeAdminPath(pathname: string): string {
-  const path = pathname.replace('/(admin)', '/admin');
-  if (path.length > 1 && path.endsWith('/')) return path.slice(0, -1);
-  return path;
+  let path = pathname.replace('/(admin)', '/admin');
+  if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
+  if (path === '/' || path === '') return '/admin';
+  return path.startsWith('/admin') ? path : `/admin${path}`;
 }
 
 export type AdminBreadcrumb = { label: string; href?: string };

@@ -3,14 +3,31 @@ import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { Platform } from 'react-native';
 import {
   ADMIN_SIDEBAR_COLLAPSED_KEY,
+  adminHref,
   breadcrumbsForAdminPath,
+  normalizeAdminPath,
   useSidebarCollapsed,
 } from '@/lib/admin/shell';
+
+describe('admin subdomain routes', () => {
+  it('removes the admin prefix only on the admin host', () => {
+    expect(adminHref('/admin', 'admin.playbackfire.com')).toBe('/');
+    expect(adminHref('/admin/purchases', 'admin.playbackfire.com')).toBe('/purchases');
+    expect(adminHref('/admin/sign-in', 'admin.playbackfire.com')).toBe('/login');
+    expect(adminHref('/admin/purchases', 'www.playbackfire.com')).toBe('/admin/purchases');
+  });
+
+  it('normalizes clean admin-host paths for shell state', () => {
+    expect(normalizeAdminPath('/')).toBe('/admin');
+    expect(normalizeAdminPath('/purchases/123')).toBe('/admin/purchases/123');
+  });
+});
 
 describe('breadcrumbsForAdminPath', () => {
   it('returns the dashboard crumb at /admin', () => {
     expect(breadcrumbsForAdminPath('/admin')).toEqual([{ label: 'Dashboard' }]);
     expect(breadcrumbsForAdminPath('/(admin)')).toEqual([{ label: 'Dashboard' }]);
+    expect(breadcrumbsForAdminPath('/')).toEqual([{ label: 'Dashboard' }]);
   });
 
   it('builds linked parent crumbs for nested admin routes', () => {

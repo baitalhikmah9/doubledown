@@ -16,6 +16,7 @@ import { AdminButton } from '@/components/admin/AdminButton';
 import { AdminTable, type AdminTableColumn } from '@/components/admin/AdminTable';
 import { ADMIN_THEME } from '@/constants/adminTheme';
 import { FONTS } from '@/constants/theme';
+import { adminHref } from '@/lib/admin/shell';
 
 type WalletRow = {
   wallet: {
@@ -100,7 +101,7 @@ export default function WalletsScreen() {
           columns={columns}
           rows={results as WalletRow[]}
           rowKey={(row) => row.wallet._id}
-          onRowPress={(row) => router.push(`/admin/wallets/${row.wallet._id}`)}
+          onRowPress={(row) => router.push(adminHref(`/admin/wallets/${row.wallet._id}`) as any)}
           emptyText="No wallets found."
         />
       ) : submittedQuery ? (

@@ -17,6 +17,7 @@ import { api } from '@/convex/_generated/api';
 import { FONTS, LAYOUT, SPACING } from '@/constants/theme';
 import { HOME_SOFT_UI } from '@/themes';
 import { useDarkModeFlatTop } from '@/lib/hooks/useTheme';
+import { adminHref } from '@/lib/admin/shell';
 
 const T = HOME_SOFT_UI;
 
@@ -94,7 +95,7 @@ export default function AdminSignInScreen() {
       );
     }
     if (userProfile?.role === 'admin') {
-      return <Redirect href="/admin" />;
+      return <Redirect href={adminHref('/admin') as any} />;
     }
     if (shouldLoadAffiliate && affiliateDashboard === undefined) {
       return (
@@ -108,7 +109,7 @@ export default function AdminSignInScreen() {
       Array.isArray(affiliateDashboard.codes) &&
       affiliateDashboard.codes.length > 0
     ) {
-      return <Redirect href="/admin/affiliate" />;
+      return <Redirect href={adminHref('/admin/affiliate') as any} />;
     }
 
     return (

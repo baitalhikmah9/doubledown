@@ -22,6 +22,7 @@ import { ADMIN_THEME } from '@/constants/adminTheme';
 import { FONTS } from '@/constants/theme';
 import { DEFAULT_TOKEN_PRODUCTS } from '@/convex/lib/paymentCatalog';
 import { generatePromoCode, isUnlimitedUsageCap } from '@/convex/lib/promoRules';
+import { adminHref } from '@/lib/admin/shell';
 
 const STATUS_LABELS: Record<string, string> = {
   active: 'Active',
@@ -557,7 +558,7 @@ export default function PromoCodesScreen() {
           columns={columns}
           rows={promoCodes.items as PromoRow[]}
           rowKey={(promo) => promo._id}
-          onRowPress={(promo) => router.push(`/admin/promo-codes/${promo._id}`)}
+          onRowPress={(promo) => router.push(adminHref(`/admin/promo-codes/${promo._id}`) as any)}
           emptyText="No promo codes found."
         />
       )}
