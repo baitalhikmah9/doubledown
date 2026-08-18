@@ -3,6 +3,7 @@ import { v } from 'convex/values';
 import {
   evaluatePromoAccountRestriction,
   evaluatePromoRedemption,
+  evaluatePromoRewardType,
   normalizePromoCode,
 } from './lib/promoRules';
 import {
@@ -121,6 +122,11 @@ export const redeemCode = mutation({
     if (!promoCheck.ok) {
       await recordFailedPromoAttempt(ctx, user._id, now);
       return { success: false as const, error: promoCheck.reason };
+    }
+
+    const rewardCheck = evaluatePromoRewardType(promo.rewardType);
+    if (!rewardCheck.ok) {
+      return { success: false as const, error: rewardCheck.reason };
     }
 
     if (!purchaserAccount) {

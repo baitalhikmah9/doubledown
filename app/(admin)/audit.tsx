@@ -3,18 +3,18 @@ import {
   View,
   Text,
   StyleSheet,
-  Pressable,
   ScrollView,
   useWindowDimensions,
 } from 'react-native';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { AdminScreenHeader } from '@/components/admin/AdminScreenHeader';
+import { AdminCard, AdminCardTitle } from '@/components/admin/AdminCard';
+import { AdminTable, type AdminTableColumn } from '@/components/admin/AdminTable';
+import { AdminPagination } from '@/components/admin/AdminPagination';
 import PromoModeDropdown from '@/components/admin/PromoModeDropdown';
-import { BRAND_ADMIN_TABLE, BRAND_RAISED_SURFACE, FONTS, SPACING } from '@/constants/theme';
-import { HOME_SOFT_UI } from '@/themes';
-
-const SOFT = HOME_SOFT_UI.colors;
+import { ADMIN_THEME } from '@/constants/adminTheme';
+import { FONTS } from '@/constants/theme';
 
 const ACTION_OPTIONS = [
   { value: '', label: 'All Actions' },
@@ -31,6 +31,35 @@ const TARGET_TYPE_OPTIONS = [
   { value: 'wallet', label: 'Wallet' },
   { value: 'store_purchase', label: 'Purchase' },
 ];
+
+type AuditRow = {
+  _id: string;
+  timestamp: number;
+  actorEmail?: string | null;
+  actorUserId: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  reason?: string | null;
+  before?: unknown;
+  after?: unknown;
+};
+
+function formatSnapshot(snapshot?: unknown): string {
+  if (snapshot === undefined || snapshot === null) return '-';
+  return JSON.stringify(snapshot, null, 2);
+}
+
+function DetailBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={styles.snapshotText} selectable>
+        {value}
+      </Text>
+    </View>
+  );
+}
 
 export default function AuditScreen() {
   const { width } = useWindowDimensions();
@@ -70,16 +99,49 @@ export default function AuditScreen() {
 
   const handlePrevious = () => setCursorStack(cursorStack.slice(0, -1));
 
+  const columns: AdminTableColumn<AuditRow>[] = [
+    {
+      key: 'date',
+      label: 'Date',
+      flex: 2,
+      render: (log) => new Date(log.timestamp).toLocaleString(),
+    },
+    {
+      key: 'actor',
+      label: 'Actor',
+      flex: 2,
+      render: (log) => log.actorEmail ?? log.actorUserId,
+    },
+    { key: 'action', label: 'Action', flex: 2, render: (log) => log.action },
+    {
+      key: 'target',
+      label: 'Target',
+      flex: 2,
+      render: (log) => `${log.targetType}: ${log.targetId}`,
+    },
+    { key: 'reason', label: 'Reason', flex: 2, render: (log) => log.reason ?? '-' },
+    {
+      key: 'details',
+      label: '',
+      flex: 1,
+      align: 'right',
+      render: (log) => (
+        <Text style={[styles.detailsToggle, expandedId === log._id && styles.detailsOpen]}>
+          {expandedId === log._id ? 'Hide' : 'Details'}
+        </Text>
+      ),
+    },
+  ];
+
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       <AdminScreenHeader
         title="Audit Log"
-        fallbackHref="/admin"
-        backAccessibilityLabel="Back to admin overview"
+        description="Immutable record of administrative operations"
       />
 
-      <View style={[styles.panel, isCompact && styles.panelCompact]}>
-        <Text style={styles.panelTitle}>Filters</Text>
+      <AdminCard>
+        <AdminCardTitle>Filters</AdminCardTitle>
         <View style={[styles.filterRow, isCompact && styles.filterRowCompact]}>
           <View style={styles.filterField}>
             <Text style={styles.formLabel}>Action</Text>
@@ -100,108 +162,39 @@ export default function AuditScreen() {
             />
           </View>
         </View>
-      </View>
+      </AdminCard>
 
       {logs === undefined ? (
-        <Text style={styles.empty}>Loading...</Text>
+        <Text style={styles.loadingText}>Loading audit logs...</Text>
       ) : (
         <>
-          {logs.items.length === 0 ? (
-            <Text style={styles.empty}>No audit records found. Audit entries are written for admin promo, wallet, and purchase reversals.</Text>
-          ) : (
-            <View style={styles.table}>
-              <View style={[styles.row, styles.headerRow]}>
-                <Text style={[styles.cell, styles.headerCell, styles.cellDate]}>Date</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.cellActor]}>Actor</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.cellAction]}>Action</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.cellTarget]}>Target</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.cellReason]}>Reason</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.cellDetails]}>Details</Text>
-              </View>
-              {logs.items.map((log: any) => {
-                const expanded = expandedId === log._id;
-                return (
-                  <View key={log._id}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Show audit details"
-                      accessibilityState={{ expanded }}
-                      onPress={() => setExpandedId(expanded ? null : log._id)}
-                      style={styles.row}
-                    >
-                      <Text style={[styles.cell, styles.cellDate]}>
-                        {new Date(log.timestamp).toLocaleString()}
-                      </Text>
-                      <Text style={[styles.cell, styles.cellActor]} numberOfLines={1}>
-                        {log.actorEmail ?? log.actorUserId}
-                      </Text>
-                      <Text style={[styles.cell, styles.cellAction]} numberOfLines={1}>
-                        {log.action}
-                      </Text>
-                      <Text style={[styles.cell, styles.cellTarget]} numberOfLines={1} selectable>
-                        {log.targetType}: {log.targetId}
-                      </Text>
-                      <Text style={[styles.cell, styles.cellReason]} numberOfLines={2}>
-                        {log.reason ?? '-'}
-                      </Text>
-                      <Text style={[styles.cell, styles.cellDetails, styles.detailsToggle]}>
-                        {expanded ? 'Hide' : 'Show'}
-                      </Text>
-                    </Pressable>
-                    {expanded && (
-                      <View style={styles.detailPanel}>
-                        <DetailBlock label="Before" value={formatSnapshot(log.before)} />
-                        <DetailBlock label="After" value={formatSnapshot(log.after)} />
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
-          )}
+          <AdminTable
+            columns={columns}
+            rows={logs.items as AuditRow[]}
+            rowKey={(log) => log._id}
+            onRowPress={(log) => setExpandedId(expandedId === log._id ? null : log._id)}
+            rowAccessibilityLabel={() => 'Show audit details'}
+            emptyText="No audit records found."
+            rowFooter={(log) =>
+              expandedId === log._id ? (
+                <View style={styles.detailPanel}>
+                  <DetailBlock label="Before Snapshot" value={formatSnapshot(log.before)} />
+                  <DetailBlock label="After Snapshot" value={formatSnapshot(log.after)} />
+                </View>
+              ) : null
+            }
+          />
           {(cursorStack.length > 0 || logs.nextCursor != null) && (
-            <View style={styles.paginationRow}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.secondaryButton,
-                  (pressed || cursorStack.length === 0) && styles.disabledButton,
-                ]}
-                onPress={handlePrevious}
-                disabled={cursorStack.length === 0}
-              >
-                <Text style={styles.secondaryButtonText}>Previous</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.secondaryButton,
-                  (pressed || logs.nextCursor == null) && styles.disabledButton,
-                ]}
-                onPress={handleNext}
-                disabled={logs.nextCursor == null}
-              >
-                <Text style={styles.secondaryButtonText}>Next</Text>
-              </Pressable>
-            </View>
+            <AdminPagination
+              hasPrevious={cursorStack.length > 0}
+              hasNext={logs.nextCursor != null}
+              onPrevious={handlePrevious}
+              onNext={handleNext}
+            />
           )}
         </>
       )}
     </ScrollView>
-  );
-}
-
-function formatSnapshot(snapshot?: unknown): string {
-  if (snapshot === undefined || snapshot === null) return '-';
-  return JSON.stringify(snapshot, null, 2);
-}
-
-function DetailBlock({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.detailBlock}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.snapshotText} selectable>
-        {value}
-      </Text>
-    </View>
   );
 }
 
@@ -210,134 +203,63 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   container: {
-    gap: SPACING.lg,
-  },
-  panel: {
-    ...BRAND_RAISED_SURFACE,
-    borderRadius: 18,
-    padding: SPACING.lg,
-    gap: SPACING.md,
-  },
-  panelCompact: {
-    gap: SPACING.md,
-  },
-  panelTitle: {
-    fontFamily: FONTS.uiSemibold,
-    fontSize: 16,
-    color: SOFT.textPrimary,
+    gap: 20,
   },
   filterRow: {
     flexDirection: 'row',
-    gap: SPACING.md,
+    gap: 12,
   },
   filterRowCompact: {
     flexDirection: 'column',
   },
   filterField: {
     flex: 1,
-    minWidth: 180,
+    minWidth: 160,
   },
   formLabel: {
-    fontFamily: FONTS.uiSemibold,
+    fontFamily: FONTS.uiMedium,
     fontSize: 12,
-    color: SOFT.textMuted,
-    marginBottom: 4,
+    color: ADMIN_THEME.colors.mutedForeground,
+    marginBottom: 6,
   },
-  empty: {
+  loadingText: {
     fontFamily: FONTS.ui,
     fontSize: 14,
-    color: SOFT.textMuted,
-    paddingVertical: SPACING.md,
-  },
-  table: {
-    gap: 1,
-    backgroundColor: BRAND_ADMIN_TABLE.rowDivider,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    gap: 8,
-    alignItems: 'center',
-  },
-  headerRow: {
-    backgroundColor: BRAND_ADMIN_TABLE.headerBackground,
-  },
-  cell: {
-    fontFamily: FONTS.ui,
-    fontSize: 12,
-    color: SOFT.textPrimary,
-  },
-  headerCell: {
-    fontFamily: FONTS.uiSemibold,
-    color: SOFT.textMuted,
-    fontSize: 12,
-  },
-  cellDate: {
-    flex: 2,
-  },
-  cellActor: {
-    flex: 2,
-    minWidth: 0,
-  },
-  cellAction: {
-    flex: 2,
-    minWidth: 0,
-  },
-  cellTarget: {
-    flex: 2,
-    minWidth: 0,
-  },
-  cellReason: {
-    flex: 2,
-    minWidth: 0,
-  },
-  cellDetails: {
-    flex: 1,
+    color: ADMIN_THEME.colors.mutedForeground,
+    paddingVertical: 20,
   },
   detailsToggle: {
-    fontFamily: FONTS.uiSemibold,
-    color: SOFT.textMuted,
-    textAlign: 'right',
+    fontFamily: FONTS.uiMedium,
+    fontSize: 13,
+    color: ADMIN_THEME.colors.foreground,
+    textDecorationLine: 'underline',
+  },
+  detailsOpen: {
+    color: ADMIN_THEME.colors.foreground,
   },
   detailPanel: {
-    backgroundColor: BRAND_ADMIN_TABLE.inputBackground,
-    padding: SPACING.md,
-    gap: SPACING.sm,
+    backgroundColor: ADMIN_THEME.colors.secondary,
+    borderTopWidth: 1,
+    borderTopColor: ADMIN_THEME.colors.border,
+    padding: 16,
+    gap: 12,
   },
   detailBlock: {
-    gap: 2,
+    gap: 4,
   },
   detailLabel: {
-    fontFamily: FONTS.uiSemibold,
-    fontSize: 11,
-    color: SOFT.textMuted,
+    fontFamily: FONTS.uiMedium,
+    fontSize: 12,
+    color: ADMIN_THEME.colors.mutedForeground,
   },
   snapshotText: {
-    fontFamily: FONTS.ui,
+    fontFamily: 'monospace',
     fontSize: 12,
-    color: SOFT.textPrimary,
-  },
-  paginationRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: SPACING.md,
-  },
-  secondaryButton: {
-    ...BRAND_RAISED_SURFACE,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-  },
-  secondaryButtonText: {
-    fontFamily: FONTS.uiBold,
-    fontSize: 12,
-    letterSpacing: 0.8,
-    color: SOFT.textPrimary,
-  },
-  disabledButton: {
-    opacity: 0.5,
+    color: ADMIN_THEME.colors.foreground,
+    backgroundColor: ADMIN_THEME.colors.card,
+    padding: 8,
+    borderRadius: ADMIN_THEME.radius.sm,
+    borderWidth: 1,
+    borderColor: ADMIN_THEME.colors.border,
   },
 });

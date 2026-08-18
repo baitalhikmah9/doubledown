@@ -4,19 +4,21 @@ import {
   Text,
   StyleSheet,
   TextInput,
-  Pressable,
   ScrollView,
   useWindowDimensions,
 } from 'react-native';
 import { useQuery } from 'convex/react';
+import { useRouter } from 'expo-router';
 import { api } from '@/convex/_generated/api';
 import { AdminScreenHeader } from '@/components/admin/AdminScreenHeader';
+import { AdminCard, AdminCardTitle } from '@/components/admin/AdminCard';
+import { AdminButton } from '@/components/admin/AdminButton';
+import { AdminTable, type AdminTableColumn } from '@/components/admin/AdminTable';
+import { AdminPagination } from '@/components/admin/AdminPagination';
+import { AdminStatusBadge } from '@/components/admin/AdminStatusBadge';
 import PromoModeDropdown from '@/components/admin/PromoModeDropdown';
-import { BRAND_ADMIN_TABLE, BRAND_RAISED_SURFACE, COLORS, FONTS, SPACING } from '@/constants/theme';
-import { Link } from 'expo-router';
-import { HOME_SOFT_UI } from '@/themes';
-
-const SOFT = HOME_SOFT_UI.colors;
+import { ADMIN_THEME } from '@/constants/adminTheme';
+import { FONTS } from '@/constants/theme';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -31,9 +33,25 @@ const STORE_OPTIONS = [
   { value: 'play_store', label: 'Google Play' },
 ];
 
+type PurchaseRow = {
+  _id: string;
+  store?: string | null;
+  productKey: string;
+  status: string;
+  storeTransactionId: string;
+  purchasedAt: number;
+};
+
+function formatStore(store?: string | null) {
+  if (store === 'app_store') return 'App Store';
+  if (store === 'play_store') return 'Google Play';
+  return store ?? '-';
+}
+
 export default function PurchasesScreen() {
   const { width } = useWindowDimensions();
   const isCompact = width < 768;
+  const router = useRouter();
 
   const [status, setStatus] = useState('');
   const [store, setStore] = useState('');
@@ -76,35 +94,61 @@ export default function PurchasesScreen() {
 
   const handlePrevious = () => setCursorStack(cursorStack.slice(0, -1));
 
+  const columns: AdminTableColumn<PurchaseRow>[] = [
+    {
+      key: 'store',
+      label: 'Store',
+      flex: 1,
+      render: (row) => formatStore(row.store),
+    },
+    { key: 'product', label: 'Product', flex: 2, render: (row) => row.productKey },
+    {
+      key: 'status',
+      label: 'Status',
+      flex: 1,
+      render: (row) => <AdminStatusBadge label={row.status} status={row.status} />,
+    },
+    {
+      key: 'tx',
+      label: 'Store Tx ID',
+      flex: 2,
+      render: (row) => row.storeTransactionId,
+    },
+    {
+      key: 'date',
+      label: 'Date',
+      flex: 1,
+      render: (row) => new Date(row.purchasedAt).toLocaleDateString(),
+    },
+    {
+      key: 'actions',
+      label: '',
+      flex: 1,
+      align: 'right',
+      render: (row) => <Text style={styles.link}>View</Text>,
+    },
+  ];
+
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       <AdminScreenHeader
         title="Purchases"
-        fallbackHref="/admin"
-        backAccessibilityLabel="Back to admin overview"
+        description="View IAP and store transactions"
       />
 
-      <View style={styles.panel}>
-        <Text style={styles.panelTitle}>Filters</Text>
+      <AdminCard>
+        <AdminCardTitle>Filters</AdminCardTitle>
         <View style={[styles.filterRow, isCompact && styles.filterRowCompact]}>
           <TextInput
             value={search}
             onChangeText={setSearch}
-            style={styles.searchInput}
-            placeholder="Purchaser ID or store transaction ID"
-            placeholderTextColor={COLORS.disabled}
+            style={styles.input}
+            placeholder="Purchaser ID or store transaction ID..."
+            placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
             autoCapitalize="none"
             onSubmitEditing={handleSearch}
           />
-          <Pressable
-            style={({ pressed }) => [
-              styles.primaryButton,
-              { opacity: pressed ? 0.9 : 1 },
-            ]}
-            onPress={handleSearch}
-          >
-            <Text style={styles.primaryButtonText}>Search</Text>
-          </Pressable>
+          <AdminButton label="Search" onPress={handleSearch} />
         </View>
         <View style={[styles.filterRow, isCompact && styles.filterRowCompact]}>
           <View style={styles.filterField}>
@@ -116,71 +160,26 @@ export default function PurchasesScreen() {
             <PromoModeDropdown value={store} options={STORE_OPTIONS} onValueChange={setStoreAndReset} />
           </View>
         </View>
-      </View>
+      </AdminCard>
 
       {purchases === undefined ? (
-        <Text style={styles.empty}>Loading...</Text>
+        <Text style={styles.loadingText}>Loading purchases...</Text>
       ) : (
         <>
-          {purchases.items.length === 0 ? (
-            <Text style={styles.empty}>No purchases found.</Text>
-          ) : (
-            <View style={styles.table}>
-              <View style={[styles.row, styles.headerRow]}>
-                <Text style={[styles.cell, styles.headerCell, styles.cellStore]}>Store</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.cellProduct]}>Product</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.cellStatus]}>Status</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.cellTx]}>Store Tx ID</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.cellDate]}>Date</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.cellActions]} />
-              </View>
-              {purchases.items.map((purchase: any) => (
-                <Link key={purchase._id} href={`/admin/purchases/${purchase._id}`} asChild>
-                  <Pressable style={styles.row}>
-                    <Text style={[styles.cell, styles.cellStore]} numberOfLines={1}>
-                      {formatStore(purchase.store)}
-                    </Text>
-                    <Text style={[styles.cell, styles.cellProduct]} numberOfLines={1}>
-                      {purchase.productKey}
-                    </Text>
-                    <Text style={[styles.cell, styles.cellStatus]}>{purchase.status}</Text>
-                    <Text style={[styles.cell, styles.cellTx]} numberOfLines={1} selectable>
-                      {purchase.storeTransactionId}
-                    </Text>
-                    <Text style={[styles.cell, styles.cellDate]}>
-                      {new Date(purchase.purchasedAt).toLocaleDateString()}
-                    </Text>
-                    <View style={styles.cellActions}>
-                      <Text style={styles.link}>View</Text>
-                    </View>
-                  </Pressable>
-                </Link>
-              ))}
-            </View>
-          )}
+          <AdminTable
+            columns={columns}
+            rows={purchases.items as PurchaseRow[]}
+            rowKey={(row) => row._id}
+            onRowPress={(row) => router.push(`/admin/purchases/${row._id}`)}
+            emptyText="No purchases found."
+          />
           {(cursorStack.length > 0 || purchases.nextCursor != null) && (
-            <View style={styles.paginationRow}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.secondaryButton,
-                  (pressed || cursorStack.length === 0) && styles.disabledButton,
-                ]}
-                onPress={handlePrevious}
-                disabled={cursorStack.length === 0}
-              >
-                <Text style={styles.secondaryButtonText}>Previous</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.secondaryButton,
-                  (pressed || purchases.nextCursor == null) && styles.disabledButton,
-                ]}
-                onPress={handleNext}
-                disabled={purchases.nextCursor == null}
-              >
-                <Text style={styles.secondaryButtonText}>Next</Text>
-              </Pressable>
-            </View>
+            <AdminPagination
+              hasPrevious={cursorStack.length > 0}
+              hasNext={purchases.nextCursor != null}
+              onPrevious={handlePrevious}
+              onNext={handleNext}
+            />
           )}
         </>
       )}
@@ -188,34 +187,17 @@ export default function PurchasesScreen() {
   );
 }
 
-function formatStore(store?: string | null) {
-  if (store === 'app_store') return 'App Store';
-  if (store === 'play_store') return 'Google Play';
-  return store ?? '-';
-}
-
 const styles = StyleSheet.create({
   scroll: {
     flex: 1,
   },
   container: {
-    gap: SPACING.lg,
-  },
-  panel: {
-    ...BRAND_RAISED_SURFACE,
-    borderRadius: 18,
-    padding: SPACING.lg,
-    gap: SPACING.md,
-  },
-  panelTitle: {
-    fontFamily: FONTS.uiSemibold,
-    fontSize: 16,
-    color: SOFT.textPrimary,
+    gap: 20,
   },
   filterRow: {
     flexDirection: 'row',
-    gap: SPACING.md,
-    alignItems: 'center',
+    gap: 12,
+    alignItems: 'flex-end',
   },
   filterRowCompact: {
     flexDirection: 'column',
@@ -223,114 +205,36 @@ const styles = StyleSheet.create({
   },
   filterField: {
     flex: 1,
-    minWidth: 180,
+    minWidth: 160,
   },
   formLabel: {
-    fontFamily: FONTS.uiSemibold,
+    fontFamily: FONTS.uiMedium,
     fontSize: 12,
-    color: SOFT.textMuted,
-    marginBottom: 4,
+    color: ADMIN_THEME.colors.mutedForeground,
+    marginBottom: 6,
   },
-  searchInput: {
+  input: {
     flex: 1,
+    height: 36,
     borderWidth: 1,
-    borderColor: BRAND_ADMIN_TABLE.inputBorder,
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    borderColor: ADMIN_THEME.colors.border,
+    borderRadius: ADMIN_THEME.radius.md,
+    paddingHorizontal: 12,
     fontFamily: FONTS.ui,
     fontSize: 13,
-    color: SOFT.textPrimary,
-    backgroundColor: BRAND_ADMIN_TABLE.inputBackground,
+    color: ADMIN_THEME.colors.foreground,
+    backgroundColor: ADMIN_THEME.colors.inputBackground,
   },
-  primaryButton: {
-    ...BRAND_RAISED_SURFACE,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-  },
-  primaryButtonText: {
-    fontFamily: FONTS.uiBold,
-    fontSize: 12,
-    letterSpacing: 1,
-    color: SOFT.textPrimary,
-  },
-  empty: {
+  loadingText: {
     fontFamily: FONTS.ui,
     fontSize: 14,
-    color: SOFT.textMuted,
-    paddingVertical: SPACING.md,
-  },
-  table: {
-    gap: 1,
-    backgroundColor: BRAND_ADMIN_TABLE.rowDivider,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    gap: 8,
-    alignItems: 'center',
-  },
-  headerRow: {
-    backgroundColor: BRAND_ADMIN_TABLE.headerBackground,
-  },
-  cell: {
-    fontFamily: FONTS.ui,
-    fontSize: 13,
-    color: SOFT.textPrimary,
-  },
-  headerCell: {
-    fontFamily: FONTS.uiSemibold,
-    color: SOFT.textMuted,
-    fontSize: 12,
-  },
-  cellStore: {
-    flex: 1,
-    minWidth: 0,
-  },
-  cellProduct: {
-    flex: 2,
-    minWidth: 0,
-  },
-  cellStatus: {
-    flex: 1,
-  },
-  cellTx: {
-    flex: 2,
-    minWidth: 0,
-  },
-  cellDate: {
-    flex: 1,
-  },
-  cellActions: {
-    flex: 1,
-    alignItems: 'flex-end',
+    color: ADMIN_THEME.colors.mutedForeground,
+    paddingVertical: 20,
   },
   link: {
-    fontFamily: FONTS.uiSemibold,
+    fontFamily: FONTS.uiMedium,
     fontSize: 13,
-    color: COLORS.primary,
-  },
-  paginationRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: SPACING.md,
-  },
-  secondaryButton: {
-    ...BRAND_RAISED_SURFACE,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-  },
-  secondaryButtonText: {
-    fontFamily: FONTS.uiBold,
-    fontSize: 12,
-    letterSpacing: 0.8,
-    color: SOFT.textPrimary,
-  },
-  disabledButton: {
-    opacity: 0.5,
+    color: ADMIN_THEME.colors.foreground,
+    textDecorationLine: 'underline',
   },
 });

@@ -34,6 +34,12 @@ export default function AdminSignInScreen() {
     api.users.getCurrentProfile,
     shouldLoadProfile ? {} : 'skip'
   );
+  const shouldLoadAffiliate =
+    shouldLoadProfile && userProfile !== undefined && userProfile !== null && userProfile.role !== 'admin';
+  const affiliateDashboard = useQuery(
+    api.affiliate.getMyDashboard,
+    shouldLoadAffiliate ? {} : 'skip'
+  );
   const passwordSignInPreflight = useMutation(api.adminSignIn.passwordSignInPreflight);
   const passwordSignInRecordFailure = useMutation(api.adminSignIn.passwordSignInRecordFailure);
   const passwordSignInClearFailures = useMutation(api.adminSignIn.passwordSignInClearFailures);
@@ -89,6 +95,20 @@ export default function AdminSignInScreen() {
     }
     if (userProfile?.role === 'admin') {
       return <Redirect href="/admin" />;
+    }
+    if (shouldLoadAffiliate && affiliateDashboard === undefined) {
+      return (
+        <View style={[styles.center, { backgroundColor: canvas }]}>
+          <ActivityIndicator size="large" color={textPrimary} />
+        </View>
+      );
+    }
+    if (
+      affiliateDashboard &&
+      Array.isArray(affiliateDashboard.codes) &&
+      affiliateDashboard.codes.length > 0
+    ) {
+      return <Redirect href="/admin/affiliate" />;
     }
 
     return (

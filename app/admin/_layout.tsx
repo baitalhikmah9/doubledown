@@ -20,6 +20,7 @@ export default function AdminStandaloneLayout() {
       <Stack.Screen name="promo-codes" />
       <Stack.Screen name="wallets" />
       <Stack.Screen name="audit" />
+      <Stack.Screen name="affiliate" />
       <Stack.Screen name="sign-in" />
       <Stack.Screen name="sign-out" />
     </Stack>

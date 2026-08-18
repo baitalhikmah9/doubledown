@@ -9,15 +9,19 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useQuery, useMutation } from 'convex/react';
+import { useRouter } from 'expo-router';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { AdminScreenHeader } from '@/components/admin/AdminScreenHeader';
+import { AdminCard, AdminCardTitle } from '@/components/admin/AdminCard';
+import { AdminButton } from '@/components/admin/AdminButton';
+import { AdminTable, type AdminTableColumn } from '@/components/admin/AdminTable';
+import { AdminStatusBadge } from '@/components/admin/AdminStatusBadge';
 import PromoModeDropdown from '@/components/admin/PromoModeDropdown';
-import { BRAND_ADMIN_TABLE, BRAND_RAISED_SURFACE, COLORS, FONTS, SPACING } from '@/constants/theme';
-import { Link } from 'expo-router';
-import { HOME_SOFT_UI } from '@/themes';
-
-const SOFT = HOME_SOFT_UI.colors;
+import { ADMIN_THEME } from '@/constants/adminTheme';
+import { FONTS } from '@/constants/theme';
+import { DEFAULT_TOKEN_PRODUCTS } from '@/convex/lib/paymentCatalog';
+import { generatePromoCode, isUnlimitedUsageCap } from '@/convex/lib/promoRules';
 
 const STATUS_LABELS: Record<string, string> = {
   active: 'Active',
@@ -25,14 +29,6 @@ const STATUS_LABELS: Record<string, string> = {
   expired: 'Expired',
   scheduled: 'Scheduled',
   exhausted: 'Exhausted',
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  active: COLORS.success,
-  inactive: COLORS.disabled,
-  expired: COLORS.error,
-  scheduled: COLORS.info,
-  exhausted: COLORS.warning,
 };
 
 const COUPON_MODES = [
@@ -64,6 +60,18 @@ const COUPON_MODES = [
 
 type CouponMode = (typeof COUPON_MODES)[number]['value'];
 
+const REWARD_TYPES = [
+  { value: 'tokens', label: 'Free tokens' },
+  { value: 'discount', label: 'Bundle discount' },
+] as const;
+
+type RewardType = (typeof REWARD_TYPES)[number]['value'];
+
+const BUNDLE_OPTIONS = DEFAULT_TOKEN_PRODUCTS.map((product) => ({
+  value: product.productKey,
+  label: `${product.tokensGranted}-token bundle`,
+}));
+
 type WalletSearchResult = {
   wallet: {
     _id: string;
@@ -78,9 +86,23 @@ type WalletSearchResult = {
   } | null;
 };
 
+type PromoRow = {
+  _id: string;
+  code: string;
+  rewardType?: string;
+  rewardAmount: number;
+  discountPercent?: number;
+  productKey?: string;
+  usedCount?: number;
+  usageCap: number;
+  affiliateEmail?: string;
+  status: string;
+};
+
 export default function PromoCodesScreen() {
   const { width } = useWindowDimensions();
   const isCompact = width < 768;
+  const router = useRouter();
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [modeFilter, setModeFilter] = useState('');
@@ -94,8 +116,15 @@ export default function PromoCodesScreen() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [code, setCode] = useState('');
+  const [rewardType, setRewardType] = useState<RewardType>('tokens');
   const [rewardAmount, setRewardAmount] = useState('');
+  const [discountPercent, setDiscountPercent] = useState('');
+  const [productKey, setProductKey] = useState(DEFAULT_TOKEN_PRODUCTS[0]?.productKey ?? 'bundle_10');
   const [usageCap, setUsageCap] = useState('');
+  const [unlimited, setUnlimited] = useState(false);
+  const [affiliatePreset, setAffiliatePreset] = useState(false);
+  const [affiliateEmail, setAffiliateEmail] = useState('');
+  const [commissionPercent, setCommissionPercent] = useState('');
   const [mode, setMode] = useState<CouponMode>('public_single_use');
   const [accountQuery, setAccountQuery] = useState('');
   const [selectedAccount, setSelectedAccount] = useState<WalletSearchResult | null>(null);
@@ -105,14 +134,20 @@ export default function PromoCodesScreen() {
   const [submitting, setSubmitting] = useState(false);
   const selectedMode = COUPON_MODES.find((item) => item.value === mode) ?? COUPON_MODES[0];
   const amount = parseInt(rewardAmount, 10);
+  const parsedDiscount = parseInt(discountPercent, 10);
+  const parsedCommission = parseInt(commissionPercent, 10);
   const cap = parseInt(usageCap, 10);
+  const needsCap = selectedMode.requiresCap && !unlimited;
   const isSubmitDisabled =
     submitting ||
     !code.trim() ||
-    Number.isNaN(amount) ||
-    amount <= 0 ||
-    (selectedMode.requiresCap && (Number.isNaN(cap) || cap <= 0)) ||
-    (selectedMode.requiresAccount && !selectedAccount?.user?._id);
+    (rewardType === 'tokens'
+      ? Number.isNaN(amount) || amount <= 0
+      : Number.isNaN(parsedDiscount) || parsedDiscount < 1 || parsedDiscount > 100 || !productKey) ||
+    (needsCap && (Number.isNaN(cap) || cap <= 0)) ||
+    (selectedMode.requiresAccount && !selectedAccount?.user?._id) ||
+    (affiliatePreset &&
+      (!affiliateEmail.trim() || Number.isNaN(parsedCommission) || parsedCommission < 1 || parsedCommission > 100));
   const accountResults = useQuery(
     api.admin.searchWallets,
     selectedMode.requiresAccount && accountQuery.trim()
@@ -122,15 +157,30 @@ export default function PromoCodesScreen() {
 
   const handleCreate = async () => {
     setError('');
-    const amount = parseInt(rewardAmount, 10);
-    const parsedCap = selectedMode.requiresCap ? parseInt(usageCap, 10) : 1;
+    const parsedAmount = rewardType === 'tokens' ? parseInt(rewardAmount, 10) : 0;
+    const parsedCap = unlimited ? 0 : selectedMode.requiresCap ? parseInt(usageCap, 10) : 1;
+    const parsedDiscountValue = parseInt(discountPercent, 10);
+    const parsedCommissionValue = parseInt(commissionPercent, 10);
 
-    if (!code.trim() || Number.isNaN(amount)) {
-      setError('Code and token amount are required.');
+    if (!code.trim()) {
+      setError('Code is required.');
       return;
     }
 
-    if (selectedMode.requiresCap && (Number.isNaN(parsedCap) || parsedCap <= 0)) {
+    if (rewardType === 'tokens' && Number.isNaN(parsedAmount)) {
+      setError('Token amount is required.');
+      return;
+    }
+
+    if (
+      rewardType === 'discount' &&
+      (Number.isNaN(parsedDiscountValue) || parsedDiscountValue < 1 || parsedDiscountValue > 100)
+    ) {
+      setError('Discount percent must be between 1 and 100.');
+      return;
+    }
+
+    if (needsCap && (Number.isNaN(parsedCap) || parsedCap <= 0)) {
       setError('Max redemptions must be a positive number.');
       return;
     }
@@ -140,20 +190,45 @@ export default function PromoCodesScreen() {
       return;
     }
 
+    if (affiliatePreset && !affiliateEmail.trim()) {
+      setError('Affiliate email is required.');
+      return;
+    }
+
+    if (
+      affiliatePreset &&
+      (Number.isNaN(parsedCommissionValue) || parsedCommissionValue < 1 || parsedCommissionValue > 100)
+    ) {
+      setError('Commission percent must be between 1 and 100.');
+      return;
+    }
+
     try {
       setSubmitting(true);
       await createPromo({
         code: code.trim(),
-        rewardAmount: amount,
+        rewardAmount: parsedAmount,
         usageCap: parsedCap,
         mode,
         restrictedToUserId: selectedAccount?.user?._id,
         restrictedToPurchaserAccountId: selectedAccount?.wallet.purchaserAccountId ?? undefined,
+        rewardType,
+        discountPercent: rewardType === 'discount' ? parsedDiscountValue : undefined,
+        productKey: rewardType === 'discount' ? productKey : undefined,
+        affiliateEmail: affiliatePreset ? affiliateEmail.trim() : undefined,
+        commissionPercent: affiliatePreset ? parsedCommissionValue : undefined,
         metadata: campaignName || notes ? { campaignName: campaignName || undefined, notes: notes || undefined } : undefined,
       });
       setCode('');
+      setRewardType('tokens');
       setRewardAmount('');
+      setDiscountPercent('');
+      setProductKey(DEFAULT_TOKEN_PRODUCTS[0]?.productKey ?? 'bundle_10');
       setUsageCap('');
+      setUnlimited(false);
+      setAffiliatePreset(false);
+      setAffiliateEmail('');
+      setCommissionPercent('');
       setMode('public_single_use');
       setAccountQuery('');
       setSelectedAccount(null);
@@ -167,53 +242,128 @@ export default function PromoCodesScreen() {
     }
   };
 
+  const columns: AdminTableColumn<PromoRow>[] = [
+    { key: 'code', label: 'Code', flex: 2, render: (promo) => promo.code },
+    {
+      key: 'reward',
+      label: 'Reward',
+      flex: 1.4,
+      align: 'center',
+      render: (promo) =>
+        promo.rewardType === 'discount'
+          ? `${promo.discountPercent ?? 0}% off ${promo.productKey ?? 'bundle'}`
+          : `${promo.rewardAmount} tokens`,
+    },
+    {
+      key: 'cap',
+      label: 'Used / Cap',
+      flex: 1,
+      align: 'center',
+      render: (promo) =>
+        `${promo.usedCount ?? 0} / ${isUnlimitedUsageCap(promo.usageCap) ? 'Unlimited' : promo.usageCap}`,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      flex: 1,
+      align: 'center',
+      render: (promo) => (
+        <AdminStatusBadge
+          label={STATUS_LABELS[promo.status] ?? promo.status}
+          status={promo.status}
+        />
+      ),
+    },
+  ];
+
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       <AdminScreenHeader
         title="Promo Codes"
-        fallbackHref="/admin"
-        backAccessibilityLabel="Back to admin overview"
+        description="Create and manage coupon redemption codes"
         headerRight={
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={showCreate ? 'Cancel creating promo code' : 'Create new promo code'}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              { opacity: pressed ? 0.9 : 1, transform: pressed ? [{ scale: 0.98 }] : [{ scale: 1 }] },
-            ]}
+          <AdminButton
+            label={showCreate ? 'Cancel' : 'Create'}
+            variant={showCreate ? 'secondary' : 'primary'}
+            accessibilityLabel={
+              showCreate ? 'Cancel creating promo code' : 'Create new promo code'
+            }
             onPress={() => setShowCreate((s) => !s)}
-          >
-            <Text style={styles.primaryButtonText}>{showCreate ? 'Cancel' : 'Create'}</Text>
-          </Pressable>
+          />
         }
       />
 
       {showCreate && (
-        <View style={styles.panel}>
-          <Text style={styles.panelTitle}>New Promo Code</Text>
+        <AdminCard>
+          <AdminCardTitle>New Promo Code</AdminCardTitle>
           <View style={[styles.formGrid, isCompact && styles.formGridCompact]}>
             <View style={styles.formField}>
               <Text style={styles.formLabel}>Code</Text>
-              <TextInput
-                value={code}
-                onChangeText={setCode}
-                style={styles.input}
-                placeholder="e.g. WELCOME2024"
-                placeholderTextColor={COLORS.disabled}
-                autoCapitalize="characters"
-              />
+              <View style={styles.codeRow}>
+                <TextInput
+                  value={code}
+                  onChangeText={setCode}
+                  style={[styles.input, styles.codeInput]}
+                  placeholder="e.g. WELCOME2024"
+                  placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
+                  autoCapitalize="characters"
+                />
+                <AdminButton
+                  label="Generate"
+                  variant="secondary"
+                  accessibilityLabel="Generate random code"
+                  onPress={() => setCode(generatePromoCode())}
+                />
+              </View>
             </View>
             <View style={styles.formField}>
-              <Text style={styles.formLabel}>Reward Amount</Text>
-              <TextInput
-                value={rewardAmount}
-                onChangeText={setRewardAmount}
-                style={styles.input}
-                placeholder="Tokens"
-                placeholderTextColor={COLORS.disabled}
-                keyboardType="numeric"
+              <Text style={styles.formLabel}>Reward</Text>
+              <PromoModeDropdown
+                value={rewardType}
+                accessibilityLabel="Select reward type"
+                options={REWARD_TYPES}
+                onValueChange={(next) => setRewardType(next as RewardType)}
               />
             </View>
+            {rewardType === 'tokens' ? (
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Token Amount</Text>
+                <TextInput
+                  value={rewardAmount}
+                  onChangeText={setRewardAmount}
+                  style={styles.input}
+                  placeholder="Tokens"
+                  placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
+                  keyboardType="numeric"
+                />
+              </View>
+            ) : (
+              <>
+                <View style={styles.formField}>
+                  <Text style={styles.formLabel}>Discount Percent</Text>
+                  <TextInput
+                    value={discountPercent}
+                    onChangeText={setDiscountPercent}
+                    style={styles.input}
+                    placeholder="e.g. 20"
+                    placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.formField}>
+                  <Text style={styles.formLabel}>Token Bundle</Text>
+                  <PromoModeDropdown
+                    value={productKey}
+                    accessibilityLabel="Select token bundle"
+                    options={BUNDLE_OPTIONS}
+                    onValueChange={setProductKey}
+                  />
+                </View>
+                <Text style={styles.helperText}>
+                  Stored only. Checkout cannot apply this discount until a website coupon path exists.
+                </Text>
+              </>
+            )}
             <View style={styles.formField}>
               <Text style={styles.formLabel}>Mode</Text>
               <PromoModeDropdown
@@ -230,7 +380,56 @@ export default function PromoCodesScreen() {
                 }}
               />
             </View>
-            {selectedMode.requiresCap && (
+            <View style={styles.checkboxRow}>
+              <AdminButton
+                label={affiliatePreset ? 'Affiliate preset on' : 'Affiliate preset'}
+                variant={affiliatePreset ? 'primary' : 'secondary'}
+                accessibilityLabel="Toggle affiliate preset"
+                onPress={() => {
+                  const next = !affiliatePreset;
+                  setAffiliatePreset(next);
+                  if (next) {
+                    setUnlimited(true);
+                    setMode('public_multi_use');
+                    setAccountQuery('');
+                    setSelectedAccount(null);
+                  }
+                }}
+              />
+              <AdminButton
+                label={unlimited ? 'Unlimited uses' : 'Limited uses'}
+                variant={unlimited ? 'primary' : 'secondary'}
+                accessibilityLabel="Toggle unlimited uses"
+                onPress={() => setUnlimited((value) => !value)}
+              />
+            </View>
+            {affiliatePreset && (
+              <>
+                <View style={styles.formField}>
+                  <Text style={styles.formLabel}>Affiliate Email</Text>
+                  <TextInput
+                    value={affiliateEmail}
+                    onChangeText={setAffiliateEmail}
+                    style={styles.input}
+                    placeholder="creator@example.com"
+                    placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
+                    autoCapitalize="none"
+                  />
+                </View>
+                <View style={styles.formField}>
+                  <Text style={styles.formLabel}>Commission Percent</Text>
+                  <TextInput
+                    value={commissionPercent}
+                    onChangeText={setCommissionPercent}
+                    style={styles.input}
+                    placeholder="e.g. 10"
+                    placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </>
+            )}
+            {needsCap && (
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>Max Redemptions</Text>
                 <TextInput
@@ -238,7 +437,7 @@ export default function PromoCodesScreen() {
                   onChangeText={setUsageCap}
                   style={styles.input}
                   placeholder="Max redemptions"
-                  placeholderTextColor={COLORS.disabled}
+                  placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
                   keyboardType="numeric"
                 />
               </View>
@@ -254,7 +453,7 @@ export default function PromoCodesScreen() {
                   }}
                   style={styles.input}
                   placeholder="Search email, Clerk id, or purchaser id"
-                  placeholderTextColor={COLORS.disabled}
+                  placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
                   autoCapitalize="none"
                 />
                 {selectedAccount ? (
@@ -293,7 +492,7 @@ export default function PromoCodesScreen() {
                 onChangeText={setCampaignName}
                 style={styles.input}
                 placeholder="Optional"
-                placeholderTextColor={COLORS.disabled}
+                placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
               />
             </View>
             <View style={styles.formField}>
@@ -303,102 +502,64 @@ export default function PromoCodesScreen() {
                 onChangeText={setNotes}
                 style={styles.input}
                 placeholder="Optional"
-                placeholderTextColor={COLORS.disabled}
+                placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
               />
             </View>
           </View>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          <Pressable
-            style={({ pressed }) => [
-              styles.submitButton,
-              isSubmitDisabled && styles.disabledButton,
-              { opacity: pressed && !isSubmitDisabled ? 0.92 : 1 },
-            ]}
+          <AdminButton
+            label={submitting ? 'Creating...' : 'Create Promo Code'}
             onPress={handleCreate}
             disabled={isSubmitDisabled}
-          >
-            <Text style={styles.submitButtonText}>
-              {submitting ? 'Creating...' : 'Create Promo Code'}
-            </Text>
-          </Pressable>
-        </View>
+            style={styles.submitButton}
+          />
+        </AdminCard>
       )}
 
-      <View style={[styles.filterRow, isCompact && styles.filterRowCompact]}>
-        <TextInput
-          value={filter}
-          onChangeText={setFilter}
-          style={styles.filterInput}
-          placeholder="Search codes..."
-          placeholderTextColor={COLORS.disabled}
-        />
-        <View style={styles.filterField}>
-          <PromoModeDropdown
-            value={statusFilter}
-            accessibilityLabel="Select status filter"
-            options={[
-              { value: '', label: 'All Statuses' },
-              ...Object.keys(STATUS_LABELS).map((key) => ({ value: key, label: STATUS_LABELS[key] })),
-            ]}
-            onValueChange={setStatusFilter}
+      <AdminCard>
+        <View style={[styles.filterRow, isCompact && styles.filterRowCompact]}>
+          <TextInput
+            value={filter}
+            onChangeText={setFilter}
+            style={styles.filterInput}
+            placeholder="Search codes..."
+            placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
           />
+          <View style={styles.filterField}>
+            <PromoModeDropdown
+              value={statusFilter}
+              accessibilityLabel="Select status filter"
+              options={[
+                { value: '', label: 'All Statuses' },
+                ...Object.keys(STATUS_LABELS).map((key) => ({ value: key, label: STATUS_LABELS[key] })),
+              ]}
+              onValueChange={setStatusFilter}
+            />
+          </View>
+          <View style={styles.filterField}>
+            <PromoModeDropdown
+              value={modeFilter}
+              accessibilityLabel="Select mode filter"
+              options={[
+                { value: '', label: 'All Modes' },
+                ...COUPON_MODES.map((m) => ({ value: m.value, label: m.label })),
+              ]}
+              onValueChange={setModeFilter}
+            />
+          </View>
         </View>
-        <View style={styles.filterField}>
-          <PromoModeDropdown
-            value={modeFilter}
-            accessibilityLabel="Select mode filter"
-            options={[
-              { value: '', label: 'All Modes' },
-              ...COUPON_MODES.map((m) => ({ value: m.value, label: m.label })),
-            ]}
-            onValueChange={setModeFilter}
-          />
-        </View>
-      </View>
+      </AdminCard>
 
       {promoCodes === undefined ? (
-        <Text style={styles.empty}>Loading...</Text>
-      ) : promoCodes.items.length === 0 ? (
-        <Text style={styles.empty}>No promo codes found.</Text>
+        <Text style={styles.loadingText}>Loading promo codes...</Text>
       ) : (
-        <View style={styles.table}>
-          <View style={[styles.row, styles.headerRow]}>
-            <Text style={[styles.cell, styles.headerCell, styles.cellCode]}>Code</Text>
-            <Text style={[styles.cell, styles.headerCell, styles.cellReward]}>Reward</Text>
-            <Text style={[styles.cell, styles.headerCell, styles.cellCap]}>Used / Cap</Text>
-            <View style={styles.cellStatus}>
-              <Text style={[styles.cell, styles.headerCell]}>Status</Text>
-            </View>
-          </View>
-          {promoCodes.items.map((promo: { _id: string; code: string; rewardAmount: number; usedCount?: number; usageCap: number; status: string }) => (
-            <Link key={promo._id} href={`/admin/promo-codes/${promo._id}`} asChild>
-              <Pressable style={styles.row}>
-                <Text style={[styles.cell, styles.cellCode]}>{promo.code}</Text>
-                <Text style={[styles.cell, styles.cellReward]}>{promo.rewardAmount}</Text>
-                <Text style={[styles.cell, styles.cellCap]}>
-                  {promo.usedCount ?? 0} / {promo.usageCap}
-                </Text>
-                <View style={styles.cellStatus}>
-                  <View
-                    style={[
-                      styles.badge,
-                      { backgroundColor: (STATUS_COLORS[promo.status] || COLORS.disabled) + '22' },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.badgeText,
-                        { color: STATUS_COLORS[promo.status] || COLORS.disabled },
-                      ]}
-                    >
-                      {STATUS_LABELS[promo.status] ?? promo.status}
-                    </Text>
-                  </View>
-                </View>
-              </Pressable>
-            </Link>
-          ))}
-        </View>
+        <AdminTable
+          columns={columns}
+          rows={promoCodes.items as PromoRow[]}
+          rowKey={(promo) => promo._id}
+          onRowPress={(promo) => router.push(`/admin/promo-codes/${promo._id}`)}
+          emptyText="No promo codes found."
+        />
       )}
     </ScrollView>
   );
@@ -409,50 +570,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   container: {
-    gap: SPACING.lg,
-  },
-  primaryButton: {
-    ...BRAND_RAISED_SURFACE,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  primaryButtonText: {
-    fontFamily: FONTS.uiBold,
-    fontSize: 12,
-    letterSpacing: 1,
-    color: SOFT.textPrimary,
+    gap: 20,
   },
   submitButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
     alignSelf: 'flex-start',
-  },
-  submitButtonText: {
-    fontFamily: FONTS.uiBold,
-    fontSize: 13,
-    letterSpacing: 0.6,
-    color: '#FFFFFF',
-  },
-  panel: {
-    ...BRAND_RAISED_SURFACE,
-    borderRadius: 18,
-    padding: SPACING.lg,
-    gap: SPACING.md,
-  },
-  panelTitle: {
-    fontFamily: FONTS.uiSemibold,
-    fontSize: 16,
-    color: SOFT.textPrimary,
   },
   formGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: SPACING.md,
+    gap: 16,
   },
   formGridCompact: {
     flexDirection: 'column',
@@ -460,64 +586,85 @@ const styles = StyleSheet.create({
   formField: {
     flexBasis: '30%',
     flexGrow: 1,
-    minWidth: 200,
+    minWidth: 180,
   },
   formFieldWide: {
     flexBasis: '62%',
     flexGrow: 1,
-    minWidth: 280,
+    minWidth: 260,
   },
   formLabel: {
-    fontFamily: FONTS.uiSemibold,
+    fontFamily: FONTS.uiMedium,
     fontSize: 12,
-    color: SOFT.textMuted,
-    marginBottom: 4,
+    color: ADMIN_THEME.colors.mutedForeground,
+    marginBottom: 6,
+  },
+  codeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  codeInput: {
+    flex: 1,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    flexBasis: '100%',
+  },
+  helperText: {
+    flexBasis: '100%',
+    fontFamily: FONTS.ui,
+    fontSize: 12,
+    color: ADMIN_THEME.colors.mutedForeground,
   },
   input: {
+    height: 36,
     borderWidth: 1,
-    borderColor: BRAND_ADMIN_TABLE.inputBorder,
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    borderColor: ADMIN_THEME.colors.border,
+    borderRadius: ADMIN_THEME.radius.md,
+    paddingHorizontal: 12,
     fontFamily: FONTS.ui,
     fontSize: 13,
-    color: SOFT.textPrimary,
-    backgroundColor: BRAND_ADMIN_TABLE.inputBackground,
+    color: ADMIN_THEME.colors.foreground,
+    backgroundColor: ADMIN_THEME.colors.inputBackground,
   },
   selectedAccountText: {
     marginTop: 6,
     fontFamily: FONTS.ui,
     fontSize: 12,
-    color: SOFT.textMuted,
+    color: ADMIN_THEME.colors.mutedForeground,
   },
   accountResults: {
     marginTop: 8,
     borderWidth: 1,
-    borderColor: BRAND_ADMIN_TABLE.rowDivider,
-    borderRadius: 10,
+    borderColor: ADMIN_THEME.colors.border,
+    borderRadius: ADMIN_THEME.radius.md,
     overflow: 'hidden',
+    backgroundColor: ADMIN_THEME.colors.card,
   },
   accountResult: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: BRAND_ADMIN_TABLE.rowDivider,
+    backgroundColor: ADMIN_THEME.colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: ADMIN_THEME.colors.border,
     paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
   },
   accountResultTitle: {
-    fontFamily: FONTS.uiSemibold,
+    fontFamily: FONTS.uiMedium,
     fontSize: 13,
-    color: SOFT.textPrimary,
+    color: ADMIN_THEME.colors.foreground,
   },
   accountResultMeta: {
     marginTop: 2,
     fontFamily: FONTS.ui,
     fontSize: 11,
-    color: SOFT.textMuted,
+    color: ADMIN_THEME.colors.mutedForeground,
   },
   filterRow: {
     flexDirection: 'row',
-    gap: SPACING.md,
+    gap: 12,
     alignItems: 'center',
   },
   filterRowCompact: {
@@ -526,87 +673,30 @@ const styles = StyleSheet.create({
   },
   filterField: {
     flex: 1,
-    minWidth: 180,
+    minWidth: 160,
   },
   filterInput: {
     flex: 1,
     maxWidth: 320,
+    height: 36,
     borderWidth: 1,
-    borderColor: BRAND_ADMIN_TABLE.inputBorder,
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    borderColor: ADMIN_THEME.colors.border,
+    borderRadius: ADMIN_THEME.radius.md,
+    paddingHorizontal: 12,
     fontFamily: FONTS.ui,
     fontSize: 13,
-    color: SOFT.textPrimary,
-    backgroundColor: BRAND_ADMIN_TABLE.inputBackground,
+    color: ADMIN_THEME.colors.foreground,
+    backgroundColor: ADMIN_THEME.colors.inputBackground,
   },
   errorText: {
     fontFamily: FONTS.ui,
-    fontSize: 13,
-    color: COLORS.error,
+    fontSize: 12,
+    color: ADMIN_THEME.colors.destructive,
   },
-  empty: {
+  loadingText: {
     fontFamily: FONTS.ui,
     fontSize: 14,
-    color: SOFT.textMuted,
-    paddingVertical: SPACING.md,
-  },
-  table: {
-    gap: 1,
-    backgroundColor: BRAND_ADMIN_TABLE.rowDivider,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    gap: 8,
-    alignItems: 'center',
-  },
-  headerRow: {
-    backgroundColor: BRAND_ADMIN_TABLE.headerBackground,
-  },
-  cell: {
-    fontFamily: FONTS.ui,
-    fontSize: 13,
-    color: SOFT.textPrimary,
-    textAlign: 'center',
-  },
-  headerCell: {
-    fontFamily: FONTS.uiSemibold,
-    color: SOFT.textMuted,
-    fontSize: 12,
-  },
-  cellCode: {
-    flex: 2,
-    alignSelf: 'stretch',
-  },
-  cellReward: {
-    flex: 1,
-    alignSelf: 'stretch',
-  },
-  cellCap: {
-    flex: 1,
-    alignSelf: 'stretch',
-  },
-  cellStatus: {
-    flex: 1,
-    minWidth: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'stretch',
-  },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  badgeText: {
-    fontFamily: FONTS.uiSemibold,
-    fontSize: 11,
-    textAlign: 'center',
+    color: ADMIN_THEME.colors.mutedForeground,
+    paddingVertical: 20,
   },
 });

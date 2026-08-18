@@ -58,6 +58,8 @@ const PROMO_ERROR_MESSAGES: Record<string, string> = {
   account_restricted: 'That code is restricted to another account.',
   idempotency_required: 'Please try redeeming that code again.',
   rate_limited: 'Too many redemption attempts. Please try again later.',
+  discount_checkout_unavailable:
+    'This discount code cannot be applied yet. Website checkout discounts are not available.',
 };
 
 function getPromoErrorMessage(error?: string) {
@@ -70,7 +72,7 @@ function getPromoErrorMessage(error?: string) {
 const IS_IOS_PLATFORM = Platform.OS === 'ios';
 const IS_ANDROID_PLATFORM = Platform.OS === 'android';
 const IS_NATIVE_PLATFORM = IS_IOS_PLATFORM || IS_ANDROID_PLATFORM;
-/** Promo redeem UI is web-only. Android deep-links to the site; iOS shows neither. */
+/** Promo redeem UI is web-only. Native apps deep-link to playbackfire.com. */
 const IS_WEB_PLATFORM = Platform.OS === 'web';
 const PLAYBACKFIRE_SITE_URL = 'https://playbackfire.com';
 // Web is purchaseable when a RevenueCat Web Billing key is configured.
@@ -517,8 +519,6 @@ export default function StoreScreen() {
           <View
             style={[
               styles.storeBody,
-              // iOS has no redeem footer or site CTA strip.
-              IS_IOS_PLATFORM && styles.storeBodyWithoutRedeem,
               isCompactViewport && styles.storeBodyCompact,
               isTightViewport && styles.storeBodyTight,
             ]}
@@ -684,8 +684,8 @@ export default function StoreScreen() {
             {promoSuccess ? <Text style={styles.promoSuccessText}>{promoSuccess}</Text> : null}
           </View>
           ) : null}
-          {IS_ANDROID_PLATFORM ? (
-          <View style={styles.redeemSection} testID="store-android-promo-cta">
+          {IS_NATIVE_PLATFORM ? (
+          <View style={styles.redeemSection} testID="store-native-promo-cta">
             <Text
               style={[
                 styles.nativePromoCtaText,

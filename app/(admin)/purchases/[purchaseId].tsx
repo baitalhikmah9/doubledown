@@ -1,13 +1,23 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { AdminScreenHeader } from '@/components/admin/AdminScreenHeader';
-import { BRAND_ADMIN_TABLE, BRAND_RAISED_SURFACE, COLORS, FONTS, SPACING } from '@/constants/theme';
-import { HOME_SOFT_UI } from '@/themes';
+import { AdminCard, AdminCardTitle } from '@/components/admin/AdminCard';
+import { AdminButton } from '@/components/admin/AdminButton';
+import { AdminTable, type AdminTableColumn } from '@/components/admin/AdminTable';
+import { AdminStatusBadge } from '@/components/admin/AdminStatusBadge';
+import { ADMIN_THEME } from '@/constants/adminTheme';
+import { FONTS } from '@/constants/theme';
 
-const SOFT = HOME_SOFT_UI.colors;
+type PurchaseTx = {
+  _id: string;
+  type: string;
+  amount: number;
+  storeTransactionId?: string | null;
+  metadata?: { reason?: string } | null;
+};
 
 export default function PurchaseDetailScreen() {
   const { purchaseId } = useLocalSearchParams<{ purchaseId: string }>();
@@ -23,9 +33,9 @@ export default function PurchaseDetailScreen() {
   if (detail === undefined) {
     return (
       <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
-        <AdminScreenHeader title="Purchase" fallbackHref="/admin/purchases" backAccessibilityLabel="Back to purchases" />
+        <AdminScreenHeader title="Purchase Details" fallbackHref="/admin/purchases" />
         <View style={styles.center}>
-          <Text>Loading...</Text>
+          <Text style={styles.loadingText}>Loading purchase details...</Text>
         </View>
       </ScrollView>
     );
@@ -34,7 +44,7 @@ export default function PurchaseDetailScreen() {
   if (detail === null) {
     return (
       <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
-        <AdminScreenHeader title="Purchase" fallbackHref="/admin/purchases" backAccessibilityLabel="Back to purchases" />
+        <AdminScreenHeader title="Purchase Details" fallbackHref="/admin/purchases" />
         <View style={styles.center}>
           <Text style={styles.errorText}>Purchase not found.</Text>
         </View>
@@ -71,28 +81,54 @@ export default function PurchaseDetailScreen() {
     }
   };
 
+  const txColumns: AdminTableColumn<PurchaseTx>[] = [
+    { key: 'type', label: 'Type', flex: 2, render: (tx) => tx.type },
+    { key: 'amount', label: 'Amount', flex: 1, render: (tx) => String(tx.amount) },
+    {
+      key: 'tx',
+      label: 'Store Tx',
+      flex: 2,
+      render: (tx) => tx.storeTransactionId ?? '-',
+    },
+    {
+      key: 'reason',
+      label: 'Reason',
+      flex: 2,
+      render: (tx) => tx.metadata?.reason ?? '-',
+    },
+  ];
+
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
-      <AdminScreenHeader title="Purchase" fallbackHref="/admin/purchases" backAccessibilityLabel="Back to purchases" />
+      <AdminScreenHeader title="Purchase Details" fallbackHref="/admin/purchases" />
 
-      <View style={styles.panel}>
+      <AdminCard>
         <View style={styles.panelHeader}>
-          <Text style={styles.panelTitle}>Purchase</Text>
+          <AdminCardTitle>Overview</AdminCardTitle>
           {!alreadyReversed && !result ? (
-            <Pressable style={styles.dangerButton} onPress={() => setShowReverse((s) => !s)}>
-              <Text style={styles.dangerButtonText}>Reverse</Text>
-            </Pressable>
+            <AdminButton
+              label="Reverse Purchase"
+              variant="danger"
+              compact
+              onPress={() => setShowReverse((s) => !s)}
+            />
           ) : null}
         </View>
         <View style={styles.detailsGrid}>
           <DetailItem label="Store" value={formatStore(purchase.store)} />
           <DetailItem label="Product" value={purchase.productKey} />
-          <DetailItem label="Status" value={purchase.status} />
+          <View style={styles.detailItem}>
+            <Text style={styles.detailLabel}>Status</Text>
+            <AdminStatusBadge label={purchase.status} status={purchase.status} />
+          </View>
           <DetailItem label="Store Transaction ID" value={purchase.storeTransactionId} />
           <DetailItem label="Purchaser ID" value={purchase.purchaserAccountId} />
           <DetailItem label="Purchased At" value={new Date(purchase.purchasedAt).toLocaleString()} />
           {purchase.priceAmountMicros !== undefined && (
-            <DetailItem label="Price" value={`${(purchase.priceAmountMicros / 1_000_000).toFixed(2)} ${purchase.currencyCode ?? ''}`.trim()} />
+            <DetailItem
+              label="Price"
+              value={`${(purchase.priceAmountMicros / 1_000_000).toFixed(2)} ${purchase.currencyCode ?? ''}`.trim()}
+            />
           )}
         </View>
         {alreadyReversed && (
@@ -108,78 +144,55 @@ export default function PurchaseDetailScreen() {
             <Text style={styles.resultText}>Resulting wallet balance: {result.balance} tokens</Text>
           </View>
         )}
-      </View>
+      </AdminCard>
 
       {showReverse && (
-        <View style={styles.panel}>
-          <Text style={styles.panelTitle}>Reverse Purchase Grant</Text>
+        <AdminCard>
+          <AdminCardTitle>Reverse Purchase Grant</AdminCardTitle>
           <Text style={styles.formLabel}>Reason</Text>
           <TextInput
             value={reason}
             onChangeText={setReason}
-            style={styles.input}
+            style={styles.textarea}
             placeholder="Why are you reversing this purchase?"
-            placeholderTextColor={COLORS.disabled}
+            placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
             multiline
           />
           <View style={styles.buttonRow}>
-            <Pressable style={styles.secondaryButton} onPress={() => setShowReverse(false)}>
-              <Text style={styles.secondaryButtonText}>Cancel</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.dangerButton, submitting && styles.disabledButton]}
+            <AdminButton label="Cancel" variant="secondary" onPress={() => setShowReverse(false)} />
+            <AdminButton
+              label={submitting ? 'Reversing...' : 'Confirm Reversal'}
+              variant="danger"
               onPress={handleReverse}
               disabled={submitting}
-            >
-              <Text style={styles.dangerButtonText}>
-                {submitting ? 'Reversing...' : 'Confirm Reversal'}
-              </Text>
-            </Pressable>
+            />
           </View>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        </View>
+        </AdminCard>
       )}
 
-      <View style={styles.panel}>
-        <Text style={styles.panelTitle}>Linked Wallet</Text>
+      <AdminCard>
+        <AdminCardTitle>Linked Wallet</AdminCardTitle>
         {wallet ? (
           <View style={styles.detailsGrid}>
             <DetailItem label="Wallet ID" value={wallet._id} />
-            <DetailItem label="Balance" value={String(wallet.balance)} />
+            <DetailItem label="Balance" value={`${wallet.balance} tokens`} />
           </View>
         ) : (
           <Text style={styles.empty}>No linked wallet.</Text>
         )}
-      </View>
+      </AdminCard>
 
-      <View style={styles.panel}>
-        <Text style={styles.panelTitle}>Token Transactions</Text>
-        {transactions.length === 0 ? (
-          <Text style={styles.empty}>No wallet transactions for this purchase.</Text>
-        ) : (
-          <View style={styles.table}>
-            <View style={[styles.row, styles.headerRow]}>
-              <Text style={[styles.cell, styles.headerCell, styles.cellType]}>Type</Text>
-              <Text style={[styles.cell, styles.headerCell, styles.cellAmount]}>Amount</Text>
-              <Text style={[styles.cell, styles.headerCell, styles.cellTx]}>Store Tx</Text>
-              <Text style={[styles.cell, styles.headerCell, styles.cellReason]}>Reason</Text>
-            </View>
-            {transactions.map((tx) => (
-              <View key={tx._id} style={styles.row}>
-                <Text style={[styles.cell, styles.cellType]}>{tx.type}</Text>
-                <Text style={[styles.cell, styles.cellAmount]}>{tx.amount}</Text>
-                <Text style={[styles.cell, styles.cellTx]} numberOfLines={1} selectable>
-                  {tx.storeTransactionId ?? '-'}
-                </Text>
-                <Text style={[styles.cell, styles.cellReason]} numberOfLines={1}>
-                  {tx.metadata?.reason ?? '-'}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
+      <AdminCard>
+        <AdminCardTitle>Token Transactions</AdminCardTitle>
+        <AdminTable
+          columns={txColumns}
+          rows={transactions as PurchaseTx[]}
+          rowKey={(tx) => tx._id}
+          emptyText="No wallet transactions for this purchase."
+        />
         {originalGrant && <DetailItem label="Original Grant Amount" value={String(originalGrant.amount)} />}
-      </View>
+      </AdminCard>
     </ScrollView>
   );
 }
@@ -206,170 +219,96 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   container: {
-    gap: SPACING.lg,
+    gap: 20,
   },
   center: {
-    flex: 1,
+    paddingVertical: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: SPACING.xl,
-    minHeight: 120,
   },
-  panel: {
-    ...BRAND_RAISED_SURFACE,
-    borderRadius: 18,
-    padding: SPACING.lg,
-    gap: SPACING.md,
+  loadingText: {
+    fontFamily: FONTS.ui,
+    fontSize: 14,
+    color: ADMIN_THEME.colors.mutedForeground,
   },
   panelHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  panelTitle: {
-    fontFamily: FONTS.uiSemibold,
-    fontSize: 16,
-    color: SOFT.textPrimary,
-  },
   detailsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: SPACING.md,
+    gap: 16,
   },
   detailItem: {
     flexBasis: '45%',
     flexGrow: 1,
     minWidth: 160,
+    gap: 4,
   },
   detailLabel: {
-    fontFamily: FONTS.uiSemibold,
-    fontSize: 11,
-    color: SOFT.textMuted,
-    marginBottom: 2,
+    fontFamily: FONTS.uiMedium,
+    fontSize: 12,
+    color: ADMIN_THEME.colors.mutedForeground,
   },
   detailValue: {
     fontFamily: FONTS.ui,
-    fontSize: 13,
-    color: SOFT.textPrimary,
+    fontSize: 14,
+    color: ADMIN_THEME.colors.foreground,
   },
   warningText: {
-    fontFamily: FONTS.uiSemibold,
+    fontFamily: FONTS.uiMedium,
     fontSize: 13,
-    color: COLORS.warning,
+    color: ADMIN_THEME.colors.status.warning,
   },
   resultPanel: {
-    backgroundColor: 'rgba(46, 204, 113, 0.12)',
-    borderRadius: 12,
-    padding: SPACING.md,
+    backgroundColor: ADMIN_THEME.colors.status.successBg,
+    borderColor: ADMIN_THEME.colors.status.successBorder,
+    borderWidth: 1,
+    borderRadius: ADMIN_THEME.radius.md,
+    padding: 12,
     gap: 4,
   },
   resultTitle: {
-    fontFamily: FONTS.uiBold,
-    fontSize: 14,
-    color: COLORS.success,
+    fontFamily: FONTS.uiSemibold,
+    fontSize: 13,
+    color: ADMIN_THEME.colors.status.success,
   },
   resultText: {
     fontFamily: FONTS.ui,
     fontSize: 13,
-    color: SOFT.textPrimary,
+    color: ADMIN_THEME.colors.foreground,
   },
   formLabel: {
-    fontFamily: FONTS.uiSemibold,
+    fontFamily: FONTS.uiMedium,
     fontSize: 12,
-    color: SOFT.textMuted,
-    marginBottom: 4,
+    color: ADMIN_THEME.colors.mutedForeground,
   },
-  input: {
+  textarea: {
     borderWidth: 1,
-    borderColor: BRAND_ADMIN_TABLE.inputBorder,
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    borderColor: ADMIN_THEME.colors.border,
+    borderRadius: ADMIN_THEME.radius.md,
+    padding: 10,
     fontFamily: FONTS.ui,
     fontSize: 13,
-    color: SOFT.textPrimary,
-    backgroundColor: BRAND_ADMIN_TABLE.inputBackground,
+    color: ADMIN_THEME.colors.foreground,
+    backgroundColor: ADMIN_THEME.colors.inputBackground,
     minHeight: 80,
   },
   errorText: {
     fontFamily: FONTS.ui,
     fontSize: 13,
-    color: COLORS.error,
+    color: ADMIN_THEME.colors.destructive,
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: SPACING.md,
+    gap: 10,
     justifyContent: 'flex-end',
-  },
-  secondaryButton: {
-    ...BRAND_RAISED_SURFACE,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-  },
-  secondaryButtonText: {
-    fontFamily: FONTS.uiBold,
-    fontSize: 12,
-    letterSpacing: 0.8,
-    color: SOFT.textPrimary,
-  },
-  dangerButton: {
-    backgroundColor: COLORS.error,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  dangerButtonText: {
-    fontFamily: FONTS.uiSemibold,
-    fontSize: 13,
-    color: '#FFFFFF',
   },
   empty: {
     fontFamily: FONTS.ui,
     fontSize: 14,
-    color: SOFT.textMuted,
-    paddingVertical: SPACING.md,
-  },
-  table: {
-    gap: 1,
-    backgroundColor: BRAND_ADMIN_TABLE.rowDivider,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    gap: 8,
-    alignItems: 'center',
-  },
-  headerRow: {
-    backgroundColor: BRAND_ADMIN_TABLE.headerBackground,
-  },
-  cell: {
-    fontFamily: FONTS.ui,
-    fontSize: 13,
-    color: SOFT.textPrimary,
-  },
-  headerCell: {
-    fontFamily: FONTS.uiSemibold,
-    color: SOFT.textMuted,
-    fontSize: 12,
-  },
-  cellType: {
-    flex: 2,
-  },
-  cellAmount: {
-    flex: 1,
-  },
-  cellTx: {
-    flex: 2,
-    minWidth: 0,
-  },
-  cellReason: {
-    flex: 2,
+    color: ADMIN_THEME.colors.mutedForeground,
   },
 });

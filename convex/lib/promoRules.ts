@@ -6,6 +6,24 @@ export function normalizePromoCode(code: string): string {
   return code.trim().toLowerCase();
 }
 
+export const UNLIMITED_USAGE_CAP = 0;
+
+const PROMO_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+export function isUnlimitedUsageCap(usageCap: number): boolean {
+  return usageCap === UNLIMITED_USAGE_CAP;
+}
+
+export function generatePromoCode(length = 8, random = Math.random): string {
+  const size = Math.max(1, Math.floor(length));
+  let code = '';
+  for (let i = 0; i < size; i++) {
+    const index = Math.floor(random() * PROMO_CODE_ALPHABET.length);
+    code += PROMO_CODE_ALPHABET[index] ?? 'X';
+  }
+  return code;
+}
+
 export type PromoFailure =
   | 'inactive'
   | 'expired'
@@ -13,7 +31,8 @@ export type PromoFailure =
   | 'usage_cap'
   | 'per_user_cap'
   | 'already_redeemed'
-  | 'account_restricted';
+  | 'account_restricted'
+  | 'discount_checkout_unavailable';
 
 export type PromoEvaluation = { ok: true } | { ok: false; reason: PromoFailure };
 
@@ -34,8 +53,17 @@ export function evaluatePromoRedemption(input: {
   if (input.activeTo !== undefined && input.now > input.activeTo) {
     return { ok: false, reason: 'expired' };
   }
-  if (input.usedCount >= input.usageCap) return { ok: false, reason: 'usage_cap' };
+  if (!isUnlimitedUsageCap(input.usageCap) && input.usedCount >= input.usageCap) {
+    return { ok: false, reason: 'usage_cap' };
+  }
   if (input.userRedemptionCount >= input.perUserLimit) return { ok: false, reason: 'per_user_cap' };
+  return { ok: true };
+}
+
+export function evaluatePromoRewardType(rewardType: string): PromoEvaluation {
+  if (rewardType === 'discount') {
+    return { ok: false, reason: 'discount_checkout_unavailable' };
+  }
   return { ok: true };
 }
 

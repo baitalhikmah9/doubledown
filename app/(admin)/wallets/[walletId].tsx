@@ -4,17 +4,25 @@ import {
   Text,
   StyleSheet,
   TextInput,
-  Pressable,
   ScrollView,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { AdminScreenHeader } from '@/components/admin/AdminScreenHeader';
-import { BRAND_ADMIN_TABLE, BRAND_RAISED_SURFACE, COLORS, FONTS, SPACING } from '@/constants/theme';
-import { HOME_SOFT_UI } from '@/themes';
+import { AdminCard, AdminCardTitle } from '@/components/admin/AdminCard';
+import { AdminButton } from '@/components/admin/AdminButton';
+import { AdminTable, type AdminTableColumn } from '@/components/admin/AdminTable';
+import { ADMIN_THEME } from '@/constants/adminTheme';
+import { FONTS } from '@/constants/theme';
 
-const SOFT = HOME_SOFT_UI.colors;
+type WalletTx = {
+  _id: string;
+  type: string;
+  amount: number;
+  source?: string | null;
+  metadata?: { reason?: string } | null;
+};
 
 export default function WalletDetailScreen() {
   const { walletId } = useLocalSearchParams<{ walletId: string }>();
@@ -67,6 +75,11 @@ export default function WalletDetailScreen() {
     setConfirming(true);
   };
 
+  const handleCancelReview = () => {
+    setConfirming(false);
+    setIdempotencyKey('');
+  };
+
   const handleConfirm = async () => {
     setError('');
     const purchaserAccountId = walletData?.wallet.purchaserAccountId;
@@ -93,21 +106,15 @@ export default function WalletDetailScreen() {
     }
   };
 
-  const handleCancelReview = () => {
-    setConfirming(false);
-    setIdempotencyKey('');
-  };
-
   if (wallet === undefined) {
     return (
       <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
         <AdminScreenHeader
-          title="Wallet"
+          title="Wallet Details"
           fallbackHref="/admin/wallets"
-          backAccessibilityLabel="Back to wallets"
         />
         <View style={styles.center}>
-          <Text>Loading...</Text>
+          <Text style={styles.loadingText}>Loading wallet details...</Text>
         </View>
       </ScrollView>
     );
@@ -117,9 +124,8 @@ export default function WalletDetailScreen() {
     return (
       <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
         <AdminScreenHeader
-          title="Wallet"
+          title="Wallet Details"
           fallbackHref="/admin/wallets"
-          backAccessibilityLabel="Back to wallets"
         />
         <View style={styles.center}>
           <Text style={styles.errorText}>Wallet not found.</Text>
@@ -130,28 +136,48 @@ export default function WalletDetailScreen() {
 
   const walletTitle =
     walletData.user?.email ?? walletData.user?.name ?? 'Wallet';
-  const walletTitleUppercase = !walletData.user?.email && !walletData.user?.name;
+
+  const txColumns: AdminTableColumn<WalletTx>[] = [
+    { key: 'type', label: 'Type', flex: 2, render: (tx) => tx.type },
+    {
+      key: 'amount',
+      label: 'Amount',
+      flex: 1,
+      align: 'right',
+      render: (tx) => {
+        const sign = tx.amount > 0 ? '+' : '';
+        return `${sign}${tx.amount}`;
+      },
+    },
+    { key: 'source', label: 'Source', flex: 1, render: (tx) => tx.source ?? '-' },
+    {
+      key: 'reason',
+      label: 'Reason',
+      flex: 2,
+      render: (tx) => tx.metadata?.reason ?? '-',
+    },
+  ];
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       <AdminScreenHeader
         title={walletTitle}
-        uppercase={walletTitleUppercase}
+        description="Wallet details and balance adjustment"
         fallbackHref="/admin/wallets"
-        backAccessibilityLabel="Back to wallets"
       />
 
-      <View style={styles.panel}>
+      <AdminCard>
+        <AdminCardTitle>Overview</AdminCardTitle>
         <View style={styles.detailsGrid}>
           <DetailItem label="User" value={walletData.user?.email ?? walletData.user?.name ?? 'Unknown'} />
           <DetailItem label="Purchaser ID" value={walletData.wallet.purchaserAccountId ?? '-'} />
-          <DetailItem label="Balance" value={String(walletData.wallet.balance)} />
+          <DetailItem label="Balance" value={`${walletData.wallet.balance} tokens`} />
           <DetailItem label="Token Cap" value={walletData.wallet.tokenCap ? String(walletData.wallet.tokenCap) : 'Unlimited'} />
         </View>
-      </View>
+      </AdminCard>
 
-      <View style={styles.panel}>
-        <Text style={styles.panelTitle}>Manual Adjustment</Text>
+      <AdminCard>
+        <AdminCardTitle>Manual Adjustment</AdminCardTitle>
         <View style={styles.formRow}>
           <View style={styles.formField}>
             <Text style={styles.formLabel}>Amount (+/- tokens)</Text>
@@ -160,7 +186,7 @@ export default function WalletDetailScreen() {
               onChangeText={setAmount}
               style={styles.input}
               placeholder="e.g. 10 or -5"
-              placeholderTextColor={COLORS.disabled}
+              placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
               keyboardType="numeric"
             />
           </View>
@@ -170,8 +196,8 @@ export default function WalletDetailScreen() {
               value={reason}
               onChangeText={setReason}
               style={styles.input}
-              placeholder="Required reason"
-              placeholderTextColor={COLORS.disabled}
+              placeholder="Required reason for audit log"
+              placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
             />
           </View>
         </View>
@@ -186,7 +212,7 @@ export default function WalletDetailScreen() {
             </View>
             <View style={styles.confirmRow}>
               <Text style={styles.confirmLabel}>Adjustment</Text>
-              <Text style={styles.confirmValue}>{numericAmount}</Text>
+              <Text style={styles.confirmValue}>{numericAmount > 0 ? `+${numericAmount}` : numericAmount} tokens</Text>
             </View>
             <View style={styles.confirmRow}>
               <Text style={styles.confirmLabel}>Resulting balance</Text>
@@ -203,64 +229,40 @@ export default function WalletDetailScreen() {
             {willBeNegative && (
               <Text style={styles.warningText}>
                 Warning: the resulting balance would be negative. The backend rejects debits that
-                drive a wallet below zero, so this adjustment will fail unless you add tokens first.
+                drive a wallet below zero.
               </Text>
             )}
             <View style={styles.buttonRow}>
-              <Pressable style={styles.secondaryButton} onPress={handleCancelReview}>
-                <Text style={styles.secondaryButtonText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.submitButton, submitting && styles.disabledButton]}
+              <AdminButton label="Cancel" variant="secondary" onPress={handleCancelReview} />
+              <AdminButton
+                label={submitting ? 'Applying...' : 'Confirm'}
                 onPress={handleConfirm}
                 disabled={submitting}
-              >
-                <Text style={styles.submitButtonText}>
-                  {submitting ? 'Applying...' : 'Confirm'}
-                </Text>
-              </Pressable>
+              />
             </View>
           </View>
         ) : (
-          <Pressable
-            style={({ pressed }) => [
-              styles.submitButton,
-              { opacity: pressed ? 0.92 : 1 },
-            ]}
+          <AdminButton
+            label="Review Adjustment"
             onPress={handleReview}
-          >
-            <Text style={styles.submitButtonText}>Review Adjustment</Text>
-          </Pressable>
+            style={styles.submitButton}
+          />
         )}
-      </View>
+      </AdminCard>
 
-      <View style={styles.panel}>
-        <Text style={styles.panelTitle}>Recent Transactions</Text>
+      <AdminCard>
+        <AdminCardTitle>Recent Transactions</AdminCardTitle>
         {transactions === undefined ? (
-          <Text style={styles.empty}>Loading...</Text>
-        ) : transactions.items.length === 0 ? (
-          <Text style={styles.empty}>No transactions.</Text>
+          <Text style={styles.loadingText}>Loading transactions...</Text>
         ) : (
-          <View style={styles.table}>
-            <View style={[styles.row, styles.headerRow]}>
-              <Text style={[styles.cell, styles.headerCell, styles.cellType]}>Type</Text>
-              <Text style={[styles.cell, styles.headerCell, styles.cellAmount]}>Amount</Text>
-              <Text style={[styles.cell, styles.headerCell, styles.cellSource]}>Source</Text>
-              <Text style={[styles.cell, styles.headerCell, styles.cellReason]}>Reason</Text>
-            </View>
-            {transactions.items.map((tx: { _id: string; type: string; amount: number; source?: string | null; metadata?: { reason?: string } | null }) => (
-              <View key={tx._id} style={styles.row}>
-                <Text style={[styles.cell, styles.cellType]}>{tx.type}</Text>
-                <Text style={[styles.cell, styles.cellAmount]}>{tx.amount}</Text>
-                <Text style={[styles.cell, styles.cellSource]}>{tx.source ?? '-'}</Text>
-                <Text style={[styles.cell, styles.cellReason]} numberOfLines={1}>
-                  {tx.metadata?.reason ?? '-'}
-                </Text>
-              </View>
-            ))}
-          </View>
+          <AdminTable
+            columns={txColumns}
+            rows={transactions.items as WalletTx[]}
+            rowKey={(tx) => tx._id}
+            emptyText="No transactions."
+          />
         )}
-      </View>
+      </AdminCard>
     </ScrollView>
   );
 }
@@ -279,193 +281,115 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   container: {
-    gap: SPACING.lg,
+    gap: 20,
   },
   center: {
-    flex: 1,
+    paddingVertical: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: SPACING.xl,
-    minHeight: 120,
   },
-  panel: {
-    ...BRAND_RAISED_SURFACE,
-    borderRadius: 18,
-    padding: SPACING.lg,
-    gap: SPACING.md,
-  },
-  panelTitle: {
-    fontFamily: FONTS.uiSemibold,
-    fontSize: 16,
-    color: SOFT.textPrimary,
+  loadingText: {
+    fontFamily: FONTS.ui,
+    fontSize: 14,
+    color: ADMIN_THEME.colors.mutedForeground,
   },
   detailsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: SPACING.md,
+    gap: 16,
   },
   detailItem: {
     flexBasis: '45%',
     flexGrow: 1,
-    minWidth: 140,
+    minWidth: 160,
+    gap: 4,
   },
   detailLabel: {
-    fontFamily: FONTS.uiSemibold,
-    fontSize: 11,
-    color: SOFT.textMuted,
-    marginBottom: 2,
+    fontFamily: FONTS.uiMedium,
+    fontSize: 12,
+    color: ADMIN_THEME.colors.mutedForeground,
   },
   detailValue: {
     fontFamily: FONTS.ui,
     fontSize: 14,
-    color: SOFT.textPrimary,
+    color: ADMIN_THEME.colors.foreground,
   },
   formRow: {
     flexDirection: 'row',
-    gap: SPACING.md,
+    gap: 12,
   },
   formField: {
     flex: 1,
   },
   formLabel: {
-    fontFamily: FONTS.uiSemibold,
+    fontFamily: FONTS.uiMedium,
     fontSize: 12,
-    color: SOFT.textMuted,
-    marginBottom: 4,
+    color: ADMIN_THEME.colors.mutedForeground,
+    marginBottom: 6,
   },
   input: {
+    height: 36,
     borderWidth: 1,
-    borderColor: BRAND_ADMIN_TABLE.inputBorder,
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    borderColor: ADMIN_THEME.colors.border,
+    borderRadius: ADMIN_THEME.radius.md,
+    paddingHorizontal: 12,
     fontFamily: FONTS.ui,
     fontSize: 13,
-    color: SOFT.textPrimary,
-    backgroundColor: BRAND_ADMIN_TABLE.inputBackground,
+    color: ADMIN_THEME.colors.foreground,
+    backgroundColor: ADMIN_THEME.colors.inputBackground,
   },
   errorText: {
     fontFamily: FONTS.ui,
-    fontSize: 13,
-    color: COLORS.error,
+    fontSize: 12,
+    color: ADMIN_THEME.colors.destructive,
   },
   submitButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
     alignSelf: 'flex-start',
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    fontFamily: FONTS.uiBold,
-    fontSize: 13,
-    letterSpacing: 0.6,
-    color: '#FFFFFF',
   },
   confirmPanel: {
     borderWidth: 1,
-    borderColor: BRAND_ADMIN_TABLE.inputBorder,
-    borderRadius: 12,
-    padding: SPACING.md,
-    gap: SPACING.sm,
-    backgroundColor: BRAND_ADMIN_TABLE.inputBackground,
+    borderColor: ADMIN_THEME.colors.border,
+    borderRadius: ADMIN_THEME.radius.md,
+    padding: 16,
+    gap: 10,
+    backgroundColor: ADMIN_THEME.colors.secondary,
   },
   confirmTitle: {
-    fontFamily: FONTS.uiBold,
+    fontFamily: FONTS.uiSemibold,
     fontSize: 14,
-    color: SOFT.textPrimary,
+    color: ADMIN_THEME.colors.foreground,
     marginBottom: 4,
   },
   confirmRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: SPACING.sm,
+    gap: 12,
   },
   confirmLabel: {
-    fontFamily: FONTS.uiSemibold,
+    fontFamily: FONTS.uiMedium,
     fontSize: 12,
-    color: SOFT.textMuted,
+    color: ADMIN_THEME.colors.mutedForeground,
   },
   confirmValue: {
     fontFamily: FONTS.ui,
     fontSize: 13,
-    color: SOFT.textPrimary,
+    color: ADMIN_THEME.colors.foreground,
     textAlign: 'right',
-    flexShrink: 1,
   },
   confirmValueDanger: {
-    color: COLORS.error,
-    fontFamily: FONTS.uiBold,
+    color: ADMIN_THEME.colors.destructive,
+    fontFamily: FONTS.uiSemibold,
   },
   warningText: {
-    fontFamily: FONTS.uiSemibold,
-    fontSize: 13,
-    color: COLORS.warning,
+    fontFamily: FONTS.uiMedium,
+    fontSize: 12,
+    color: ADMIN_THEME.colors.status.warning,
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: SPACING.md,
+    gap: 10,
     justifyContent: 'flex-end',
-    marginTop: SPACING.xs,
-  },
-  secondaryButton: {
-    ...BRAND_RAISED_SURFACE,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-  },
-  secondaryButtonText: {
-    fontFamily: FONTS.uiBold,
-    fontSize: 12,
-    letterSpacing: 0.8,
-    color: SOFT.textPrimary,
-  },
-  empty: {
-    fontFamily: FONTS.ui,
-    fontSize: 14,
-    color: SOFT.textMuted,
-    paddingVertical: SPACING.md,
-  },
-  table: {
-    gap: 1,
-    backgroundColor: BRAND_ADMIN_TABLE.rowDivider,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    gap: 8,
-    alignItems: 'center',
-  },
-  headerRow: {
-    backgroundColor: BRAND_ADMIN_TABLE.headerBackground,
-  },
-  cell: {
-    fontFamily: FONTS.ui,
-    fontSize: 13,
-    color: SOFT.textPrimary,
-  },
-  headerCell: {
-    fontFamily: FONTS.uiSemibold,
-    color: SOFT.textMuted,
-    fontSize: 12,
-  },
-  cellType: {
-    flex: 2,
-  },
-  cellAmount: {
-    flex: 1,
-  },
-  cellSource: {
-    flex: 1,
-  },
-  cellReason: {
-    flex: 2,
+    marginTop: 6,
   },
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import {
+  createPromoCode,
   deactivatePromoCode,
   reversePurchaseGrant,
   updatePromoCode,
@@ -171,5 +172,52 @@ describe('updatePromoCode clear contract and metadata preservation', () => {
       'promo_codes_1',
       expect.objectContaining({ activeFrom: undefined, activeTo: undefined })
     );
+  });
+});
+
+describe('createPromoCode affiliate and discount', () => {
+  it('stores an affiliate discount code with unlimited uses and no expiry', async () => {
+    const ctx = mockCtx();
+    await (createPromoCode as any)._handler(ctx as any, {
+      code: 'Mikhail10',
+      rewardAmount: 0,
+      usageCap: 0,
+      mode: 'public_multi_use',
+      rewardType: 'discount',
+      discountPercent: 10,
+      productKey: 'bundle_50',
+      affiliateEmail: '  Creator@Example.com ',
+      commissionPercent: 10,
+    });
+    expect(ctx.db.insert).toHaveBeenCalledWith(
+      'promo_codes',
+      expect.objectContaining({
+        code: 'mikhail10',
+        rewardType: 'discount',
+        rewardAmount: 0,
+        usageCap: 0,
+        discountPercent: 10,
+        productKey: 'bundle_50',
+        affiliateEmail: 'creator@example.com',
+        commissionPercent: 10,
+        activeTo: undefined,
+      })
+    );
+  });
+
+  it('rejects a discount that is not scoped to a known bundle', async () => {
+    const ctx = mockCtx();
+    await expect(
+      (createPromoCode as any)._handler(ctx as any, {
+        code: 'badbundle',
+        rewardAmount: 0,
+        usageCap: 0,
+        mode: 'public_multi_use',
+        rewardType: 'discount',
+        discountPercent: 20,
+        productKey: 'bundle_100',
+      })
+    ).rejects.toThrow('product_key_invalid');
+    expect(ctx.db.insert).not.toHaveBeenCalled();
   });
 });

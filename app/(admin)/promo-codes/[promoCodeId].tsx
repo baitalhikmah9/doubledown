@@ -1,13 +1,22 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { AdminScreenHeader } from '@/components/admin/AdminScreenHeader';
-import { BRAND_ADMIN_TABLE, BRAND_RAISED_SURFACE, COLORS, FONTS, SPACING } from '@/constants/theme';
-import { HOME_SOFT_UI } from '@/themes';
+import { AdminCard, AdminCardTitle } from '@/components/admin/AdminCard';
+import { AdminButton } from '@/components/admin/AdminButton';
+import { AdminTable, type AdminTableColumn } from '@/components/admin/AdminTable';
+import { AdminStatusBadge } from '@/components/admin/AdminStatusBadge';
+import { ADMIN_THEME } from '@/constants/adminTheme';
+import { FONTS } from '@/constants/theme';
+import { isUnlimitedUsageCap } from '@/convex/lib/promoRules';
 
-const SOFT = HOME_SOFT_UI.colors;
+type RedemptionRow = {
+  redemption: { _id: string; userId: string; redeemedAt: number };
+  user: { email?: string | null; clerkId?: string | null } | null;
+  transaction: { type: string; amount: number } | null;
+};
 
 export default function PromoCodeDetailScreen() {
   const { promoCodeId } = useLocalSearchParams<{ promoCodeId: string }>();
@@ -86,7 +95,6 @@ export default function PromoCodeDetailScreen() {
       const perUser = parseInt(editPerUserLimit, 10);
       if (!Number.isNaN(perUser) && perUser !== promo!.promoCode.perUserLimit) payload.perUserLimit = perUser;
     } else if (promo!.promoCode.perUserLimit !== undefined) {
-      // Convex drops undefined optional args, so clear via an explicit flag.
       payload.clearPerUserLimit = true;
     }
 
@@ -135,13 +143,9 @@ export default function PromoCodeDetailScreen() {
   if (promo === undefined) {
     return (
       <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
-        <AdminScreenHeader
-          title="Promo code"
-          fallbackHref="/admin/promo-codes"
-          backAccessibilityLabel="Back to promo codes"
-        />
+        <AdminScreenHeader title="Promo Code Details" fallbackHref="/admin/promo-codes" />
         <View style={styles.center}>
-          <Text>Loading...</Text>
+          <Text style={styles.loadingText}>Loading promo code...</Text>
         </View>
       </ScrollView>
     );
@@ -150,11 +154,7 @@ export default function PromoCodeDetailScreen() {
   if (promo === null) {
     return (
       <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
-        <AdminScreenHeader
-          title="Promo code"
-          fallbackHref="/admin/promo-codes"
-          backAccessibilityLabel="Back to promo codes"
-        />
+        <AdminScreenHeader title="Promo Code Details" fallbackHref="/admin/promo-codes" />
         <View style={styles.center}>
           <Text style={styles.errorText}>Promo code not found.</Text>
         </View>
@@ -165,47 +165,87 @@ export default function PromoCodeDetailScreen() {
   const { promoCode, redemptions, restrictedUser } = promo;
   const isActive = promoCode.active !== false;
 
+  const redemptionColumns: AdminTableColumn<RedemptionRow>[] = [
+    {
+      key: 'user',
+      label: 'User',
+      flex: 2,
+      render: (r) => r.user?.email ?? r.user?.clerkId ?? 'Unknown',
+    },
+    {
+      key: 'userId',
+      label: 'User ID',
+      flex: 2,
+      render: (r) => <Text style={styles.cellMono} selectable>{r.redemption.userId}</Text>,
+    },
+    {
+      key: 'date',
+      label: 'Date',
+      flex: 1,
+      render: (r) => new Date(r.redemption.redeemedAt).toLocaleDateString(),
+    },
+    {
+      key: 'tx',
+      label: 'Transaction',
+      flex: 2,
+      render: (r) => (r.transaction ? `${r.transaction.type} (${r.transaction.amount})` : '-'),
+    },
+  ];
+
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       <AdminScreenHeader
         title={promoCode.code}
+        description="Promo code details and redemptions"
         fallbackHref="/admin/promo-codes"
-        backAccessibilityLabel="Back to promo codes"
+        headerRight={
+          <View style={styles.headerRightActions}>
+            {!isActive && (
+              <AdminButton
+                label={submitting ? 'Reactivating...' : 'Reactivate'}
+                variant="secondary"
+                onPress={handleReactivate}
+                disabled={submitting}
+              />
+            )}
+            <AdminButton label="Edit" variant="secondary" onPress={openEdit} />
+            {isActive ? (
+              <AdminButton label="Disable" variant="danger" onPress={() => setShowDisable(true)} />
+            ) : null}
+          </View>
+        }
       />
 
-      <View style={styles.panel}>
-        <View style={styles.panelHeader}>
-          <View style={styles.panelHeaderSpacer} />
-          {!isActive && (
-            <Pressable
-              style={[styles.secondaryButton, submitting && styles.disabledButton]}
-              onPress={handleReactivate}
-              disabled={submitting}
-            >
-              <Text style={styles.secondaryButtonText}>
-                {submitting ? 'Reactivating...' : 'Reactivate'}
-              </Text>
-            </Pressable>
-          )}
-          <Pressable style={styles.secondaryButton} onPress={openEdit}>
-            <Text style={styles.secondaryButtonText}>Edit</Text>
-          </Pressable>
-          {isActive ? (
-            <Pressable style={styles.dangerButton} onPress={() => setShowDisable(true)}>
-              <Text style={styles.dangerButtonText}>Disable</Text>
-            </Pressable>
-          ) : null}
-        </View>
-
+      <AdminCard>
+        <AdminCardTitle>Overview</AdminCardTitle>
         <View style={styles.detailsGrid}>
           <DetailItem label="Mode" value={formatPromoMode(promoCode.mode)} />
           <DetailItem label="Scope" value={promoCode.redemptionScope ?? 'public'} />
           <DetailItem label="Reward Type" value={promoCode.rewardType} />
-          <DetailItem label="Reward Amount" value={String(promoCode.rewardAmount)} />
-          <DetailItem label="Usage Cap" value={String(promoCode.usageCap)} />
+          <DetailItem
+            label={promoCode.rewardType === 'discount' ? 'Discount' : 'Reward Amount'}
+            value={
+              promoCode.rewardType === 'discount'
+                ? `${promoCode.discountPercent ?? 0}% off ${promoCode.productKey ?? 'bundle'}`
+                : `${promoCode.rewardAmount} tokens`
+            }
+          />
+          <DetailItem
+            label="Usage Cap"
+            value={isUnlimitedUsageCap(promoCode.usageCap) ? 'Unlimited' : String(promoCode.usageCap)}
+          />
+          {promoCode.affiliateEmail ? (
+            <DetailItem label="Affiliate Email" value={promoCode.affiliateEmail} />
+          ) : null}
+          {promoCode.commissionPercent !== undefined ? (
+            <DetailItem label="Commission" value={`${promoCode.commissionPercent}%`} />
+          ) : null}
           <DetailItem label="Used Count" value={String(promoCode.usedCount ?? 0)} />
           <DetailItem label="Per-User Limit" value={String(promoCode.perUserLimit ?? 1)} />
-          <DetailItem label="Active" value={isActive ? 'Yes' : 'No'} />
+          <View style={styles.detailItem}>
+            <Text style={styles.detailLabel}>Status</Text>
+            <AdminStatusBadge label={isActive ? 'Active' : 'Inactive'} status={isActive ? 'active' : 'inactive'} />
+          </View>
           {restrictedUser && (
             <DetailItem
               label="Restricted Account"
@@ -235,15 +275,14 @@ export default function PromoCodeDetailScreen() {
         {promoCode.metadata?.deactivationReason && (
           <DetailItem label="Deactivation Reason" value={promoCode.metadata.deactivationReason} />
         )}
-      </View>
+      </AdminCard>
 
       {showEdit && (
-        <View style={styles.panel}>
-          <Text style={styles.panelTitle}>Edit Promo Code</Text>
+        <AdminCard>
+          <AdminCardTitle>Edit Promo Code</AdminCardTitle>
           {(promoCode.usedCount ?? 0) > 0 && (
             <Text style={styles.warningText}>
-              Warning: this code has {promoCode.usedCount} redemption(s). Changing some fields
-              (such as reward amount) may be rejected or affect future redemptions.
+              Warning: this code has {promoCode.usedCount} redemption(s). Changing some fields may affect future redemptions.
             </Text>
           )}
           <View style={styles.formRow}>
@@ -283,7 +322,7 @@ export default function PromoCodeDetailScreen() {
                 onChangeText={setEditCampaignName}
                 style={styles.input}
                 placeholder="e.g. Spring 2025"
-                placeholderTextColor={COLORS.disabled}
+                placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
               />
             </View>
             <View style={styles.formField}>
@@ -293,7 +332,7 @@ export default function PromoCodeDetailScreen() {
                 onChangeText={setEditNotes}
                 style={styles.input}
                 placeholder="Internal notes"
-                placeholderTextColor={COLORS.disabled}
+                placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
                 multiline
               />
             </View>
@@ -306,7 +345,7 @@ export default function PromoCodeDetailScreen() {
                 onChangeText={setEditActiveFrom}
                 style={styles.input}
                 placeholder="e.g. 2025-01-01T09:00"
-                placeholderTextColor={COLORS.disabled}
+                placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
                 autoCapitalize="none"
               />
             </View>
@@ -317,101 +356,56 @@ export default function PromoCodeDetailScreen() {
                 onChangeText={setEditActiveTo}
                 style={styles.input}
                 placeholder="e.g. 2025-12-31T23:59"
-                placeholderTextColor={COLORS.disabled}
+                placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
                 autoCapitalize="none"
               />
             </View>
           </View>
-          <Text style={styles.formHint}>
-            Leave Active From / Active To empty to remove the schedule window.
-          </Text>
           {editError ? <Text style={styles.errorText}>{editError}</Text> : null}
           <View style={styles.buttonRow}>
-            <Pressable style={styles.secondaryButton} onPress={() => setShowEdit(false)}>
-              <Text style={styles.secondaryButtonText}>Cancel</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.submitButton, editSubmitting && styles.disabledButton]}
+            <AdminButton label="Cancel" variant="secondary" onPress={() => setShowEdit(false)} />
+            <AdminButton
+              label={editSubmitting ? 'Saving...' : 'Save Changes'}
               onPress={handleSave}
               disabled={editSubmitting}
-            >
-              <Text style={styles.submitButtonText}>
-                {editSubmitting ? 'Saving...' : 'Save Changes'}
-              </Text>
-            </Pressable>
+            />
           </View>
-        </View>
+        </AdminCard>
       )}
 
       {showDisable && (
-        <View style={styles.panel}>
-          <Text style={styles.panelTitle}>Disable Promo Code</Text>
+        <AdminCard>
+          <AdminCardTitle>Disable Promo Code</AdminCardTitle>
           <Text style={styles.formLabel}>Reason</Text>
           <TextInput
             value={reason}
             onChangeText={setReason}
             style={styles.input}
             placeholder="Why are you disabling this code?"
-            placeholderTextColor={COLORS.disabled}
+            placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
           />
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <View style={styles.buttonRow}>
-            <Pressable style={styles.secondaryButton} onPress={() => setShowDisable(false)}>
-              <Text style={styles.secondaryButtonText}>Cancel</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.dangerButton, submitting && styles.disabledButton]}
+            <AdminButton label="Cancel" variant="secondary" onPress={() => setShowDisable(false)} />
+            <AdminButton
+              label={submitting ? 'Disabling...' : 'Confirm Disable'}
+              variant="danger"
               onPress={handleDeactivate}
               disabled={submitting}
-            >
-              <Text style={styles.dangerButtonText}>
-                {submitting ? 'Disabling...' : 'Confirm Disable'}
-              </Text>
-            </Pressable>
+            />
           </View>
-        </View>
+        </AdminCard>
       )}
 
-      <View style={styles.panel}>
-        <Text style={styles.panelTitle}>Redemptions ({redemptions.length})</Text>
-        {redemptions.length === 0 ? (
-          <Text style={styles.empty}>No redemptions yet.</Text>
-        ) : (
-          <View style={styles.table}>
-            <View style={[styles.row, styles.headerRow]}>
-              <Text style={[styles.cell, styles.headerCell, styles.cellUser]}>User</Text>
-              <Text style={[styles.cell, styles.headerCell, styles.cellUserId]}>User ID</Text>
-              <Text style={[styles.cell, styles.headerCell, styles.cellDate]}>Date</Text>
-              <Text style={[styles.cell, styles.headerCell, styles.cellTx]}>Transaction</Text>
-            </View>
-            {redemptions.map(
-              (r: {
-                redemption: { _id: string; userId: string; redeemedAt: number };
-                user: { email?: string | null; clerkId?: string | null } | null;
-                transaction: { type: string; amount: number } | null;
-              }) => (
-                <View key={r.redemption._id} style={styles.row}>
-                  <Text style={[styles.cell, styles.cellUser]}>
-                    {r.user?.email ?? r.user?.clerkId ?? 'Unknown'}
-                  </Text>
-                  <Text
-                    style={[styles.cell, styles.cellUserId, styles.cellMono]}
-                    selectable
-                  >
-                    {r.redemption.userId}
-                  </Text>
-                  <Text style={[styles.cell, styles.cellDate]}>
-                    {new Date(r.redemption.redeemedAt).toLocaleDateString()}
-                  </Text>
-                  <Text style={[styles.cell, styles.cellTx]}>
-                    {r.transaction ? `${r.transaction.type} (${r.transaction.amount})` : '-'}
-                  </Text>
-                </View>
-              )
-            )}
-          </View>
-        )}
-      </View>
+      <AdminCard>
+        <AdminCardTitle>Redemptions ({redemptions.length})</AdminCardTitle>
+        <AdminTable
+          columns={redemptionColumns}
+          rows={redemptions as RedemptionRow[]}
+          rowKey={(r) => r.redemption._id}
+          emptyText="No redemptions yet."
+        />
+      </AdminCard>
     </ScrollView>
   );
 }
@@ -459,183 +453,86 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   container: {
-    gap: SPACING.lg,
+    gap: 20,
   },
   center: {
-    flex: 1,
+    paddingVertical: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: SPACING.xl,
-    minHeight: 120,
   },
-  panelHeaderSpacer: {
-    flex: 1,
+  loadingText: {
+    fontFamily: FONTS.ui,
+    fontSize: 14,
+    color: ADMIN_THEME.colors.mutedForeground,
   },
-  panel: {
-    ...BRAND_RAISED_SURFACE,
-    borderRadius: 18,
-    padding: SPACING.lg,
-    gap: SPACING.md,
-  },
-  panelHeader: {
+  headerRightActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 8,
     alignItems: 'center',
-  },
-  panelTitle: {
-    fontFamily: FONTS.uiSemibold,
-    fontSize: 16,
-    color: SOFT.textPrimary,
   },
   detailsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: SPACING.md,
+    gap: 16,
   },
   detailItem: {
     flexBasis: '30%',
     flexGrow: 1,
     minWidth: 140,
+    gap: 4,
   },
   detailLabel: {
-    fontFamily: FONTS.uiSemibold,
-    fontSize: 11,
-    color: SOFT.textMuted,
-    marginBottom: 2,
+    fontFamily: FONTS.uiMedium,
+    fontSize: 12,
+    color: ADMIN_THEME.colors.mutedForeground,
   },
   detailValue: {
     fontFamily: FONTS.ui,
     fontSize: 14,
-    color: SOFT.textPrimary,
+    color: ADMIN_THEME.colors.foreground,
   },
   formLabel: {
-    fontFamily: FONTS.uiSemibold,
+    fontFamily: FONTS.uiMedium,
     fontSize: 12,
-    color: SOFT.textMuted,
-    marginBottom: 4,
-  },
-  formHint: {
-    fontFamily: FONTS.ui,
-    fontSize: 12,
-    color: SOFT.textMuted,
+    color: ADMIN_THEME.colors.mutedForeground,
+    marginBottom: 6,
   },
   formRow: {
     flexDirection: 'row',
-    gap: SPACING.md,
+    gap: 12,
   },
   formField: {
     flex: 1,
   },
   warningText: {
-    fontFamily: FONTS.uiSemibold,
+    fontFamily: FONTS.uiMedium,
     fontSize: 13,
-    color: COLORS.warning,
-  },
-  submitButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-  },
-  submitButtonText: {
-    fontFamily: FONTS.uiBold,
-    fontSize: 13,
-    letterSpacing: 0.6,
-    color: '#FFFFFF',
+    color: ADMIN_THEME.colors.status.warning,
   },
   input: {
+    height: 36,
     borderWidth: 1,
-    borderColor: BRAND_ADMIN_TABLE.inputBorder,
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    borderColor: ADMIN_THEME.colors.border,
+    borderRadius: ADMIN_THEME.radius.md,
+    paddingHorizontal: 12,
     fontFamily: FONTS.ui,
     fontSize: 13,
-    color: SOFT.textPrimary,
-    backgroundColor: BRAND_ADMIN_TABLE.inputBackground,
+    color: ADMIN_THEME.colors.foreground,
+    backgroundColor: ADMIN_THEME.colors.inputBackground,
   },
   errorText: {
     fontFamily: FONTS.ui,
-    fontSize: 13,
-    color: COLORS.error,
+    fontSize: 12,
+    color: ADMIN_THEME.colors.destructive,
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: SPACING.md,
+    gap: 10,
     justifyContent: 'flex-end',
   },
-  secondaryButton: {
-    ...BRAND_RAISED_SURFACE,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-  },
-  secondaryButtonText: {
-    fontFamily: FONTS.uiBold,
-    fontSize: 12,
-    letterSpacing: 0.8,
-    color: SOFT.textPrimary,
-  },
-  dangerButton: {
-    backgroundColor: COLORS.error,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  dangerButtonText: {
-    fontFamily: FONTS.uiSemibold,
-    fontSize: 13,
-    color: '#FFFFFF',
-  },
-  empty: {
-    fontFamily: FONTS.ui,
-    fontSize: 14,
-    color: SOFT.textMuted,
-    paddingVertical: SPACING.md,
-  },
-  table: {
-    gap: 1,
-    backgroundColor: BRAND_ADMIN_TABLE.rowDivider,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    gap: 8,
-    alignItems: 'center',
-  },
-  headerRow: {
-    backgroundColor: BRAND_ADMIN_TABLE.headerBackground,
-  },
-  cell: {
-    fontFamily: FONTS.ui,
-    fontSize: 13,
-    color: SOFT.textPrimary,
-  },
-  headerCell: {
-    fontFamily: FONTS.uiSemibold,
-    color: SOFT.textMuted,
-    fontSize: 12,
-  },
-  cellUser: {
-    flex: 2,
-  },
-  cellUserId: {
-    flex: 2,
-    minWidth: 0,
-  },
   cellMono: {
-    fontSize: 11,
-  },
-  cellDate: {
-    flex: 1,
-  },
-  cellTx: {
-    flex: 2,
+    fontFamily: FONTS.ui,
+    fontSize: 13,
+    color: ADMIN_THEME.colors.foreground,
   },
 });

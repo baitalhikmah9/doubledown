@@ -3,6 +3,8 @@ import {
   evaluatePromoAccountRestriction,
   evaluateDuplicateRedemption,
   evaluatePromoRedemption,
+  evaluatePromoRewardType,
+  generatePromoCode,
   normalizePromoCode,
 } from '@/convex/lib/promoRules';
 import {
@@ -79,6 +81,36 @@ describe('promoRules', () => {
         perUserLimit: 2,
       })
     ).toEqual({ ok: false, reason: 'per_user_cap' });
+  });
+
+  it('allows unlimited usage when usageCap is 0', () => {
+    expect(
+      evaluatePromoRedemption({
+        active: true,
+        now: 100,
+        usedCount: 9_999,
+        usageCap: 0,
+        userRedemptionCount: 0,
+        perUserLimit: 1,
+      })
+    ).toEqual({ ok: true });
+  });
+
+  it('blocks discount codes until web checkout coupons exist', () => {
+    expect(evaluatePromoRewardType('discount')).toEqual({
+      ok: false,
+      reason: 'discount_checkout_unavailable',
+    });
+    expect(evaluatePromoRewardType('tokens')).toEqual({ ok: true });
+  });
+
+  it('generates unambiguous uppercase codes of the requested length', () => {
+    const values = [0, 0.5, 0.999];
+    let i = 0;
+    const code = generatePromoCode(8, () => values[i++ % values.length]!);
+    expect(code).toHaveLength(8);
+    expect(code).toMatch(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]+$/);
+    expect(code).not.toMatch(/[01IO]/);
   });
 
   it('flags duplicate redemption attempts', () => {

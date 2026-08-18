@@ -22,6 +22,10 @@ export function useWalletSync() {
   const { isLoaded: isClerkLoaded, isSignedIn } = useAuth();
   const { isAuthenticated, isLoading } = useConvexAuth();
   const authDisabled = isAuthDisabled();
+  const currentUser = useQuery(
+    api.users.getCurrentProfile,
+    !authDisabled && isClerkLoaded && isSignedIn && isAuthenticated ? {} : 'skip'
+  );
   const ensurePurchaserAccount = useMutation(api.payments.ensurePurchaserAccount);
   const grantStarterBalance = useMutation(api.wallet.grantStarterBalance);
   const [installationId, setInstallationId] = useState<string | null>(null);
@@ -49,7 +53,15 @@ export function useWalletSync() {
   // Step 2: Register the device as a purchaser account and grant the starter
   // balance.  Runs when the user becomes authenticated (including late sign-in).
   useEffect(() => {
-    if (authDisabled || isLoading || !isClerkLoaded || !isSignedIn || !isAuthenticated || !installationId) {
+    if (
+      authDisabled ||
+      isLoading ||
+      !isClerkLoaded ||
+      !isSignedIn ||
+      !isAuthenticated ||
+      !currentUser ||
+      !installationId
+    ) {
       return;
     }
     const setupKey = installationId;
@@ -68,6 +80,10 @@ export function useWalletSync() {
         // Non-fatal - the webhook will still credit the user on first purchase.
       }
 
+      // Auth may disappear while the first mutation is in flight (for example,
+      // during sign-out). Do not launch another authenticated mutation afterward.
+      if (cancelled) return;
+
       try {
         await grantStarterBalance({ deviceId: installationId });
       } catch {
@@ -84,6 +100,7 @@ export function useWalletSync() {
     };
   }, [
     authDisabled,
+    currentUser,
     ensurePurchaserAccount,
     grantStarterBalance,
     installationId,

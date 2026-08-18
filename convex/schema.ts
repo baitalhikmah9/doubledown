@@ -202,12 +202,15 @@ export default defineSchema({
     purchasedAt: v.number(),
     status: v.string(),
     rawEvent: v.any(),
+    promoCodeId: v.optional(v.id('promo_codes')),
+    commissionAmountMicros: v.optional(v.number()),
   })
     .index('by_purchaser_account', ['purchaserAccountId'])
     .index('by_store_transaction', ['store', 'storeTransactionId'])
     .index('by_original_store_transaction', ['store', 'originalStoreTransactionId'])
     .index('by_revenuecat_event', ['revenueCatEventId'])
-    .index('by_purchased_at', ['purchasedAt']),
+    .index('by_purchased_at', ['purchasedAt'])
+    .index('by_promo_code', ['promoCodeId']),
 
   payment_webhook_events: defineTable({
     eventId: v.string(),
@@ -244,7 +247,13 @@ export default defineSchema({
     updatedAt: v.optional(v.number()),
     createdByAdminUserId: v.optional(v.id('users')),
     updatedByAdminUserId: v.optional(v.id('users')),
-  }).index('by_code', ['code']),
+    discountPercent: v.optional(v.number()),
+    productKey: v.optional(v.string()),
+    affiliateEmail: v.optional(v.string()),
+    commissionPercent: v.optional(v.number()),
+  })
+    .index('by_code', ['code'])
+    .index('by_affiliate_email', ['affiliateEmail']),
 
   promo_redemptions: defineTable({
     promoCodeId: v.id('promo_codes'),

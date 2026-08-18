@@ -4,22 +4,32 @@ import {
   Text,
   StyleSheet,
   TextInput,
-  Pressable,
   ScrollView,
   useWindowDimensions,
 } from 'react-native';
 import { useQuery } from 'convex/react';
+import { useRouter } from 'expo-router';
 import { api } from '@/convex/_generated/api';
 import { AdminScreenHeader } from '@/components/admin/AdminScreenHeader';
-import { BRAND_ADMIN_TABLE, BRAND_RAISED_SURFACE, COLORS, FONTS, SPACING } from '@/constants/theme';
-import { Link } from 'expo-router';
-import { HOME_SOFT_UI } from '@/themes';
+import { AdminCard, AdminCardTitle } from '@/components/admin/AdminCard';
+import { AdminButton } from '@/components/admin/AdminButton';
+import { AdminTable, type AdminTableColumn } from '@/components/admin/AdminTable';
+import { ADMIN_THEME } from '@/constants/adminTheme';
+import { FONTS } from '@/constants/theme';
 
-const SOFT = HOME_SOFT_UI.colors;
+type WalletRow = {
+  wallet: {
+    _id: string;
+    purchaserAccountId?: string | null;
+    balance: number;
+  };
+  user: { email?: string | null; name?: string | null } | null;
+};
 
 export default function WalletsScreen() {
   const { width } = useWindowDimensions();
   const isCompact = width < 768;
+  const router = useRouter();
   const [query, setQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
   const results = useQuery(
@@ -31,68 +41,72 @@ export default function WalletsScreen() {
     setSubmittedQuery(query.trim());
   };
 
+  const columns: AdminTableColumn<WalletRow>[] = [
+    {
+      key: 'user',
+      label: 'User',
+      flex: 2,
+      render: (row) => row.user?.email ?? row.user?.name ?? 'Unknown',
+    },
+    {
+      key: 'id',
+      label: 'Purchaser Account ID',
+      flex: 2,
+      render: (row) => row.wallet.purchaserAccountId ?? '-',
+    },
+    {
+      key: 'balance',
+      label: 'Balance',
+      flex: 1,
+      align: 'right',
+      render: (row) => `${row.wallet.balance} tokens`,
+    },
+    {
+      key: 'actions',
+      label: '',
+      flex: 1,
+      align: 'right',
+      render: (row) => <Text style={styles.link}>View</Text>,
+    },
+  ];
+
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       <AdminScreenHeader
         title="Wallets"
-        fallbackHref="/admin"
-        backAccessibilityLabel="Back to admin overview"
+        description="Search user wallets and manage balances"
       />
 
-      <View style={styles.panel}>
-        <Text style={styles.panelTitle}>Search</Text>
+      <AdminCard>
+        <AdminCardTitle>Search Wallets</AdminCardTitle>
         <View style={[styles.searchRow, isCompact && styles.searchRowCompact]}>
           <TextInput
             value={query}
             onChangeText={setQuery}
             style={styles.searchInput}
-            placeholder="Email, Clerk ID, or Purchaser Account ID"
-            placeholderTextColor={COLORS.disabled}
+            placeholder="Search email, Clerk ID, or purchaser account ID..."
+            placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
+            autoCapitalize="none"
             onSubmitEditing={handleSearch}
           />
-          <Pressable
-            style={({ pressed }) => [
-              styles.primaryButton,
-              { opacity: pressed ? 0.9 : 1, transform: pressed ? [{ scale: 0.98 }] : [{ scale: 1 }] },
-            ]}
-            onPress={handleSearch}
-          >
-            <Text style={styles.primaryButtonText}>Search</Text>
-          </Pressable>
+          <AdminButton label="Search" onPress={handleSearch} />
         </View>
-      </View>
+      </AdminCard>
 
       {submittedQuery && results === undefined ? (
-        <Text style={styles.empty}>Loading...</Text>
-      ) : submittedQuery && results && results.length === 0 ? (
-        <Text style={styles.empty}>No wallets found.</Text>
+        <Text style={styles.loadingText}>Searching wallets...</Text>
       ) : results && results.length > 0 ? (
-        <View style={styles.table}>
-          <View style={[styles.row, styles.headerRow]}>
-            <Text style={[styles.cell, styles.headerCell, styles.cellUser]}>User</Text>
-            <Text style={[styles.cell, styles.headerCell, styles.cellId]}>Purchaser ID</Text>
-            <Text style={[styles.cell, styles.headerCell, styles.cellBalance]}>Balance</Text>
-            <Text style={[styles.cell, styles.headerCell, styles.cellActions]} />
-          </View>
-          {results.map(({ wallet, user }: { wallet: { _id: string; purchaserAccountId?: string | null; balance: number }; user: { email?: string | null; name?: string | null } | null }) => (
-            <View key={wallet._id} style={styles.row}>
-              <Text style={[styles.cell, styles.cellUser]}>
-                {user?.email ?? user?.name ?? 'Unknown'}
-              </Text>
-              <Text style={[styles.cell, styles.cellId]} numberOfLines={1}>
-                {wallet.purchaserAccountId ?? '-'}
-              </Text>
-              <Text style={[styles.cell, styles.cellBalance]}>{wallet.balance}</Text>
-              <View style={styles.cellActions}>
-                <Link href={`/admin/wallets/${wallet._id}`} asChild>
-                  <Pressable>
-                    <Text style={styles.link}>View</Text>
-                  </Pressable>
-                </Link>
-              </View>
-            </View>
-          ))}
-        </View>
+        <AdminTable
+          columns={columns}
+          rows={results as WalletRow[]}
+          rowKey={(row) => row.wallet._id}
+          onRowPress={(row) => router.push(`/admin/wallets/${row.wallet._id}`)}
+          emptyText="No wallets found."
+        />
+      ) : submittedQuery ? (
+        <AdminCard>
+          <Text style={styles.empty}>No wallets found matching &ldquo;{submittedQuery}&rdquo;.</Text>
+        </AdminCard>
       ) : null}
     </ScrollView>
   );
@@ -103,22 +117,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   container: {
-    gap: SPACING.lg,
-  },
-  panel: {
-    ...BRAND_RAISED_SURFACE,
-    borderRadius: 18,
-    padding: SPACING.lg,
-    gap: SPACING.md,
-  },
-  panelTitle: {
-    fontFamily: FONTS.uiSemibold,
-    fontSize: 16,
-    color: SOFT.textPrimary,
+    gap: 20,
   },
   searchRow: {
     flexDirection: 'row',
-    gap: SPACING.md,
+    gap: 12,
     alignItems: 'center',
   },
   searchRowCompact: {
@@ -127,76 +130,33 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
+    height: 36,
     borderWidth: 1,
-    borderColor: BRAND_ADMIN_TABLE.inputBorder,
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    borderColor: ADMIN_THEME.colors.border,
+    borderRadius: ADMIN_THEME.radius.md,
+    paddingHorizontal: 12,
     fontFamily: FONTS.ui,
     fontSize: 13,
-    color: SOFT.textPrimary,
-    backgroundColor: BRAND_ADMIN_TABLE.inputBackground,
+    color: ADMIN_THEME.colors.foreground,
+    backgroundColor: ADMIN_THEME.colors.inputBackground,
   },
-  primaryButton: {
-    ...BRAND_RAISED_SURFACE,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-  },
-  primaryButtonText: {
-    fontFamily: FONTS.uiBold,
-    fontSize: 12,
-    letterSpacing: 1,
-    color: SOFT.textPrimary,
+  loadingText: {
+    fontFamily: FONTS.ui,
+    fontSize: 14,
+    color: ADMIN_THEME.colors.mutedForeground,
+    paddingVertical: 20,
   },
   empty: {
     fontFamily: FONTS.ui,
     fontSize: 14,
-    color: SOFT.textMuted,
-    paddingVertical: SPACING.md,
-  },
-  table: {
-    gap: 1,
-    backgroundColor: BRAND_ADMIN_TABLE.rowDivider,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    gap: 8,
-    alignItems: 'center',
-  },
-  headerRow: {
-    backgroundColor: BRAND_ADMIN_TABLE.headerBackground,
-  },
-  cell: {
-    fontFamily: FONTS.ui,
-    fontSize: 13,
-    color: SOFT.textPrimary,
-  },
-  headerCell: {
-    fontFamily: FONTS.uiSemibold,
-    color: SOFT.textMuted,
-    fontSize: 12,
-  },
-  cellUser: {
-    flex: 2,
-  },
-  cellId: {
-    flex: 2,
-  },
-  cellBalance: {
-    flex: 1,
-  },
-  cellActions: {
-    flex: 1,
-    alignItems: 'flex-end',
+    color: ADMIN_THEME.colors.mutedForeground,
+    textAlign: 'center',
+    paddingVertical: 20,
   },
   link: {
-    fontFamily: FONTS.uiSemibold,
+    fontFamily: FONTS.uiMedium,
     fontSize: 13,
-    color: COLORS.primary,
+    color: ADMIN_THEME.colors.foreground,
+    textDecorationLine: 'underline',
   },
 });

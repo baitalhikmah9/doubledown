@@ -10,12 +10,14 @@
 
 import type * as admin from "../admin.js";
 import type * as adminSignIn from "../adminSignIn.js";
+import type * as affiliate from "../affiliate.js";
 import type * as content from "../content.js";
 import type * as devices from "../devices.js";
 import type * as http from "../http.js";
 import type * as lib_accountDeletion from "../lib/accountDeletion.js";
 import type * as lib_adminSignInRateLimit from "../lib/adminSignInRateLimit.js";
 import type * as lib_adminValidation from "../lib/adminValidation.js";
+import type * as lib_affiliateStats from "../lib/affiliateStats.js";
 import type * as lib_audit from "../lib/audit.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_boundedPagination from "../lib/boundedPagination.js";
@@ -47,12 +49,14 @@ import type {
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   adminSignIn: typeof adminSignIn;
+  affiliate: typeof affiliate;
   content: typeof content;
   devices: typeof devices;
   http: typeof http;
   "lib/accountDeletion": typeof lib_accountDeletion;
   "lib/adminSignInRateLimit": typeof lib_adminSignInRateLimit;
   "lib/adminValidation": typeof lib_adminValidation;
+  "lib/affiliateStats": typeof lib_affiliateStats;
   "lib/audit": typeof lib_audit;
   "lib/auth": typeof lib_auth;
   "lib/boundedPagination": typeof lib_boundedPagination;

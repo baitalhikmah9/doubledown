@@ -77,7 +77,7 @@ describe('adminValidation', () => {
       ).toEqual({ ok: false, reason: 'restricted_user_not_allowed' });
     });
 
-    it('rejects multi-use modes without a positive cap', () => {
+    it('rejects multi-use modes without a non-negative cap', () => {
       expect(derivePromoModeDefaults({ mode: 'public_multi_use' })).toEqual({
         ok: false,
         reason: 'usage_cap_positive',
@@ -85,10 +85,24 @@ describe('adminValidation', () => {
       expect(
         derivePromoModeDefaults({
           mode: 'account_multi_use',
-          requestedUsageCap: 0,
+          requestedUsageCap: -1,
           restrictedToUserId: 'user_123',
         })
       ).toEqual({ ok: false, reason: 'usage_cap_positive' });
+    });
+
+    it('treats usage cap 0 as unlimited for multi-use modes', () => {
+      expect(
+        derivePromoModeDefaults({
+          mode: 'public_multi_use',
+          requestedUsageCap: 0,
+        })
+      ).toEqual({
+        ok: true,
+        usageCap: 0,
+        perUserLimit: 1,
+        redemptionScope: 'public',
+      });
     });
   });
 
@@ -145,6 +159,16 @@ describe('adminValidation', () => {
           usageCap: 10,
         }, 200)
       ).toBe('exhausted');
+    });
+
+    it('does not exhaust unlimited codes', () => {
+      expect(
+        derivePromoCodeStatus({
+          active: true,
+          usedCount: 10_000,
+          usageCap: 0,
+        }, 200)
+      ).toBe('active');
     });
   });
 
@@ -214,6 +238,72 @@ describe('adminValidation', () => {
         })
       ).toEqual({ ok: false, reason: 'usage_cap_nonnegative' });
     });
+
+    it('accepts unlimited usage cap 0', () => {
+      expect(
+        validateCreatePromoCodeArgs({
+          normalizedCode: 'mikhail10',
+          rewardAmount: 20,
+          usageCap: 0,
+          mode: 'public_multi_use',
+        })
+      ).toEqual({ ok: true });
+    });
+
+    it('accepts a bundle discount code', () => {
+      expect(
+        validateCreatePromoCodeArgs({
+          normalizedCode: 'bundle20off',
+          rewardAmount: 0,
+          usageCap: 0,
+          rewardType: 'discount',
+          discountPercent: 20,
+          productKey: 'bundle_50',
+        })
+      ).toEqual({ ok: true });
+    });
+
+    it('rejects a discount without a known bundle', () => {
+      expect(
+        validateCreatePromoCodeArgs({
+          normalizedCode: 'bundle20off',
+          rewardAmount: 0,
+          usageCap: 0,
+          rewardType: 'discount',
+          discountPercent: 20,
+          productKey: 'bundle_100',
+        })
+      ).toEqual({ ok: false, reason: 'product_key_invalid' });
+    });
+
+    it('requires commission when an affiliate email is set', () => {
+      expect(
+        validateCreatePromoCodeArgs({
+          normalizedCode: 'mikhail10',
+          rewardAmount: 0,
+          usageCap: 0,
+          rewardType: 'discount',
+          discountPercent: 10,
+          productKey: 'bundle_50',
+          affiliateEmail: 'creator@example.com',
+        })
+      ).toEqual({ ok: false, reason: 'commission_percent_invalid' });
+    });
+
+    it('accepts an affiliate-bound discount code', () => {
+      expect(
+        validateCreatePromoCodeArgs({
+          normalizedCode: 'mikhail10',
+          rewardAmount: 0,
+          usageCap: 0,
+          rewardType: 'discount',
+          discountPercent: 10,
+          productKey: 'bundle_50',
+          affiliateEmail: '  Creator@Example.com ',
+          commissionPercent: 10,
+        })
+      ).toEqual({ ok: true });
+    });
   });
 
   describe('validateUpdatePromoCodeArgs', () => {
@@ -233,6 +323,15 @@ describe('adminValidation', () => {
           { usageCap: 3 }
         )
       ).toEqual({ ok: false, reason: 'usage_cap_below_used' });
+    });
+
+    it('allows switching a used code to unlimited', () => {
+      expect(
+        validateUpdatePromoCodeArgs(
+          { usedCount: 5, rewardAmount: 10 },
+          { usageCap: 0 }
+        )
+      ).toEqual({ ok: true });
     });
 
     it('rejects changing rewardAmount after redemption', () => {

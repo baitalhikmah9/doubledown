@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { render, waitFor } from '@testing-library/react-native';
+import { act, render, waitFor } from '@testing-library/react-native';
 import { Text } from 'react-native';
 
 const mockUseAuth = jest.fn(() => ({ isLoaded: true, isSignedIn: false }));
@@ -94,5 +94,40 @@ describe('useWalletSync', () => {
     await waitFor(() => {
       expect(usePlayStore.getState().tokens).toBe(42);
     });
+  });
+
+  it('waits for the Convex user profile before setting up the wallet', async () => {
+    mockUseAuth.mockReturnValue({ isLoaded: true, isSignedIn: true });
+    mockUseConvexAuth.mockReturnValue({ isAuthenticated: true, isLoading: false });
+
+    const view = render(<WalletSyncHarness />);
+    await waitFor(() => expect(mockUseQuery).toHaveBeenCalled());
+    expect(mockMutation).not.toHaveBeenCalled();
+
+    mockUseQuery.mockReturnValue({ _id: 'user_123' });
+    view.rerender(<WalletSyncHarness />);
+    await waitFor(() => expect(mockMutation).toHaveBeenCalledTimes(2));
+  });
+
+  it('does not grant starter balance after auth disappears during setup', async () => {
+    let finishAccountSetup: (() => void) | undefined;
+    mockMutation.mockImplementationOnce(
+      () => new Promise<void>((resolve) => {
+        finishAccountSetup = resolve;
+      })
+    );
+    mockUseAuth.mockReturnValue({ isLoaded: true, isSignedIn: true });
+    mockUseConvexAuth.mockReturnValue({ isAuthenticated: true, isLoading: false });
+    mockUseQuery.mockReturnValue({ _id: 'user_123' });
+
+    const view = render(<WalletSyncHarness />);
+    await waitFor(() => expect(mockMutation).toHaveBeenCalledTimes(1));
+
+    mockUseAuth.mockReturnValue({ isLoaded: true, isSignedIn: false });
+    mockUseConvexAuth.mockReturnValue({ isAuthenticated: false, isLoading: false });
+    view.rerender(<WalletSyncHarness />);
+
+    await act(async () => finishAccountSetup?.());
+    expect(mockMutation).toHaveBeenCalledTimes(1);
   });
 });

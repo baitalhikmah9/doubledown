@@ -11,17 +11,19 @@ import {
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { AdminScreenHeader } from '@/components/admin/AdminScreenHeader';
+import { AdminCard, AdminCardTitle } from '@/components/admin/AdminCard';
+import { AdminButton } from '@/components/admin/AdminButton';
+import { AdminTable, type AdminTableColumn } from '@/components/admin/AdminTable';
+import { AdminPagination } from '@/components/admin/AdminPagination';
 import PromoModeDropdown from '@/components/admin/PromoModeDropdown';
-import { BRAND_ADMIN_TABLE, BRAND_RAISED_SURFACE, COLORS, FONTS, SPACING } from '@/constants/theme';
+import { ADMIN_THEME } from '@/constants/adminTheme';
+import { FONTS } from '@/constants/theme';
 import { Link } from 'expo-router';
-import { HOME_SOFT_UI } from '@/themes';
 import {
   WALLET_TRANSACTION_SOURCES,
   WALLET_TRANSACTION_SOURCE_LABELS,
   WALLET_TRANSACTION_TYPES,
 } from '@/convex/lib/walletTransactionTypes';
-
-const SOFT = HOME_SOFT_UI.colors;
 
 const SOURCE_OPTIONS = [
   { value: '', label: 'All Sources' },
@@ -30,6 +32,19 @@ const SOURCE_OPTIONS = [
     label: WALLET_TRANSACTION_SOURCE_LABELS[source],
   })),
 ];
+
+type TransactionRow = {
+  transaction: {
+    _id: string;
+    type: string;
+    amount: number;
+    source?: string | null;
+    createdAt: number;
+    purchaseId?: string | null;
+  };
+  wallet: { _id: string; purchaserAccountId?: string | null } | null;
+  userEmail: string | null;
+};
 
 export default function TransactionsScreen() {
   const { width } = useWindowDimensions();
@@ -91,8 +106,6 @@ export default function TransactionsScreen() {
     }
     setDateError('');
     setFrom(parsedFrom !== undefined ? startOfDay(parsedFrom) : undefined);
-    // Send the exclusive start of the day after To so the whole selected day
-    // is included (a transaction at 23:59:59.999 of the To day must match).
     setTo(parsedTo !== undefined ? exclusiveNextDay(parsedTo) : undefined);
     resetPagination();
   };
@@ -105,35 +118,83 @@ export default function TransactionsScreen() {
 
   const handlePrevious = () => setCursorStack(cursorStack.slice(0, -1));
 
+  const columns: AdminTableColumn<TransactionRow>[] = [
+    {
+      key: 'account',
+      label: 'Account',
+      flex: 2,
+      render: (item) => item.userEmail ?? item.wallet?.purchaserAccountId ?? '-',
+    },
+    { key: 'type', label: 'Type', flex: 1.5, render: (item) => item.transaction.type },
+    {
+      key: 'amount',
+      label: 'Amount',
+      flex: 1,
+      align: 'right',
+      render: (item) => {
+        const sign = item.transaction.amount > 0 ? '+' : '';
+        return `${sign}${item.transaction.amount}`;
+      },
+    },
+    {
+      key: 'source',
+      label: 'Source',
+      flex: 1.5,
+      render: (item) => item.transaction.source ?? '-',
+    },
+    {
+      key: 'date',
+      label: 'Date',
+      flex: 1,
+      render: (item) => new Date(item.transaction.createdAt).toLocaleDateString(),
+    },
+    {
+      key: 'actions',
+      label: '',
+      flex: 1,
+      minWidth: 110,
+      align: 'right',
+      render: (item) => (
+        <View style={styles.cellActions}>
+          {item.wallet && (
+            <Link href={`/admin/wallets/${item.wallet._id}`} asChild>
+              <Pressable>
+                <Text style={styles.link}>Wallet</Text>
+              </Pressable>
+            </Link>
+          )}
+          {item.transaction.purchaseId && (
+            <Link href={`/admin/purchases/${item.transaction.purchaseId}`} asChild>
+              <Pressable>
+                <Text style={styles.link}>Purchase</Text>
+              </Pressable>
+            </Link>
+          )}
+        </View>
+      ),
+    },
+  ];
+
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       <AdminScreenHeader
         title="Transactions"
-        fallbackHref="/admin"
-        backAccessibilityLabel="Back to admin overview"
+        description="View and filter all wallet balance changes"
       />
 
-      <View style={styles.panel}>
-        <Text style={styles.panelTitle}>Filters</Text>
+      <AdminCard>
+        <AdminCardTitle>Filters</AdminCardTitle>
         <View style={[styles.filterRow, isCompact && styles.filterRowCompact]}>
           <TextInput
             value={search}
             onChangeText={setSearch}
-            style={styles.searchInput}
-            placeholder="Email, purchaser ID, transaction ID"
-            placeholderTextColor={COLORS.disabled}
+            style={styles.input}
+            placeholder="Search email, purchaser ID, transaction ID..."
+            placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
             autoCapitalize="none"
             onSubmitEditing={handleSearch}
           />
-          <Pressable
-            style={({ pressed }) => [
-              styles.primaryButton,
-              { opacity: pressed ? 0.9 : 1 },
-            ]}
-            onPress={handleSearch}
-          >
-            <Text style={styles.primaryButtonText}>Search</Text>
-          </Pressable>
+          <AdminButton label="Search" onPress={handleSearch} />
         </View>
         <View style={[styles.filterRow, isCompact && styles.filterRowCompact]}>
           <View style={styles.filterField}>
@@ -164,9 +225,9 @@ export default function TransactionsScreen() {
             <TextInput
               value={dateFrom}
               onChangeText={setDateFrom}
-              style={styles.searchInput}
+              style={styles.input}
               placeholder="e.g. 2025-01-01"
-              placeholderTextColor={COLORS.disabled}
+              placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
               autoCapitalize="none"
             />
           </View>
@@ -175,100 +236,34 @@ export default function TransactionsScreen() {
             <TextInput
               value={dateTo}
               onChangeText={setDateTo}
-              style={styles.searchInput}
+              style={styles.input}
               placeholder="e.g. 2025-12-31"
-              placeholderTextColor={COLORS.disabled}
+              placeholderTextColor={ADMIN_THEME.colors.mutedForeground}
               autoCapitalize="none"
             />
           </View>
-          <Pressable
-            style={({ pressed }) => [
-              styles.primaryButton,
-              { opacity: pressed ? 0.9 : 1 },
-            ]}
-            onPress={handleApplyDates}
-          >
-            <Text style={styles.primaryButtonText}>Apply Dates</Text>
-          </Pressable>
+          <AdminButton label="Apply Dates" variant="secondary" onPress={handleApplyDates} />
         </View>
         {dateError ? <Text style={styles.errorText}>{dateError}</Text> : null}
-        <Text style={styles.formHint}>
-          Date filters are inclusive: transactions on or between the selected days are shown.
-        </Text>
-      </View>
+      </AdminCard>
 
       {transactions === undefined ? (
-        <Text style={styles.empty}>Loading...</Text>
+        <Text style={styles.loadingText}>Loading transactions...</Text>
       ) : (
         <>
-          {transactions.items.length === 0 ? (
-            <Text style={styles.empty}>No transactions found.</Text>
-          ) : (
-            <View style={styles.table}>
-              <View style={[styles.row, styles.headerRow]}>
-                <Text style={[styles.cell, styles.headerCell, styles.cellEmail]}>Account</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.cellType]}>Type</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.cellAmount]}>Amount</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.cellSource]}>Source</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.cellDate]}>Date</Text>
-                <Text style={[styles.cell, styles.headerCell, styles.cellActions]} />
-              </View>
-              {transactions.items.map((item: any) => (
-                <View key={item.transaction._id} style={styles.row}>
-                  <Text style={[styles.cell, styles.cellEmail]} numberOfLines={1}>
-                    {item.userEmail ?? item.wallet?.purchaserAccountId ?? '-'}
-                  </Text>
-                  <Text style={[styles.cell, styles.cellType]} numberOfLines={1}>
-                    {item.transaction.type}
-                  </Text>
-                  <Text style={[styles.cell, styles.cellAmount]}>{item.transaction.amount}</Text>
-                  <Text style={[styles.cell, styles.cellSource]}>{item.transaction.source ?? '-'}</Text>
-                  <Text style={[styles.cell, styles.cellDate]}>
-                    {new Date(item.transaction.createdAt).toLocaleDateString()}
-                  </Text>
-                  <View style={styles.cellActions}>
-                    {item.wallet && (
-                      <Link href={`/admin/wallets/${item.wallet._id}`} asChild>
-                        <Pressable>
-                          <Text style={styles.link}>Wallet</Text>
-                        </Pressable>
-                      </Link>
-                    )}
-                    {item.transaction.purchaseId && (
-                      <Link href={`/admin/purchases/${item.transaction.purchaseId}`} asChild>
-                        <Pressable>
-                          <Text style={styles.link}>Purchase</Text>
-                        </Pressable>
-                      </Link>
-                    )}
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
+          <AdminTable
+            columns={columns}
+            rows={(transactions.items as TransactionRow[])}
+            rowKey={(item) => item.transaction._id}
+            emptyText="No transactions found."
+          />
           {(cursorStack.length > 0 || transactions.nextCursor != null) && (
-            <View style={styles.paginationRow}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.secondaryButton,
-                  (pressed || cursorStack.length === 0) && styles.disabledButton,
-                ]}
-                onPress={handlePrevious}
-                disabled={cursorStack.length === 0}
-              >
-                <Text style={styles.secondaryButtonText}>Previous</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.secondaryButton,
-                  (pressed || transactions.nextCursor == null) && styles.disabledButton,
-                ]}
-                onPress={handleNext}
-                disabled={transactions.nextCursor == null}
-              >
-                <Text style={styles.secondaryButtonText}>Next</Text>
-              </Pressable>
-            </View>
+            <AdminPagination
+              hasPrevious={cursorStack.length > 0}
+              hasNext={transactions.nextCursor != null}
+              onPrevious={handlePrevious}
+              onNext={handleNext}
+            />
           )}
         </>
       )}
@@ -297,10 +292,6 @@ function startOfDay(epoch: number): number {
   return date.getTime();
 }
 
-/**
- * Local midnight of the day after `epoch` (DST-safe), used as the exclusive
- * upper bound so every millisecond of the selected day is included.
- */
 export function exclusiveNextDay(epoch: number): number {
   const date = new Date(epoch);
   date.setDate(date.getDate() + 1);
@@ -313,23 +304,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   container: {
-    gap: SPACING.lg,
-  },
-  panel: {
-    ...BRAND_RAISED_SURFACE,
-    borderRadius: 18,
-    padding: SPACING.lg,
-    gap: SPACING.md,
-  },
-  panelTitle: {
-    fontFamily: FONTS.uiSemibold,
-    fontSize: 16,
-    color: SOFT.textPrimary,
+    gap: 20,
   },
   filterRow: {
     flexDirection: 'row',
-    gap: SPACING.md,
-    alignItems: 'center',
+    gap: 12,
+    alignItems: 'flex-end',
   },
   filterRowCompact: {
     flexDirection: 'column',
@@ -337,126 +317,46 @@ const styles = StyleSheet.create({
   },
   filterField: {
     flex: 1,
-    minWidth: 180,
+    minWidth: 160,
   },
   formLabel: {
-    fontFamily: FONTS.uiSemibold,
+    fontFamily: FONTS.uiMedium,
     fontSize: 12,
-    color: SOFT.textMuted,
-    marginBottom: 4,
+    color: ADMIN_THEME.colors.mutedForeground,
+    marginBottom: 6,
   },
-  formHint: {
-    fontFamily: FONTS.ui,
-    fontSize: 12,
-    color: SOFT.textMuted,
-  },
-  searchInput: {
+  input: {
     flex: 1,
+    height: 36,
     borderWidth: 1,
-    borderColor: BRAND_ADMIN_TABLE.inputBorder,
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    borderColor: ADMIN_THEME.colors.border,
+    borderRadius: ADMIN_THEME.radius.md,
+    paddingHorizontal: 12,
     fontFamily: FONTS.ui,
     fontSize: 13,
-    color: SOFT.textPrimary,
-    backgroundColor: BRAND_ADMIN_TABLE.inputBackground,
-  },
-  primaryButton: {
-    ...BRAND_RAISED_SURFACE,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-  },
-  primaryButtonText: {
-    fontFamily: FONTS.uiBold,
-    fontSize: 12,
-    letterSpacing: 1,
-    color: SOFT.textPrimary,
+    color: ADMIN_THEME.colors.foreground,
+    backgroundColor: ADMIN_THEME.colors.inputBackground,
   },
   errorText: {
     fontFamily: FONTS.ui,
-    fontSize: 13,
-    color: COLORS.error,
+    fontSize: 12,
+    color: ADMIN_THEME.colors.destructive,
   },
-  empty: {
+  loadingText: {
     fontFamily: FONTS.ui,
     fontSize: 14,
-    color: SOFT.textMuted,
-    paddingVertical: SPACING.md,
-  },
-  table: {
-    gap: 1,
-    backgroundColor: BRAND_ADMIN_TABLE.rowDivider,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    gap: 8,
-    alignItems: 'center',
-  },
-  headerRow: {
-    backgroundColor: BRAND_ADMIN_TABLE.headerBackground,
-  },
-  cell: {
-    fontFamily: FONTS.ui,
-    fontSize: 13,
-    color: SOFT.textPrimary,
-  },
-  headerCell: {
-    fontFamily: FONTS.uiSemibold,
-    color: SOFT.textMuted,
-    fontSize: 12,
-  },
-  cellEmail: {
-    flex: 2,
-    minWidth: 0,
-  },
-  cellType: {
-    flex: 2,
-    minWidth: 0,
-  },
-  cellAmount: {
-    flex: 1,
-    textAlign: 'right',
-  },
-  cellSource: {
-    flex: 1,
-  },
-  cellDate: {
-    flex: 1,
+    color: ADMIN_THEME.colors.mutedForeground,
+    paddingVertical: 20,
   },
   cellActions: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    gap: 12,
     justifyContent: 'flex-end',
-    minWidth: 110,
   },
   link: {
-    fontFamily: FONTS.uiSemibold,
+    fontFamily: FONTS.uiMedium,
     fontSize: 13,
-    color: COLORS.primary,
-  },
-  paginationRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: SPACING.md,
-  },
-  secondaryButton: {
-    ...BRAND_RAISED_SURFACE,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-  },
-  secondaryButtonText: {
-    fontFamily: FONTS.uiBold,
-    fontSize: 12,
-    letterSpacing: 0.8,
-    color: SOFT.textPrimary,
-  },
-  disabledButton: {
-    opacity: 0.5,
+    color: ADMIN_THEME.colors.foreground,
+    textDecorationLine: 'underline',
   },
 });

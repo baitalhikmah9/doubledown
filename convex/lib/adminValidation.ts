@@ -1,3 +1,7 @@
+import { isAffiliateEmail, normalizeAffiliateEmail } from './affiliateStats';
+import { DEFAULT_TOKEN_PRODUCTS } from './paymentCatalog';
+import { isUnlimitedUsageCap } from './promoRules';
+
 /**
  * Pure validation helpers for admin operations.
  */
@@ -53,7 +57,7 @@ export function derivePromoModeDefaults(args: {
     if (
       args.requestedUsageCap === undefined ||
       !Number.isInteger(args.requestedUsageCap) ||
-      args.requestedUsageCap <= 0
+      args.requestedUsageCap < 0
     ) {
       return { ok: false, reason: 'usage_cap_positive' };
     }
@@ -87,8 +91,28 @@ export function derivePromoCodeStatus(
   if (promo.active === false) return 'inactive';
   if (promo.activeFrom !== undefined && now < promo.activeFrom) return 'scheduled';
   if (promo.activeTo !== undefined && now > promo.activeTo) return 'expired';
-  if ((promo.usedCount ?? 0) >= promo.usageCap) return 'exhausted';
+  if (!isUnlimitedUsageCap(promo.usageCap) && (promo.usedCount ?? 0) >= promo.usageCap) {
+    return 'exhausted';
+  }
   return 'active';
+}
+
+const TOKEN_PRODUCT_KEYS = new Set(DEFAULT_TOKEN_PRODUCTS.map((product) => product.productKey));
+
+export function isKnownTokenProductKey(productKey: string): boolean {
+  return TOKEN_PRODUCT_KEYS.has(productKey);
+}
+
+function validatePercent(value: number | undefined, reason: string) {
+  if (
+    value === undefined ||
+    !Number.isInteger(value) ||
+    value < 1 ||
+    value > 100
+  ) {
+    return { ok: false as const, reason };
+  }
+  return { ok: true as const };
 }
 
 export function validateCreatePromoCodeArgs(args: {
@@ -98,14 +122,34 @@ export function validateCreatePromoCodeArgs(args: {
   mode?: string;
   activeFrom?: number;
   activeTo?: number;
+  rewardType?: string;
+  discountPercent?: number;
+  productKey?: string;
+  affiliateEmail?: string;
+  commissionPercent?: number;
 }): { ok: true } | { ok: false; reason: string } {
   if (!args.normalizedCode) return { ok: false, reason: 'code_required' };
-  if (args.rewardAmount <= 0) return { ok: false, reason: 'reward_amount_positive' };
-  if (!Number.isInteger(args.rewardAmount)) {
-    return { ok: false, reason: 'reward_amount_integer' };
+  const rewardType = args.rewardType ?? 'tokens';
+  if (rewardType !== 'tokens' && rewardType !== 'discount') {
+    return { ok: false, reason: 'reward_type_invalid' };
   }
-  if (!Number.isFinite(args.rewardAmount) || args.rewardAmount > 1_000_000_000) {
-    return { ok: false, reason: 'reward_amount_invalid' };
+  if (rewardType === 'discount') {
+    const percent = validatePercent(args.discountPercent, 'discount_percent_invalid');
+    if (!percent.ok) return percent;
+    if (!args.productKey || !isKnownTokenProductKey(args.productKey)) {
+      return { ok: false, reason: 'product_key_invalid' };
+    }
+    if (args.rewardAmount !== 0) {
+      return { ok: false, reason: 'discount_reward_amount_zero' };
+    }
+  } else {
+    if (args.rewardAmount <= 0) return { ok: false, reason: 'reward_amount_positive' };
+    if (!Number.isInteger(args.rewardAmount)) {
+      return { ok: false, reason: 'reward_amount_integer' };
+    }
+    if (!Number.isFinite(args.rewardAmount) || args.rewardAmount > 1_000_000_000) {
+      return { ok: false, reason: 'reward_amount_invalid' };
+    }
   }
   if (args.usageCap < 0) return { ok: false, reason: 'usage_cap_nonnegative' };
   if (!Number.isInteger(args.usageCap)) return { ok: false, reason: 'usage_cap_integer' };
@@ -121,6 +165,18 @@ export function validateCreatePromoCodeArgs(args: {
     args.activeFrom >= args.activeTo
   ) {
     return { ok: false, reason: 'active_from_before_active_to' };
+  }
+  const affiliateEmail = args.affiliateEmail
+    ? normalizeAffiliateEmail(args.affiliateEmail)
+    : '';
+  if (affiliateEmail) {
+    if (!isAffiliateEmail(affiliateEmail)) {
+      return { ok: false, reason: 'affiliate_email_invalid' };
+    }
+    const commission = validatePercent(args.commissionPercent, 'commission_percent_invalid');
+    if (!commission.ok) return commission;
+  } else if (args.commissionPercent !== undefined) {
+    return { ok: false, reason: 'affiliate_email_required' };
   }
   return { ok: true };
 }
@@ -182,7 +238,7 @@ export function applyPromoCodeUpdate(
     if (
       effectiveUsageCap === undefined ||
       !Number.isFinite(effectiveUsageCap) ||
-      effectivePerUserLimit > effectiveUsageCap
+      (!isUnlimitedUsageCap(effectiveUsageCap) && effectivePerUserLimit > effectiveUsageCap)
     ) {
       return { ok: false, reason: 'per_user_limit_exceeds_cap' };
     }
@@ -231,7 +287,11 @@ export function validateUpdatePromoCodeArgs(
     usageCap?: number;
   }
 ): { ok: true } | { ok: false; reason: string } {
-  if (updates.usageCap !== undefined && updates.usageCap < (promo.usedCount ?? 0)) {
+  if (
+    updates.usageCap !== undefined &&
+    !isUnlimitedUsageCap(updates.usageCap) &&
+    updates.usageCap < (promo.usedCount ?? 0)
+  ) {
     return { ok: false, reason: 'usage_cap_below_used' };
   }
   if (

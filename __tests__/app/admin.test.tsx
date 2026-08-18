@@ -1,7 +1,8 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
+import useWindowDimensions from 'react-native/Libraries/Utilities/useWindowDimensions';
 
 // Desktop window dimensions so the admin sidebar renders in layout tests
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
@@ -25,6 +26,7 @@ const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn(() => true);
 const mockRedirect = jest.fn();
+let mockPathname = '/admin';
 const mockSignOut = jest.fn();
 const mockUseAuth = jest.fn(() => ({
   isSignedIn: true,
@@ -86,7 +88,7 @@ jest.mock('expo-router', () => ({
     canGoBack: mockCanGoBack,
   }),
   useLocalSearchParams: () => ({}),
-  usePathname: () => '/admin',
+  usePathname: () => mockPathname,
   Redirect: ({ href }: { href: string }) => {
     mockRedirect(href);
     return null;
@@ -128,9 +130,10 @@ jest.mock('@/lib/authMode', () => ({
 jest.mock('@expo/vector-icons', () => {
   const React = require('react');
   const { Text } = require('react-native');
-  return {
-    Ionicons: ({ name }: { name: string }) => <Text accessibilityElementsHidden>{String(name)}</Text>,
-  };
+  const Icon = ({ name }: { name: string }) => (
+    <Text accessibilityElementsHidden>{String(name)}</Text>
+  );
+  return { Ionicons: Icon, Feather: Icon };
 });
 
 jest.mock('expo-web-browser', () => ({
@@ -161,7 +164,22 @@ describe('AdminLayout', () => {
       items: [],
     });
     jest.clearAllMocks();
+    mockPathname = '/admin';
     Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true });
+    const store = new Map<string, string>();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          store.set(key, value);
+        },
+        removeItem: (key: string) => {
+          store.delete(key);
+        },
+        clear: () => store.clear(),
+      },
+    });
   });
 
   afterEach(() => {
@@ -192,7 +210,7 @@ describe('AdminLayout', () => {
     expect(toJSON()).toBeTruthy();
   });
 
-  it('shows a sign out control in the admin top bar on web', () => {
+  it('opens account actions in a popup instead of navigating immediately', () => {
     mockUseAuth.mockReturnValue({
       isSignedIn: true,
       userId: 'user_123',
@@ -201,7 +219,10 @@ describe('AdminLayout', () => {
     });
 
     render(<AdminLayout />);
+    expect(screen.queryByLabelText('Sign out')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Account menu'));
     expect(screen.getByLabelText('Sign out')).toBeTruthy();
+    expect(screen.getByText('Log out')).toBeTruthy();
   });
 
   it('redirects signed-out web admins to the admin auth page', () => {
@@ -247,11 +268,98 @@ describe('AdminLayout', () => {
     expect(mockRedirect).toHaveBeenCalledWith('/admin/sign-in');
   });
 
+  it('redirects assigned affiliates to the coupon dashboard', () => {
+    mockUseQuery
+      .mockReturnValueOnce({
+        _id: 'user_aff',
+        email: 'creator@example.com',
+      } as never)
+      .mockReturnValueOnce({
+        codes: [{ code: 'mikhail10', usageCount: 4 }],
+      } as never);
+
+    render(<AdminLayout />);
+    expect(mockRedirect).toHaveBeenCalledWith('/admin/affiliate');
+  });
+
   it('redirects away from admin on native platforms', () => {
     Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true });
 
     render(<AdminLayout />);
     expect(mockRedirect).toHaveBeenCalledWith('/(app)/');
+  });
+
+  it('shows route breadcrumbs and a desktop collapse rail', () => {
+    mockPathname = '/admin/promo-codes';
+    render(<AdminLayout />);
+    expect(screen.getByLabelText('Breadcrumb')).toBeTruthy();
+    expect(screen.getAllByText('Promo Codes').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('Dashboard').length).toBeGreaterThan(0);
+    expect(screen.getByLabelText('Toggle sidebar rail')).toBeTruthy();
+    expect(screen.getByLabelText('Toggle sidebar')).toBeTruthy();
+    expect(
+      screen.getAllByLabelText('Backfire Admin').every((item) => !Array.isArray(item.props.style))
+    ).toBe(true);
+    expect(
+      screen.getAllByLabelText('Dashboard').every((item) => !Array.isArray(item.props.style))
+    ).toBe(true);
+    expect(StyleSheet.flatten(screen.getByTestId('admin-sidebar-trigger').props.style)).toEqual(
+      expect.objectContaining({ width: 28, height: 28 })
+    );
+    expect(StyleSheet.flatten(screen.getByTestId('admin-sidebar-nav-Dashboard').props.style)).toEqual(
+      expect.objectContaining({ height: 32, paddingHorizontal: 8, borderRadius: 6 })
+    );
+  });
+
+  it('persists desktop sidebar collapse to web storage', () => {
+    render(<AdminLayout />);
+    fireEvent.press(screen.getByLabelText('Toggle sidebar'));
+    expect(globalThis.localStorage.getItem('backfire:admin-sidebar-collapsed')).toBe('1');
+    expect(
+      StyleSheet.flatten(screen.getByTestId('admin-sidebar-brand-icon').props.style).marginRight
+    ).toBe(0);
+    expect(
+      StyleSheet.flatten(screen.getByTestId('admin-sidebar-nav-icon-Dashboard').props.style)
+    ).toEqual(expect.objectContaining({ width: 16, flexShrink: 0 }));
+    expect(
+      StyleSheet.flatten(screen.getByTestId('admin-sidebar-nav-Dashboard').props.style)
+    ).toEqual(
+      expect.objectContaining({
+        width: 32,
+        flexDirection: 'row',
+        alignItems: 'center',
+        transition: expect.stringContaining('width'),
+      })
+    );
+  });
+
+  it('keeps affiliate nav limited to My coupon', () => {
+    mockPathname = '/admin/affiliate';
+    mockUseQuery
+      .mockReturnValueOnce({
+        _id: 'user_aff',
+        email: 'creator@example.com',
+      } as never)
+      .mockReturnValueOnce({
+        codes: [{ code: 'mikhail10', usageCount: 4 }],
+      } as never);
+
+    render(<AdminLayout />);
+    expect(screen.getAllByText('My coupon').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Promo Codes')).toBeNull();
+    expect(screen.queryByText('Wallets')).toBeNull();
+    expect(screen.queryByText('Transactions')).toBeNull();
+    expect(screen.queryByText('Audit Log')).toBeNull();
+    expect(screen.queryByLabelText('Dashboard')).toBeNull();
+  });
+
+  it('uses an off-canvas trigger on mobile and hides the desktop rail', () => {
+    const mockDimensions = useWindowDimensions as unknown as jest.Mock;
+    mockDimensions.mockReturnValue({ width: 800, height: 900, scale: 1, fontScale: 1 });
+    render(<AdminLayout />);
+    expect(screen.getByLabelText('Open navigation')).toBeTruthy();
+    expect(screen.queryByLabelText('Toggle sidebar rail')).toBeNull();
+    mockDimensions.mockReturnValue({ width: 1280, height: 800, scale: 1, fontScale: 1 });
   });
 });
 
@@ -265,9 +373,24 @@ describe('AdminIndexScreen', () => {
     });
   });
 
-  it('renders dashboard title', () => {
+  it('renders the dashboard heading and overview tab', () => {
     render(<AdminIndexScreen />);
-    expect(screen.getByText('Overview')).toBeTruthy();
+    expect(screen.getByText('Dashboard')).toBeTruthy();
+    expect(screen.getAllByText('Overview').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('renders shadcn-style stat cards with zeroed stats while data is absent', () => {
+    render(<AdminIndexScreen />);
+    expect(screen.getByText('Total Revenue')).toBeTruthy();
+    expect(screen.getByText('Purchases')).toBeTruthy();
+    expect(screen.getByText('Active Promo Codes')).toBeTruthy();
+    expect(screen.getByText('Total Redemptions')).toBeTruthy();
+  });
+
+  it('renders the revenue chart and recent activity cards', () => {
+    render(<AdminIndexScreen />);
+    expect(screen.getAllByText('Overview').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Recent Activity')).toBeTruthy();
   });
 });
 
@@ -315,7 +438,7 @@ describe('PromoCodesScreen', () => {
 
   it('renders promo codes title', () => {
     render(<PromoCodesScreen />);
-    expect(screen.getByText('PROMO CODES')).toBeTruthy();
+    expect(screen.getByText('Promo Codes')).toBeTruthy();
   });
 
   it('shows the coupon mode selector in the create form', () => {
@@ -366,6 +489,34 @@ describe('PromoCodesScreen', () => {
       );
     });
   });
+
+  it('can generate a code and apply the affiliate preset', async () => {
+    render(<PromoCodesScreen />);
+    fireEvent.press(screen.getByText('Create'));
+    fireEvent.press(screen.getByLabelText('Generate random code'));
+    const codeInput = screen.getByPlaceholderText('e.g. WELCOME2024');
+    expect(String((codeInput.props as { value?: string }).value ?? '')).toHaveLength(8);
+
+    fireEvent.press(screen.getByLabelText('Toggle affiliate preset'));
+    expect(screen.getByText('Affiliate Email')).toBeTruthy();
+    expect(screen.getByText('Commission Percent')).toBeTruthy();
+    fireEvent.changeText(screen.getByPlaceholderText('creator@example.com'), 'creator@example.com');
+    fireEvent.changeText(screen.getByPlaceholderText('e.g. 10'), '10');
+    fireEvent.changeText(screen.getByPlaceholderText('Tokens'), '20');
+    fireEvent.press(screen.getByText('Create Promo Code'));
+
+    await waitFor(() => {
+      expect(createPromo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          rewardAmount: 20,
+          usageCap: 0,
+          mode: 'public_multi_use',
+          affiliateEmail: 'creator@example.com',
+          commissionPercent: 10,
+        })
+      );
+    });
+  });
 });
 
 describe('WalletsScreen', () => {
@@ -381,7 +532,7 @@ describe('WalletsScreen', () => {
 
   it('renders wallets title', () => {
     render(<WalletsScreen />);
-    expect(screen.getByText('WALLETS')).toBeTruthy();
+    expect(screen.getByText('Wallets')).toBeTruthy();
   });
 });
 
@@ -653,9 +804,10 @@ describe('TransactionsScreen', () => {
     });
   });
 
-  it('renders the transaction ledger title', () => {
+  it('renders the transaction ledger title without redundant dashboard navigation', () => {
     render(<TransactionsScreen />);
-    expect(screen.getByText('TRANSACTIONS')).toBeTruthy();
+    expect(screen.getByText('Transactions')).toBeTruthy();
+    expect(screen.queryByLabelText('Go back')).toBeNull();
   });
 
   it('renders an empty ledger message', () => {
@@ -865,7 +1017,7 @@ describe('PurchasesScreen', () => {
 
   it('renders the purchases title', () => {
     render(<PurchasesScreen />);
-    expect(screen.getByText('PURCHASES')).toBeTruthy();
+    expect(screen.getByText('Purchases')).toBeTruthy();
   });
 
   it('pages forward with the returned cursor and resets on search', () => {
@@ -949,7 +1101,7 @@ describe('AuditScreen', () => {
 
   it('renders the audit log title', () => {
     render(<AuditScreen />);
-    expect(screen.getByText('AUDIT LOG')).toBeTruthy();
+    expect(screen.getByText('Audit Log')).toBeTruthy();
   });
 
   it('expands a record to show before/after snapshots', () => {

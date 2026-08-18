@@ -10,24 +10,20 @@ const storePath = path.join(__dirname, '../../app/(app)/store.tsx');
 describe('store redeem input', () => {
   const source = fs.readFileSync(storePath, 'utf8');
 
-  it('web redeems, Android CTAs to site, iOS shows neither redeem nor site CTA', () => {
+  it('web redeems, native apps CTA to playbackfire.com', () => {
     expect(source).toContain("const IS_WEB_PLATFORM = Platform.OS === 'web'");
-    expect(source).toContain("const IS_ANDROID_PLATFORM = Platform.OS === 'android'");
-    expect(source).toContain("const IS_IOS_PLATFORM = Platform.OS === 'ios'");
+    expect(source).toContain("const IS_NATIVE_PLATFORM = IS_IOS_PLATFORM || IS_ANDROID_PLATFORM");
     expect(source).toContain("const PLAYBACKFIRE_SITE_URL = 'https://playbackfire.com'");
     // Web-only redeem UI.
     expect(source).toMatch(/IS_WEB_PLATFORM \? \(/);
     expect(source).toMatch(/testID="store-redeem-section"/);
     expect(source).toMatch(/IS_WEB_PLATFORM \?[\s\S]*redeemInput[\s\S]*\) : null/);
-    // Android-only external CTA.
-    expect(source).toMatch(/IS_ANDROID_PLATFORM \? \(/);
-    expect(source).toMatch(/testID="store-android-promo-cta"/);
+    // iOS and Android both deep-link to the website coupon box.
+    expect(source).toMatch(/IS_NATIVE_PLATFORM \? \(/);
+    expect(source).toMatch(/testID="store-native-promo-cta"/);
     expect(source).toMatch(/Linking\.openURL\(PLAYBACKFIRE_SITE_URL\)/);
     expect(source).toMatch(/To input promo\/coupon codes, head over to playbackfire\.com\./);
-    // iOS: no redeem strip and no site CTA branch gated on iOS.
-    expect(source).toMatch(/IS_IOS_PLATFORM && styles\.storeBodyWithoutRedeem/);
-    expect(source).not.toMatch(/IS_IOS_PLATFORM \?[\s\S]{0,80}Linking\.openURL/);
-    expect(source).not.toMatch(/IS_NATIVE_PLATFORM \?[\s\S]{0,120}Linking\.openURL/);
+    expect(source).not.toMatch(/IS_IOS_PLATFORM && styles\.storeBodyWithoutRedeem/);
   });
 
   it('does not hard-code pure white on redeemInput styles', () => {

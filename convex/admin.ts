@@ -2,6 +2,7 @@ import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 import { requireAdmin } from './lib/auth';
 import { ensureWalletDoc } from './lib/ensureWallet';
+import { isAffiliateEmail, normalizeAffiliateEmail } from './lib/affiliateStats';
 import { normalizePromoCode } from './lib/promoRules';
 import { writeAudit } from './lib/audit';
 import { scanIndexPage, SCAN_BATCH } from './lib/boundedPagination';
@@ -232,6 +233,11 @@ export const createPromoCode = mutation({
     restrictedToPurchaserAccountId: v.optional(v.string()),
     activeFrom: v.optional(v.number()),
     activeTo: v.optional(v.number()),
+    rewardType: v.optional(v.union(v.literal('tokens'), v.literal('discount'))),
+    discountPercent: v.optional(v.number()),
+    productKey: v.optional(v.string()),
+    affiliateEmail: v.optional(v.string()),
+    commissionPercent: v.optional(v.number()),
     metadata: v.optional(
       v.object({
         campaignName: v.optional(v.string()),
@@ -242,6 +248,10 @@ export const createPromoCode = mutation({
   handler: async (ctx, args) => {
     const adminUser = await requireAdmin(ctx);
     const normalized = normalizePromoCode(args.code);
+    const rewardType = args.rewardType ?? 'tokens';
+    const affiliateEmail = args.affiliateEmail
+      ? normalizeAffiliateEmail(args.affiliateEmail)
+      : undefined;
 
     const validation = validateCreatePromoCodeArgs({
       normalizedCode: normalized,
@@ -250,6 +260,11 @@ export const createPromoCode = mutation({
       mode: args.mode,
       activeFrom: args.activeFrom,
       activeTo: args.activeTo,
+      rewardType,
+      discountPercent: args.discountPercent,
+      productKey: args.productKey,
+      affiliateEmail,
+      commissionPercent: args.commissionPercent,
     });
     if (!validation.ok) {
       throw new Error(validation.reason);
@@ -285,7 +300,7 @@ export const createPromoCode = mutation({
     const now = Date.now();
     const promoCodeId = await ctx.db.insert('promo_codes', {
       code: normalized,
-      rewardType: 'tokens',
+      rewardType,
       rewardAmount: args.rewardAmount,
       usageCap: modeDefaults.usageCap,
       perUserLimit: modeDefaults.perUserLimit,
@@ -301,6 +316,10 @@ export const createPromoCode = mutation({
       createdAt: now,
       updatedAt: now,
       createdByAdminUserId: adminUser._id,
+      discountPercent: rewardType === 'discount' ? args.discountPercent : undefined,
+      productKey: rewardType === 'discount' ? args.productKey : undefined,
+      affiliateEmail: affiliateEmail && isAffiliateEmail(affiliateEmail) ? affiliateEmail : undefined,
+      commissionPercent: affiliateEmail ? args.commissionPercent : undefined,
     });
 
     await writeAudit(ctx, {
@@ -311,7 +330,7 @@ export const createPromoCode = mutation({
       targetId: promoCodeId,
       after: {
         code: normalized,
-        rewardType: 'tokens',
+        rewardType,
         rewardAmount: args.rewardAmount,
         usageCap: modeDefaults.usageCap,
         perUserLimit: modeDefaults.perUserLimit,
@@ -322,6 +341,10 @@ export const createPromoCode = mutation({
         active: true,
         activeFrom: args.activeFrom,
         activeTo: args.activeTo,
+        discountPercent: rewardType === 'discount' ? args.discountPercent : undefined,
+        productKey: rewardType === 'discount' ? args.productKey : undefined,
+        affiliateEmail: affiliateEmail && isAffiliateEmail(affiliateEmail) ? affiliateEmail : undefined,
+        commissionPercent: affiliateEmail ? args.commissionPercent : undefined,
       },
     });
 
@@ -926,5 +949,163 @@ export const listAuditLog = query({
     );
 
     return { items, nextCursor };
+  },
+});
+
+// ───────────────────────────────────────────────
+// Admin Dashboard Stats
+// ───────────────────────────────────────────────
+
+const MONTH_LABELS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+/** Start-of-month epochs for the trailing `count` months, oldest first. */
+function buildMonthBuckets(
+  now: number,
+  count: number
+): { start: number; end: number; label: string }[] {
+  const buckets: { start: number; end: number; label: string }[] = [];
+  const cursor = new Date(now);
+  cursor.setDate(1);
+  cursor.setHours(0, 0, 0, 0);
+  for (let i = 0; i < count; i++) {
+    const end = cursor.getTime();
+    cursor.setMonth(cursor.getMonth() - 1);
+    const start = cursor.getTime();
+    buckets.unshift({ start, end, label: MONTH_LABELS[new Date(start).getMonth()] });
+  }
+  return buckets;
+}
+
+/** Percent change of `current` vs `previous`; null when there is no baseline. */
+function monthDeltaPct(current: number, previous: number): number | null {
+  if (previous <= 0) return null;
+  return ((current - previous) / previous) * 100;
+}
+
+export const getDashboardStats = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+
+    const now = Date.now();
+    const buckets = buildMonthBuckets(now, 12);
+    const windowStart = buckets[0].start;
+
+    // Revenue / purchase counts come from store_purchases (real money charged),
+    // windowed to the trailing 12 months so the dashboard stays bounded.
+    const purchases = await ctx.db
+      .query('store_purchases')
+      .withIndex('by_purchased_at', (q) => q.gte('purchasedAt', windowStart))
+      .order('desc')
+      .collect();
+    const granted = purchases.filter((purchase) => purchase.status === 'granted');
+
+    const revenueByMonth = buckets.map(() => 0);
+    const purchasesByMonth = buckets.map(() => 0);
+    let currencyCode: string | undefined;
+    for (const purchase of granted) {
+      const idx = buckets.findIndex(
+        (bucket) => purchase.purchasedAt >= bucket.start && purchase.purchasedAt < bucket.end
+      );
+      if (idx === -1) continue;
+      if (typeof purchase.priceAmountMicros === 'number') {
+        revenueByMonth[idx] += purchase.priceAmountMicros;
+        if (purchase.currencyCode) currencyCode = purchase.currencyCode;
+      }
+      purchasesByMonth[idx] += 1;
+    }
+
+    const monthlyRevenue = buckets.map((bucket, index) => ({
+      label: bucket.label,
+      total: revenueByMonth[index],
+    }));
+    const totalRevenue = revenueByMonth.reduce((sum, value) => sum + value, 0);
+    const purchasesTotal = purchasesByMonth.reduce((sum, value) => sum + value, 0);
+    const revenueDeltaPct = monthDeltaPct(
+      revenueByMonth[revenueByMonth.length - 1],
+      revenueByMonth[revenueByMonth.length - 2]
+    );
+    const purchasesDeltaPct = monthDeltaPct(
+      purchasesByMonth[purchasesByMonth.length - 1],
+      purchasesByMonth[purchasesByMonth.length - 2]
+    );
+
+    // Promo code health (small table; same full-scan pattern as listPromoCodes).
+    const promoCodes = await ctx.db.query('promo_codes').collect();
+    const activePromoCodes = promoCodes.filter(
+      (promo) => derivePromoCodeStatus(promo, now) === 'active'
+    ).length;
+    const totalRedemptions = promoCodes.reduce(
+      (sum, promo) => sum + (promo.usedCount ?? 0),
+      0
+    );
+
+    // Latest wallet activity with account labels (mirrors listTransactions enrichment).
+    const recent = await ctx.db
+      .query('wallet_transactions')
+      .withIndex('by_created')
+      .order('desc')
+      .take(6);
+
+    const walletById = new Map<string, Doc<'wallets'>>();
+    const emailByUserId = new Map<string, string>();
+    const freshWalletIds = [...new Set(recent.map((transaction) => transaction.walletId))];
+    const freshWallets = await Promise.all(freshWalletIds.map((id) => ctx.db.get(id)));
+    freshWalletIds.forEach((id, index) => {
+      const wallet = freshWallets[index];
+      if (wallet) walletById.set(id, wallet);
+    });
+    const freshUserIds = [
+      ...new Set(
+        freshWallets
+          .map((wallet) => wallet?.userId)
+          .filter((id): id is Id<'users'> => id !== undefined)
+      ),
+    ];
+    const freshUsers = await Promise.all(freshUserIds.map((id) => ctx.db.get(id)));
+    freshUserIds.forEach((id, index) => {
+      const email = freshUsers[index]?.email;
+      if (email) emailByUserId.set(id, email);
+    });
+
+    const recentTransactions = recent.map((transaction) => {
+      const wallet = walletById.get(transaction.walletId);
+      const email = wallet?.userId ? emailByUserId.get(wallet.userId) : undefined;
+      return {
+        id: transaction._id,
+        account: email ?? wallet?.purchaserAccountId ?? null,
+        type: transaction.type,
+        amount: transaction.amount,
+        createdAt: transaction.createdAt,
+        walletId: transaction.walletId,
+        purchaseId: transaction.purchaseId ?? null,
+      };
+    });
+
+    return {
+      currencyCode: currencyCode ?? 'USD',
+      totalRevenue,
+      revenueDeltaPct,
+      purchasesTotal,
+      purchasesDeltaPct,
+      activePromoCodes,
+      totalPromoCodes: promoCodes.length,
+      totalRedemptions,
+      monthlyRevenue,
+      recentTransactions,
+    };
   },
 });
