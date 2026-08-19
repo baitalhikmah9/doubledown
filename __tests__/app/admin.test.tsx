@@ -56,6 +56,10 @@ const mockUseMutation = jest.fn<(...args: unknown[]) => unknown>(
   () => jest.fn(() => Promise.resolve({ allowed: true, failuresInWindow: 0 }))
 );
 
+const mockUseAction = jest.fn<(...args: unknown[]) => unknown>(
+  () => jest.fn(() => Promise.resolve({ ok: true }))
+);
+
 function useAdminSignInMutationMocks() {
   adminSignInMutationCall = 0;
   mockUseMutation.mockImplementation(() => {
@@ -120,6 +124,7 @@ jest.mock('@clerk/clerk-expo', () => ({
 jest.mock('convex/react', () => ({
   useQuery: (...args: unknown[]) => mockUseQuery(...args),
   useMutation: (...args: unknown[]) => mockUseMutation(...args),
+  useAction: (...args: unknown[]) => mockUseAction(...args),
   useConvexAuth: () => mockUseConvexAuth(),
 }));
 

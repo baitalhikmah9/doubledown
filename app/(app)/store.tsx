@@ -234,8 +234,8 @@ export default function StoreScreen() {
   const catalog = useQuery(api.payments.getCatalog);
   const balanceData = useQuery(api.wallet.getBalance, {});
 
-  // Promo redemption.
-  const redeemPromoCode = useMutation(api.promo.redeemCode);
+  // Promo redemption + discount validation (unified single coupon box).
+  const applyPromoCode = useMutation(api.promo.applyPromoCode);
 
   // Display token balance: signed-out users always see 0.
   const displayTokens = resolveDisplayTokenBalance({
@@ -292,6 +292,106 @@ export default function StoreScreen() {
 
   const [buyingKey, setBuyingKey] = useState<string | null>(null);
 
+  // ── Unified coupon code (web checkout) ─────────────────────────────────
+  // A single input. The server (applyPromoCode) determines whether the code
+  // is a token reward (granted immediately) or a product-scoped discount
+  // (creates a pending claim and returns the matching bundle). For discounts,
+  // the client holds the code + bundle to pass to RC Web Billing checkout.
+  const [couponCodeInput, setCouponCodeInput] = useState('');
+  const [appliedDiscount, setAppliedDiscount] = useState<{
+    code: string;
+    productKey: string;
+    discountPercent: number;
+    expiresAt: number;
+  } | null>(null);
+  const [couponError, setCouponError] = useState('');
+  const [couponSuccess, setCouponSuccess] = useState('');
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+
+  const handleCouponCodeChange = useCallback(
+    (text: string) => {
+      setCouponCodeInput(text);
+      if (couponError) setCouponError('');
+      if (couponSuccess) setCouponSuccess('');
+      // Clear any previously applied discount when the user edits the field.
+      if (appliedDiscount) setAppliedDiscount(null);
+    },
+    [appliedDiscount, couponError, couponSuccess]
+  );
+
+  const applyCouponCode = useCallback(async () => {
+    setCouponError('');
+    setCouponSuccess('');
+
+    const code = couponCodeInput.trim();
+    if (!code || isApplyingCoupon) {
+      if (!code) setCouponError('Enter a promo or discount code.');
+      return;
+    }
+
+    if (!isSignedIn) {
+      showThemedAlert(SIGN_IN_TO_REDEEM_MESSAGE);
+      router.push('/(auth)/sign-in');
+      return;
+    }
+
+    setIsApplyingCoupon(true);
+    try {
+      const result = await applyPromoCode({
+        code,
+        clientRequestId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      });
+      if (!result.success) {
+        setCouponError(getPromoErrorMessage(result.error));
+        setAppliedDiscount(null);
+        return;
+      }
+
+      if (result.kind === 'tokens') {
+        // Token reward: granted server-side. Clear the input.
+        setCouponCodeInput('');
+        if (result.duplicate) {
+          setCouponSuccess('That code has already been redeemed.');
+        } else {
+          const granted =
+            typeof result.tokensGranted === 'number' && result.tokensGranted > 0
+              ? result.tokensGranted
+              : null;
+          setCouponSuccess(
+            granted != null
+              ? `${formatTokens(granted)} tokens added to your balance.`
+              : t('store.voucherSuccess')
+          );
+        }
+      } else {
+        // Discount: server created a pending claim for promo.productKey.
+        // Hold the code + bundle so checkout passes it to RC Web Billing.
+        setAppliedDiscount({
+          code: code.toLowerCase(),
+          productKey: result.productKey,
+          discountPercent: result.discountPercent,
+          expiresAt: result.expiresAt,
+        });
+        setCouponSuccess(
+          `${result.discountPercent}% off ready for the ${result.productKey.replace(
+            'bundle_',
+            ''
+          )}-token bundle. Tap BUY on that bundle; the discount is applied at checkout and you will see the final price before paying.`
+        );
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      setCouponError(
+        message.includes('Not authenticated')
+          ? SIGN_IN_TO_REDEEM_MESSAGE
+          : 'Unable to apply that code. Please try again.'
+      );
+      setAppliedDiscount(null);
+    } finally {
+      setIsApplyingCoupon(false);
+    }
+  }, [couponCodeInput, isApplyingCoupon, isSignedIn, applyPromoCode, router, t]);
+
   const onBuyBundle = useCallback(
     async (bundle: DisplayBundle) => {
       if (!rcSupported || !rcReady || !catalogProducts) {
@@ -311,9 +411,17 @@ export default function StoreScreen() {
         return;
       }
 
+      // Only pass the discount code when it was validated for this exact
+      // bundle. A mismatched code is ignored so checkout never sends a code
+      // the server hasn't validated for this product.
+      const discountForBundle =
+        appliedDiscount && appliedDiscount.productKey === bundle.productKey
+          ? appliedDiscount.code
+          : undefined;
+
       setBuyingKey(bundle.productKey);
       try {
-        const outcome = await purchase(catalogProduct);
+        const outcome = await purchase(catalogProduct, { discountCode: discountForBundle });
         if (outcome.granted) {
           const tokens = outcome.tokensGranted || bundle.tokensGranted;
           showThemedAlert(
@@ -326,6 +434,14 @@ export default function StoreScreen() {
             `Your ${formatTokens(bundle.tokensGranted)} tokens will appear in your balance shortly.`
           );
         }
+        // Clear the applied discount after a successful purchase attempt so it
+        // cannot be reused for a different bundle. The server-side claim is
+        // consumed by the webhook regardless.
+        if (discountForBundle) {
+          setAppliedDiscount(null);
+          setCouponCodeInput('');
+          setCouponSuccess('');
+        }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : '';
         if (message.toLowerCase().includes('cancelled')) {
@@ -336,83 +452,8 @@ export default function StoreScreen() {
         setBuyingKey(null);
       }
     },
-    [catalogProducts, purchase, rcReady, rcSupported]
+    [appliedDiscount, catalogProducts, purchase, rcReady, rcSupported]
   );
-
-  // ── Voucher / promo redemption ──────────────────────────────────────────
-
-  const [voucherCode, setVoucherCode] = useState('');
-  const [isRedeeming, setIsRedeeming] = useState(false);
-  const [promoError, setPromoError] = useState('');
-  const [promoSuccess, setPromoSuccess] = useState('');
-
-  const handleVoucherChange = useCallback(
-    (text: string) => {
-      setVoucherCode(text);
-      if (promoError) setPromoError('');
-      if (promoSuccess) setPromoSuccess('');
-    },
-    [promoError, promoSuccess]
-  );
-
-  const applyVoucher = useCallback(async () => {
-    setPromoError('');
-    setPromoSuccess('');
-
-    const code = voucherCode.trim();
-    if (!code || isRedeeming) {
-      if (!code) setPromoError(t('store.voucherInvalid'));
-      return;
-    }
-
-    if (!isSignedIn) {
-      showThemedAlert(SIGN_IN_TO_REDEEM_MESSAGE);
-      router.push('/(auth)/sign-in');
-      return;
-    }
-
-    setIsRedeeming(true);
-    try {
-      const result = await redeemPromoCode({
-        code,
-        clientRequestId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      });
-
-      if (!result.success) {
-        setPromoError(getPromoErrorMessage(result.error));
-        return;
-      }
-
-      // Do NOT grant tokens locally - the Convex mutation already patched the
-      // wallet balance, and the useQuery subscription will update automatically.
-      setVoucherCode('');
-
-      // If duplicate (idempotent replay), don't imply new tokens were added
-      if (result.duplicate) {
-        setPromoSuccess('That code has already been redeemed.');
-        return;
-      }
-
-      const granted =
-        typeof result.tokensGranted === 'number' && result.tokensGranted > 0
-          ? result.tokensGranted
-          : null;
-      setPromoSuccess(
-        granted != null
-          ? `${formatTokens(granted)} tokens added to your balance.`
-          : t('store.voucherSuccess')
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '';
-      setPromoError(
-        message.includes('Not authenticated')
-          ? SIGN_IN_TO_REDEEM_MESSAGE
-          : 'Unable to redeem that code. Please try again.'
-      );
-    } finally {
-      setIsRedeeming(false);
-    }
-  }, [isRedeeming, isSignedIn, redeemPromoCode, router, t, voucherCode]);
 
   // ── Navigation ──────────────────────────────────────────────────────────
 
@@ -590,22 +631,9 @@ export default function StoreScreen() {
             </Text>
           </View>
 
-          {/* Web: redeem. Android: external site CTA. iOS: neither (Apple 3.1.1). */}
+          {/* Web: single coupon box. Native (iOS + Android): external site CTA. */}
           {IS_WEB_PLATFORM ? (
-          <View style={styles.redeemSection} testID="store-redeem-section">
-            <Text
-              style={[
-                styles.redeemTitle,
-                isCompactViewport && styles.redeemTitleCompact,
-                {
-                  color: textPrimary,
-                  fontSize: Math.round(14 * viewportScale),
-                  letterSpacing: 1.2 * viewportScale,
-                },
-              ]}
-            >
-              REDEEM CODE
-            </Text>
+          <View style={styles.redeemSection} testID="store-coupon-section">
             <View
               style={[
                 styles.redeemCard,
@@ -621,9 +649,9 @@ export default function StoreScreen() {
               ]}
             >
               <TextInput
-                value={voucherCode}
-                onChangeText={handleVoucherChange}
-                placeholder="Enter code here..."
+                value={couponCodeInput}
+                onChangeText={handleCouponCodeChange}
+                placeholder="Enter promo or discount code..."
                 placeholderTextColor={textMuted}
                 autoCapitalize="characters"
                 autoCorrect={false}
@@ -637,14 +665,14 @@ export default function StoreScreen() {
                     fontSize: Math.round(14 * viewportScale),
                     color: textPrimary,
                     backgroundColor: redeemFieldBackground,
-                    borderColor: promoError ? '#D32F2F' : redeemFieldBorder,
-                    borderWidth: promoError ? 1.5 : 1,
+                    borderColor: couponError ? '#D32F2F' : redeemFieldBorder,
+                    borderWidth: couponError ? 1.5 : 1,
                   },
                 ]}
               />
               <Pressable
-                onPress={applyVoucher}
-                disabled={isRedeeming}
+                onPress={applyCouponCode}
+                disabled={isApplyingCoupon}
                 style={({ pressed }) => [
                   styles.applyButton,
                   isCompactViewport && styles.applyButtonCompact,
@@ -658,12 +686,12 @@ export default function StoreScreen() {
                       (isCompactViewport ? SPACING.md : SPACING.lg) * viewportScale
                     ),
                     backgroundColor: applyButtonBackground,
-                    opacity: isRedeeming ? 0.65 : pressed ? 0.92 : 1,
-                    transform: pressed && !isRedeeming ? [{ scale: 0.98 }] : [{ scale: 1 }],
+                    opacity: isApplyingCoupon ? 0.65 : pressed ? 0.92 : 1,
+                    transform: pressed && !isApplyingCoupon ? [{ scale: 0.98 }] : [{ scale: 1 }],
                   },
                 ]}
               >
-                {isRedeeming ? (
+                {isApplyingCoupon ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
                   <Text
@@ -680,8 +708,8 @@ export default function StoreScreen() {
                 )}
               </Pressable>
             </View>
-            {promoError ? <Text style={styles.promoErrorText}>{promoError}</Text> : null}
-            {promoSuccess ? <Text style={styles.promoSuccessText}>{promoSuccess}</Text> : null}
+            {couponError ? <Text style={styles.promoErrorText}>{couponError}</Text> : null}
+            {couponSuccess ? <Text style={styles.promoSuccessText}>{couponSuccess}</Text> : null}
           </View>
           ) : null}
           {IS_NATIVE_PLATFORM ? (
@@ -965,15 +993,6 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.uiBold,
     fontSize: 13,
     letterSpacing: 0.8,
-  },
-  redeemTitle: {
-    fontFamily: FONTS.uiBold,
-    fontSize: 14,
-    letterSpacing: 1.2,
-    marginBottom: SPACING.sm,
-  },
-  redeemTitleCompact: {
-    marginBottom: SPACING.xs,
   },
   redeemCard: {
     flexDirection: 'row',

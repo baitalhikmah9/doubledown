@@ -1,4 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   applyPromoCodeUpdate,
   derivePromoModeDefaults,
@@ -254,6 +256,7 @@ describe('adminValidation', () => {
       expect(
         validateCreatePromoCodeArgs({
           normalizedCode: 'bundle20off',
+          rawCode: 'BUNDLE20OFF',
           rewardAmount: 0,
           usageCap: 0,
           rewardType: 'discount',
@@ -267,6 +270,7 @@ describe('adminValidation', () => {
       expect(
         validateCreatePromoCodeArgs({
           normalizedCode: 'bundle20off',
+          rawCode: 'BUNDLE20OFF',
           rewardAmount: 0,
           usageCap: 0,
           rewardType: 'discount',
@@ -276,10 +280,25 @@ describe('adminValidation', () => {
       ).toEqual({ ok: false, reason: 'product_key_invalid' });
     });
 
+    it('rejects a discount code with invalid characters', () => {
+      expect(
+        validateCreatePromoCodeArgs({
+          normalizedCode: 'bundle 20 off',
+          rawCode: 'BUNDLE 20 OFF',
+          rewardAmount: 0,
+          usageCap: 0,
+          rewardType: 'discount',
+          discountPercent: 20,
+          productKey: 'bundle_50',
+        })
+      ).toEqual({ ok: false, reason: 'discount_code_format_invalid' });
+    });
+
     it('requires commission when an affiliate email is set', () => {
       expect(
         validateCreatePromoCodeArgs({
           normalizedCode: 'mikhail10',
+          rawCode: 'MIKHAIL10',
           rewardAmount: 0,
           usageCap: 0,
           rewardType: 'discount',
@@ -294,6 +313,7 @@ describe('adminValidation', () => {
       expect(
         validateCreatePromoCodeArgs({
           normalizedCode: 'mikhail10',
+          rawCode: 'MIKHAIL10',
           rewardAmount: 0,
           usageCap: 0,
           rewardType: 'discount',
@@ -582,5 +602,199 @@ describe('wallet transaction source and type constants', () => {
         'account_deletion_forfeit',
       ])
     );
+  });
+});
+
+describe('discount lifecycle reconciliation (cron path)', () => {
+  const adminSource = fs.readFileSync(
+    path.join(__dirname, '../../convex/admin.ts'),
+    'utf8'
+  );
+
+  it('listDiscountsNeedingReconciliation does not require admin auth (cron-called)', () => {
+    // Extract the function body for listDiscountsNeedingReconciliation.
+    const match = adminSource.match(
+      /export const listDiscountsNeedingReconciliation = internalQuery\(\{[\s\S]*?\}\);/
+    );
+    expect(match).toBeTruthy();
+    const body = match![0];
+    // Must NOT call requireAdmin or requireUser: the cron has no user identity.
+    expect(body).not.toMatch(/requireAdmin/);
+    expect(body).not.toMatch(/requireUser/);
+  });
+
+  it('getPromoCodeForReconciliation does not require admin auth (cron-called)', () => {
+    const match = adminSource.match(
+      /export const getPromoCodeForReconciliation = internalQuery\(\{[\s\S]*?\}\);/
+    );
+    expect(match).toBeTruthy();
+    const body = match![0];
+    expect(body).not.toMatch(/requireAdmin/);
+    expect(body).not.toMatch(/requireUser/);
+  });
+
+  it('markDiscountDisablePending does not require admin auth (cron-called)', () => {
+    const match = adminSource.match(
+      /export const markDiscountDisablePending = internalMutation\(\{[\s\S]*?\}\);/
+    );
+    expect(match).toBeTruthy();
+    const body = match![0];
+    expect(body).not.toMatch(/requireAdmin/);
+    expect(body).not.toMatch(/requireUser/);
+  });
+
+  it('markDiscountDisabled does not require admin auth (cron-called)', () => {
+    const match = adminSource.match(
+      /export const markDiscountDisabled = internalMutation\(\{[\s\S]*?\}\);/
+    );
+    expect(match).toBeTruthy();
+    const body = match![0];
+    expect(body).not.toMatch(/requireAdmin/);
+    expect(body).not.toMatch(/requireUser/);
+  });
+
+  it('reconcileDiscountLifecycle is an internalAction (no client auth needed)', () => {
+    expect(adminSource).toMatch(
+      /export const reconcileDiscountLifecycle = internalAction\(/
+    );
+  });
+
+  it('disableExpiredDiscount is an internalAction (scheduled, no client auth)', () => {
+    expect(adminSource).toMatch(
+      /export const disableExpiredDiscount = internalAction\(/
+    );
+  });
+
+  it('crons.ts uses the correct plural filename with default export', () => {
+    const cronsPath = path.join(__dirname, '../../convex/crons.ts');
+    expect(fs.existsSync(cronsPath)).toBe(true);
+    const cronsSource = fs.readFileSync(cronsPath, 'utf8');
+    expect(cronsSource).toMatch(/export default crons/);
+    expect(cronsSource).toMatch(/internal\.admin\.reconcileDiscountLifecycle/);
+    // The old singular cron.ts must not exist.
+    expect(fs.existsSync(path.join(__dirname, '../../convex/cron.ts'))).toBe(false);
+  });
+});
+
+describe('provisionDiscountPromo compensating cleanup', () => {
+  const adminSource = fs.readFileSync(
+    path.join(__dirname, '../../convex/admin.ts'),
+    'utf8'
+  );
+
+  // Extract the provisionDiscountPromo action body. The action contains nested
+  // `});` closures, so we extract from the export to the next top-level export.
+  const actionStart = adminSource.indexOf('export const provisionDiscountPromo = action(');
+  const nextExport = adminSource.indexOf('\nexport const', actionStart + 1);
+  const actionBody = adminSource.slice(actionStart, nextExport);
+
+  it('tracks idPersistedThisRun for cleanup decisions (no codeAttachedThisRun flag)', () => {
+    expect(actionBody).toMatch(/let idPersistedThisRun = false/);
+    // The codeAttachedThisRun flag was removed: cleanup is now unconditional
+    // for non-orphan failures because the code may be attached remotely even
+    // when ensureDiscountCode throws.
+    expect(actionBody).not.toMatch(/codeAttachedThisRun/);
+  });
+
+  it('enables the discount on retry before ensureDiscountCode', () => {
+    // The retry path (persisted discountId) must call enableDiscount before
+    // ensureDiscountCode, so a prior compensating disable is reversed.
+    const enableIdx = actionBody.indexOf('await enableDiscount({ discountId })');
+    const ensureIdx = actionBody.indexOf('await ensureDiscountCode({');
+    expect(enableIdx).toBeGreaterThan(-1);
+    expect(ensureIdx).toBeGreaterThan(-1);
+    expect(enableIdx).toBeLessThan(ensureIdx);
+  });
+
+  it('recovers automatically when enableDiscount returns 404 (stale provider id)', () => {
+    // On 404, the action must clear the stale id and create a fresh discount
+    // in the same attempt.
+    expect(actionBody).toMatch(/isDiscountNotFoundError\(enableErr\)/);
+    expect(actionBody).toMatch(/internal\.admin\.clearStaleDiscountId/);
+    // After clearing, a new createPercentageDiscount + persistDiscountId must
+    // follow within the same catch-recovery branch.
+    const notFoundIdx = actionBody.indexOf('isDiscountNotFoundError(enableErr)');
+    const recoveryCreateIdx = actionBody.indexOf('createPercentageDiscount({', notFoundIdx);
+    const recoveryPersistIdx = actionBody.indexOf('internal.admin.persistDiscountId', notFoundIdx);
+    expect(recoveryCreateIdx).toBeGreaterThan(-1);
+    expect(recoveryPersistIdx).toBeGreaterThan(recoveryCreateIdx);
+  });
+
+  it('Case A: deletes the orphan provider discount when persistDiscountId fails', () => {
+    // When discountCreatedThisRun && !idPersistedThisRun, the code must call
+    // deleteDiscount (not disableDiscount) so the deterministic identifier
+    // does not block retry.
+    expect(actionBody).toMatch(
+      /discountCreatedThisRun && !idPersistedThisRun && discountId/
+    );
+    expect(actionBody).toMatch(/await deleteDiscount\(\{ discountId \}\)/);
+  });
+
+  it('Case B: always deletes provider code + disables discount for any non-orphan failure', () => {
+    // For any failure with a known discountId that is NOT Case A, cleanup must
+    // always delete the provider code and disable the discount, regardless of
+    // whether ensureDiscountCode reported success. The code may be attached
+    // remotely despite a thrown response.
+    expect(actionBody).toMatch(/\} else if \(discountId\) \{/);
+    expect(actionBody).toMatch(/await deleteDiscountCode\(/);
+    expect(actionBody).toMatch(/await disableDiscount\(\{ discountId \}\)/);
+    // Must NOT gate on codeAttachedThisRun.
+    expect(actionBody).not.toMatch(/discountId && codeAttachedThisRun/);
+  });
+
+  it('surfaces a manual cleanup error when cleanup fails (does not claim safety)', () => {
+    // The error message must include "Manual provider cleanup required" when
+    // cleanupError is set, so the admin knows automatic retry is not safe.
+    expect(actionBody).toMatch(/Manual provider cleanup required/);
+    // The old "acceptable" comment must be gone.
+    expect(actionBody).not.toMatch(/acceptable for a short window/);
+    expect(actionBody).not.toMatch(/acceptable/);
+  });
+
+  it('does not contain comments claiming an active provider code on finalize failure is acceptable', () => {
+    expect(adminSource).not.toMatch(/code is usable[\s\S]*acceptable/);
+    expect(adminSource).not.toMatch(/acceptable for a short window/);
+  });
+
+  it('defines a clearStaleDiscountId internal mutation', () => {
+    expect(adminSource).toMatch(
+      /export const clearStaleDiscountId = internalMutation\(/
+    );
+  });
+});
+
+describe('updatePromoCode discount reactivation guard', () => {
+  const adminSource = fs.readFileSync(
+    path.join(__dirname, '../../convex/admin.ts'),
+    'utf8'
+  );
+
+  // Extract the updatePromoCode mutation body to the next top-level export.
+  const updateStart = adminSource.indexOf('export const updatePromoCode = mutation(');
+  const updateNext = adminSource.indexOf('\nexport const', updateStart + 1);
+  const updateBody = adminSource.slice(updateStart, updateNext);
+
+  it('rejects active:true for discount codes unless already provisioned', () => {
+    expect(updateBody).toMatch(/discount_reactivation_requires_provisioning/);
+    expect(updateBody).toMatch(/promo\.rewardType === 'discount'/);
+    expect(updateBody).toMatch(/args\.active === true/);
+    expect(updateBody).toMatch(/revenueCatProvisioningStatus !== 'provisioned'/);
+  });
+});
+
+describe('promo detail UI reactivation guard', () => {
+  const uiSource = fs.readFileSync(
+    path.join(__dirname, '../../app/(admin)/promo-codes/[promoCodeId].tsx'),
+    'utf8'
+  );
+
+  it('hides Reactivate for discount codes', () => {
+    // The Reactivate button must be gated on !isDiscount.
+    expect(uiSource).toMatch(/!isActive && !isDiscount &&/);
+  });
+
+  it('shows Retry Provisioning for failed/pending discount codes', () => {
+    expect(uiSource).toMatch(/isFailedOrPendingDiscount/);
+    expect(uiSource).toMatch(/Retry Provisioning/);
   });
 });

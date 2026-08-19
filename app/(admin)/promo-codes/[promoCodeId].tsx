@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { AdminScreenHeader } from '@/components/admin/AdminScreenHeader';
 import { AdminCard, AdminCardTitle } from '@/components/admin/AdminCard';
@@ -22,6 +22,8 @@ export default function PromoCodeDetailScreen() {
   const { promoCodeId } = useLocalSearchParams<{ promoCodeId: string }>();
   const promo = useQuery(api.admin.getPromoCode, { promoCodeId: promoCodeId as any });
   const deactivate = useMutation(api.admin.deactivatePromoCode);
+  const deactivateDiscount = useAction(api.admin.deactivateDiscountPromo);
+  const provisionDiscount = useAction(api.admin.provisionDiscountPromo);
   const updatePromo = useMutation(api.admin.updatePromoCode);
 
   const [showDisable, setShowDisable] = useState(false);
@@ -48,11 +50,50 @@ export default function PromoCodeDetailScreen() {
     }
     try {
       setSubmitting(true);
-      await deactivate({ promoCodeId: promoCodeId as any, reason: reason.trim() });
+      // Discount codes use the deactivateDiscountPromo action, which sets
+      // local active=false (disable_pending) immediately, then attempts the
+      // provider disable. If the provider disable fails, the promo stays
+      // disable_pending and the hourly reconciliation retries.
+      const isDiscount = promo?.promoCode.rewardType === 'discount';
+      if (isDiscount) {
+        const result = await deactivateDiscount({
+          promoCodeId: promoCodeId as any,
+          reason: reason.trim(),
+        });
+        if (!result.ok) {
+          setError(
+            `Local code deactivated (disable_pending). Provider disable failed: ${result.error}. ` +
+              'The hourly reconciliation will retry the provider disable automatically.'
+          );
+          setShowDisable(false);
+          setReason('');
+          return;
+        }
+      } else {
+        await deactivate({ promoCodeId: promoCodeId as any, reason: reason.trim() });
+      }
       setShowDisable(false);
       setReason('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to deactivate');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRetryProvisioning = async () => {
+    setError('');
+    try {
+      setSubmitting(true);
+      const result = await provisionDiscount({ promoCodeId: promoCodeId as any });
+      if (!result.ok) {
+        setError(
+          `Provisioning retry failed: ${result.error}. The code stays inactive. ` +
+            'Fix the configuration and retry again.'
+        );
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to retry provisioning');
     } finally {
       setSubmitting(false);
     }
@@ -164,6 +205,16 @@ export default function PromoCodeDetailScreen() {
 
   const { promoCode, redemptions, restrictedUser } = promo;
   const isActive = promoCode.active !== false;
+  const provisioningStatus = (promoCode as any).revenueCatProvisioningStatus as
+    | 'pending'
+    | 'provisioned'
+    | 'failed'
+    | 'disable_pending'
+    | 'disabled'
+    | undefined;
+  const isDiscount = promoCode.rewardType === 'discount';
+  const isFailedOrPendingDiscount =
+    isDiscount && (provisioningStatus === 'failed' || provisioningStatus === 'pending');
 
   const redemptionColumns: AdminTableColumn<RedemptionRow>[] = [
     {
@@ -200,7 +251,15 @@ export default function PromoCodeDetailScreen() {
         fallbackHref="/admin/promo-codes"
         headerRight={
           <View style={styles.headerRightActions}>
-            {!isActive && (
+            {isFailedOrPendingDiscount && (
+              <AdminButton
+                label={submitting ? 'Retrying...' : 'Retry Provisioning'}
+                variant="secondary"
+                onPress={handleRetryProvisioning}
+                disabled={submitting}
+              />
+            )}
+            {!isActive && !isDiscount && (
               <AdminButton
                 label={submitting ? 'Reactivating...' : 'Reactivate'}
                 variant="secondary"
@@ -246,6 +305,27 @@ export default function PromoCodeDetailScreen() {
             <Text style={styles.detailLabel}>Status</Text>
             <AdminStatusBadge label={isActive ? 'Active' : 'Inactive'} status={isActive ? 'active' : 'inactive'} />
           </View>
+          {promoCode.rewardType === 'discount' && provisioningStatus ? (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>RC Provisioning</Text>
+              <AdminStatusBadge
+                label={provisioningStatus}
+                status={
+                  provisioningStatus === 'provisioned'
+                    ? 'active'
+                    : provisioningStatus === 'failed' || provisioningStatus === 'disable_pending'
+                      ? 'inactive'
+                      : 'inactive'
+                }
+              />
+            </View>
+          ) : null}
+          {promoCode.rewardType === 'discount' && (promoCode as any).provisioningError ? (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Provisioning Error</Text>
+              <Text style={styles.detailValue}>{(promoCode as any).provisioningError}</Text>
+            </View>
+          ) : null}
           {restrictedUser && (
             <DetailItem
               label="Restricted Account"

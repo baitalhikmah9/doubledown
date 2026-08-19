@@ -81,14 +81,14 @@ describe('affiliateStats', () => {
 const mockedRequireUser = requireUser as jest.MockedFunction<typeof requireUser>;
 
 function mockAffiliateCtx(results: Record<string, unknown[]>) {
-  const calls: Array<{ table: string; index: string; eqs: Array<[string, unknown]> }> = [];
+  const calls: { table: string; index: string; eqs: [string, unknown][] }[] = [];
   const db = {
     query: jest.fn((table: string) => ({
       withIndex: (
         index: string,
         rangeFn?: (q: { eq: (field: string, value: unknown) => unknown }) => void
       ) => {
-        const eqs: Array<[string, unknown]> = [];
+        const eqs: [string, unknown][] = [];
         const q = {
           eq(field: string, value: unknown) {
             eqs.push([field, value]);
@@ -165,7 +165,7 @@ describe('affiliate.getMyDashboard', () => {
         discountPercent: 10,
         productKey: 'bundle_50',
         commissionPercent: 10,
-        checkoutDiscountBlocked: true,
+        activeTo: null,
         earningsByCurrency: [
           {
             currencyCode: 'GBP',
@@ -176,6 +176,8 @@ describe('affiliate.getMyDashboard', () => {
             averageCommissionMicros: 800_000,
           },
         ],
+        totalSaleMicros: 8_000_000,
+        totalCommissionMicros: 800_000,
       },
     ]);
   });

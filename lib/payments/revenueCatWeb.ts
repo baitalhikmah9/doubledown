@@ -75,10 +75,24 @@ interface WebPurchaseResult {
 
 interface WebPurchasesInstance {
   getOfferings: (params?: unknown) => Promise<WebOfferings>;
-  purchase: (params: { rcPackage: WebPackage }) => Promise<WebPurchaseResult>;
+  purchase: (params: WebPurchaseParams) => Promise<WebPurchaseResult>;
   purchasePackage: (rcPackage: WebPackage) => Promise<WebPurchaseResult>;
   getCustomerInfo: () => Promise<unknown>;
   changeUser: (newAppUserId: string) => Promise<unknown>;
+}
+
+/**
+ * Parameters passed to the Web Billing SDK `purchase()` method. The SDK
+ * supports `discountCode` and `showDiscountCodeField` (experimental) so a
+ * validated code can be applied at checkout. The admin provisioning flow
+ * creates the RevenueCat discount and code automatically, so no manual
+ * dashboard or Stripe coupon setup is required for the charged price to
+ * reflect the discount.
+ */
+interface WebPurchaseParams {
+  rcPackage: WebPackage;
+  discountCode?: string;
+  showDiscountCodeField?: boolean;
 }
 
 let sdkPromise: Promise<WebPurchasesModule> | null = null;
@@ -260,9 +274,19 @@ export async function getWebStoreProducts(
  * via RC Billing). Returns the real store transaction id from the SDK; never
  * synthesizes a fake id. If the SDK omits the transaction id, the caller must
  * treat the purchase as pending and rely on the webhook for authoritative grant.
+ *
+ * When `discountCode` is supplied, it is forwarded to the RC Web Billing
+ * checkout as the initial applied code. The percentage discount is applied by
+ * RevenueCat because the admin flow provisions the discount + code in
+ * RevenueCat automatically (no manual dashboard or Stripe coupon setup). The
+ * server-side pending claim (created by promo.applyPromoCode) is matched
+ * against the webhook event, which is the authoritative source: attribution
+ * and commission are only recorded when the webhook confirms the configured
+ * discount was applied to the purchase.
  */
 export async function purchaseWebProduct(
-  product: StoreProductInfo
+  product: StoreProductInfo,
+  options?: { discountCode?: string }
 ): Promise<PurchaseResult> {
   const active = instance;
   if (!active) {
@@ -270,7 +294,15 @@ export async function purchaseWebProduct(
   }
 
   const pkg = product.raw as WebPackage;
-  const result = await active.purchase({ rcPackage: pkg });
+  const discountCode = options?.discountCode?.trim() || undefined;
+  // showDiscountCodeField is false so the user cannot replace the server-
+  // validated code with a different one in the checkout. The code is fixed to
+  // the one validated by promo.applyPromoCode.
+  const result = await active.purchase({
+    rcPackage: pkg,
+    discountCode,
+    showDiscountCodeField: false,
+  });
 
   const transactionId =
     typeof result.storeTransaction?.storeTransactionId === 'string'

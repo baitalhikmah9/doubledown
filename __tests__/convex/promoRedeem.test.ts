@@ -14,7 +14,7 @@ jest.mock('@/convex/lib/purchaserAccounts', () => ({
 }));
 
 jest.mock('@/convex/lib/ensureWallet', () => ({
-  ensureWalletDoc: jest.fn(),
+  ensureWalletDoc: jest.fn(async () => ({ _id: 'wallet_1', balance: 0 })),
 }));
 
 function mockRedeemCtx(promo: Record<string, unknown> | null) {
@@ -58,5 +58,29 @@ describe('promo.redeemCode discount block', () => {
     expect(ctx.db.insert).not.toHaveBeenCalled();
     expect(ctx.db.patch).not.toHaveBeenCalled();
     expect(ensureWalletDoc).not.toHaveBeenCalled();
+  });
+
+  it('still grants tokens for a valid token reward code', async () => {
+    (requireUser as jest.MockedFunction<typeof requireUser>).mockResolvedValueOnce({
+      _id: 'users_1',
+      email: 'fan@example.com',
+    } as never);
+
+    const ctx = mockRedeemCtx({
+      _id: 'promo_tokens',
+      code: 'free10',
+      rewardType: 'tokens',
+      rewardAmount: 10,
+      usageCap: 100,
+      usedCount: 0,
+      perUserLimit: 1,
+      active: true,
+    });
+
+    const result = await (redeemCode as any)._handler(ctx as any, {
+      code: 'FREE10',
+      clientRequestId: 'req_1',
+    });
+    expect(result).toMatchObject({ success: true, tokensGranted: 10 });
   });
 });

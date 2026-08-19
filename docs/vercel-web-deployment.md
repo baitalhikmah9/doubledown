@@ -43,6 +43,8 @@ Do not add these as Vercel static web client variables unless the app starts rea
 | `CONVEX_DEPLOYMENT` | Convex CLI/deployment metadata |
 | `EXPO_PUBLIC_CONVEX_SITE_URL` | Not currently read by the app |
 | `REVENUECAT_WEBHOOK_AUTH_HEADER` | Secret backend/Convex webhook configuration |
+| `REVENUECAT_V2_SECRET_API_KEY` | Convex dashboard env. RevenueCat v2 secret API key with `project_configuration:discounts:read_write` permission. Required for admin discount-code provisioning. |
+| `REVENUECAT_PROJECT_ID` | Convex dashboard env. RevenueCat project id. Required together with the v2 secret key for discount provisioning and expiry sync. |
 
 ## Clerk Checklist
 

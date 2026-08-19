@@ -251,9 +251,41 @@ export default defineSchema({
     productKey: v.optional(v.string()),
     affiliateEmail: v.optional(v.string()),
     commissionPercent: v.optional(v.number()),
+    /**
+     * RevenueCat API v2 discount provisioning state for discount reward types.
+     *
+     * - `pending`: local row inserted, provider provisioning in flight.
+     * - `provisioned`: provider discount + code created, code is usable.
+     * - `failed`: provider provisioning failed; the local code must NOT be
+     *   presented as usable. Admin can retry or delete the row.
+     * - `disable_pending`: local active=false (validation rejects it) but the
+     *   provider discount could not be disabled yet (e.g. env not configured
+     *   or transient API failure). The hourly reconciliation retries the
+     *   provider disable; only on success does the status become `disabled`.
+     * - `disabled`: provider discount disabled (deactivation or expiry).
+     *
+     * Token-only codes never set this field.
+     */
+    revenueCatProvisioningStatus: v.optional(
+      v.union(
+        v.literal('pending'),
+        v.literal('provisioned'),
+        v.literal('failed'),
+        v.literal('disable_pending'),
+        v.literal('disabled')
+      )
+    ),
+    /** RevenueCat API v2 discount id returned by POST /discounts. */
+    revenueCatDiscountId: v.optional(v.string()),
+    /** RevenueCat API v2 discount identifier (stable, used for webhook matching). */
+    revenueCatDiscountIdentifier: v.optional(v.string()),
+    /** Canonical uppercase code sent to RevenueCat (local code is lowercase). */
+    revenueCatProviderCode: v.optional(v.string()),
+    provisioningError: v.optional(v.string()),
   })
     .index('by_code', ['code'])
-    .index('by_affiliate_email', ['affiliateEmail']),
+    .index('by_affiliate_email', ['affiliateEmail'])
+    .index('by_rc_provisioning', ['revenueCatProvisioningStatus']),
 
   promo_redemptions: defineTable({
     promoCodeId: v.id('promo_codes'),
@@ -264,6 +296,30 @@ export default defineSchema({
     .index('by_user', ['userId'])
     .index('by_promo_code', ['promoCodeId'])
     .index('by_user_promo', ['userId', 'promoCodeId']),
+
+  /**
+   * Pending discount-code claims for web checkout attribution.
+   *
+   * A claim is created when a signed-in web user validates a discount promo
+   * for a specific bundle. The webhook/client-sync path consumes the claim
+   * once the matching purchase is granted, attributing the sale to the promo
+   * and computing commission from the actual post-discount charged amount.
+   * Claims expire (default 1h) so a stale code cannot be attributed later.
+   */
+  promo_discount_claims: defineTable({
+    promoCodeId: v.id('promo_codes'),
+    userId: v.id('users'),
+    purchaserAccountId: v.string(),
+    productKey: v.string(),
+    claimedAt: v.number(),
+    expiresAt: v.number(),
+    status: v.string(),
+    consumedPurchaseId: v.optional(v.id('store_purchases')),
+    consumedAt: v.optional(v.number()),
+  })
+    .index('by_user_promo', ['userId', 'promoCodeId'])
+    .index('by_purchaser_product_status', ['purchaserAccountId', 'productKey', 'status'])
+    .index('by_promo_status', ['promoCodeId', 'status']),
 
   feature_flags: defineTable({
     key: v.string(),

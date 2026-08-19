@@ -24,6 +24,18 @@ export const getMyDashboard = query({
           .collect();
         const attributed = purchases.filter((purchase) => purchase.status === 'granted');
         const commissionPercent = promo.commissionPercent ?? 0;
+        const earningsByCurrency = aggregateAffiliateEarnings(attributed, commissionPercent);
+
+        // Total sales/revenue across all currencies (sum of totalSaleMicros).
+        // Per-currency totals remain in earningsByCurrency for accurate display.
+        const totalSaleMicros = earningsByCurrency.reduce(
+          (sum, row) => sum + row.totalSaleMicros,
+          0
+        );
+        const totalCommissionMicros = earningsByCurrency.reduce(
+          (sum, row) => sum + row.totalCommissionMicros,
+          0
+        );
 
         return {
           code: promo.code,
@@ -32,8 +44,10 @@ export const getMyDashboard = query({
           discountPercent: promo.discountPercent ?? null,
           productKey: promo.productKey ?? null,
           commissionPercent,
-          checkoutDiscountBlocked: promo.rewardType === 'discount',
-          earningsByCurrency: aggregateAffiliateEarnings(attributed, commissionPercent),
+          activeTo: promo.activeTo ?? null,
+          earningsByCurrency,
+          totalSaleMicros,
+          totalCommissionMicros,
         };
       })
     );

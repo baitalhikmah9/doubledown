@@ -1,15 +1,31 @@
-import { mutation, query } from './_generated/server';
+import { mutation, query, internalMutation, internalQuery, internalAction, action } from './_generated/server';
 import { v } from 'convex/values';
+import { internal, api } from './_generated/api';
 import { requireAdmin } from './lib/auth';
 import { ensureWalletDoc } from './lib/ensureWallet';
 import { isAffiliateEmail, normalizeAffiliateEmail } from './lib/affiliateStats';
-import { normalizePromoCode } from './lib/promoRules';
+import {
+  normalizePromoCode,
+  toProviderDiscountCode,
+} from './lib/promoRules';
 import { writeAudit } from './lib/audit';
 import { scanIndexPage, SCAN_BATCH } from './lib/boundedPagination';
 import {
   WALLET_TRANSACTION_SOURCES,
   WALLET_TRANSACTION_TYPES,
 } from './lib/walletTransactionTypes';
+import {
+  createPercentageDiscount,
+  ensureDiscountCode,
+  enableDiscount,
+  disableDiscount,
+  deleteDiscount,
+  deleteDiscountCode,
+  buildRevenueCatDiscountIdentifier,
+  isDiscountNotFoundError,
+  RevenueCatV2Error,
+} from './lib/revenueCatApiV2';
+import { getDefaultWebProductIdentifierForProductKey } from './lib/paymentCatalog';
 import type { Doc, Id } from './_generated/dataModel';
 import {
   applyPromoCodeUpdate,
@@ -255,6 +271,7 @@ export const createPromoCode = mutation({
 
     const validation = validateCreatePromoCodeArgs({
       normalizedCode: normalized,
+      rawCode: args.code,
       rewardAmount: args.rewardAmount,
       usageCap: args.usageCap,
       mode: args.mode,
@@ -298,6 +315,11 @@ export const createPromoCode = mutation({
     }
 
     const now = Date.now();
+    // Discount codes are inserted inactive + provisioning_pending until the
+    // RevenueCat provider discount + code are created by the
+    // provisionDiscountPromo action. Token codes are active immediately.
+    const isDiscount = rewardType === 'discount';
+    const providerCode = isDiscount ? toProviderDiscountCode(args.code!) : undefined;
     const promoCodeId = await ctx.db.insert('promo_codes', {
       code: normalized,
       rewardType,
@@ -308,7 +330,7 @@ export const createPromoCode = mutation({
       redemptionScope: modeDefaults.redemptionScope,
       restrictedToUserId: args.restrictedToUserId,
       restrictedToPurchaserAccountId: args.restrictedToPurchaserAccountId,
-      active: true,
+      active: !isDiscount,
       usedCount: 0,
       activeFrom: args.activeFrom,
       activeTo: args.activeTo,
@@ -316,10 +338,12 @@ export const createPromoCode = mutation({
       createdAt: now,
       updatedAt: now,
       createdByAdminUserId: adminUser._id,
-      discountPercent: rewardType === 'discount' ? args.discountPercent : undefined,
-      productKey: rewardType === 'discount' ? args.productKey : undefined,
+      discountPercent: isDiscount ? args.discountPercent : undefined,
+      productKey: isDiscount ? args.productKey : undefined,
       affiliateEmail: affiliateEmail && isAffiliateEmail(affiliateEmail) ? affiliateEmail : undefined,
       commissionPercent: affiliateEmail ? args.commissionPercent : undefined,
+      revenueCatProvisioningStatus: isDiscount ? 'pending' : undefined,
+      revenueCatProviderCode: providerCode,
     });
 
     await writeAudit(ctx, {
@@ -338,13 +362,15 @@ export const createPromoCode = mutation({
         redemptionScope: modeDefaults.redemptionScope,
         restrictedToUserId: args.restrictedToUserId,
         restrictedToPurchaserAccountId: args.restrictedToPurchaserAccountId,
-        active: true,
+        active: !isDiscount,
         activeFrom: args.activeFrom,
         activeTo: args.activeTo,
-        discountPercent: rewardType === 'discount' ? args.discountPercent : undefined,
-        productKey: rewardType === 'discount' ? args.productKey : undefined,
+        discountPercent: isDiscount ? args.discountPercent : undefined,
+        productKey: isDiscount ? args.productKey : undefined,
         affiliateEmail: affiliateEmail && isAffiliateEmail(affiliateEmail) ? affiliateEmail : undefined,
         commissionPercent: affiliateEmail ? args.commissionPercent : undefined,
+        revenueCatProvisioningStatus: isDiscount ? 'pending' : undefined,
+        revenueCatProviderCode: providerCode,
       },
     });
 
@@ -394,6 +420,23 @@ export const updatePromoCode = mutation({
       throw new Error(result.reason);
     }
 
+    // Discount codes cannot be reactivated via the generic local update path.
+    // Reactivation would set local active=true without confirming the provider
+    // discount is enabled, leaving a usable local code pointing at a disabled
+    // provider discount (or vice versa). Discount codes must use the
+    // provisionDiscountPromo action (Retry Provisioning) which reconciles
+    // provider state. A disabled discount stays disabled unless a
+    // provider-aware enable action re-provisions it.
+    if (
+      promo.rewardType === 'discount' &&
+      args.active === true &&
+      promo.revenueCatProvisioningStatus !== 'provisioned'
+    ) {
+      throw new Error(
+        'discount_reactivation_requires_provisioning'
+      );
+    }
+
     const patch: Record<string, unknown> = {
       ...result.patch,
       updatedAt: Date.now(),
@@ -440,11 +483,21 @@ export const deactivatePromoCode = mutation({
     }
 
     const metadata = promo.metadata ?? {};
-    await ctx.db.patch(args.promoCodeId, {
+    const patch: Record<string, unknown> = {
       active: false,
       updatedAt: Date.now(),
       metadata: { ...metadata, deactivationReason: args.reason },
-    });
+    };
+    // For discount codes, this public mutation is only reached for token codes
+    // in the normal flow (the UI calls deactivateDiscountPromo action for
+    // discount codes, which uses markDiscountDisablePending + markDiscountDisabled).
+    // If a discount code somehow reaches this mutation directly, set
+    // disable_pending (NOT disabled) so the reconciliation retries the provider
+    // disable. Never claim `disabled` without a confirmed provider disable.
+    if (promo.rewardType === 'discount') {
+      patch.revenueCatProvisioningStatus = 'disable_pending';
+    }
+    await ctx.db.patch(args.promoCodeId, patch);
     await writeAudit(ctx, {
       actorUserId: adminUser._id,
       actorEmail: adminUser.email,
@@ -1107,5 +1160,674 @@ export const getDashboardStats = query({
       monthlyRevenue,
       recentTransactions,
     };
+  },
+});
+
+// ───────────────────────────────────────────────
+// RevenueCat discount provisioning (actions + internal mutations)
+//
+// Two-phase state machine for discount promos:
+//
+//   pending ──create discount──> pending (discount id persisted)
+//           ──attach code──> pending (code attached)
+//           ──finalize──> provisioned (active=true)
+//           ──schedule expiry──> (scheduler.runAt(activeTo))
+//
+//   provisioned ──deactivate──> disable_pending (active=false, provider not yet disabled)
+//               ──reconcile disable──> disabled
+//               ──expiry (activeTo passed)──> disable_pending ──reconcile──> disabled
+//
+//   failed: provisioning failed at any step; admin can retry. The persisted
+//   revenueCatDiscountId lets a retry reuse the provider discount instead of
+//   colliding on the deterministic identifier.
+//
+// Key invariants:
+//  - The provider discount id is persisted immediately after create, while the
+//    local promo stays inactive/pending. A retry reuses it.
+//  - Code attachment is idempotent via ensureDiscountCode (409 -> verify).
+//  - If local finalization fails after the provider code exists, we
+//    best-effort delete the code + disable the discount so no active provider
+//    code is left silently. The local row stays pending/failed for retry.
+//  - Deactivation sets disable_pending (not disabled) until the provider
+//    disable succeeds (or 404). The hourly reconciliation retries.
+//  - Validation rejects anything other than `provisioned`.
+// ───────────────────────────────────────────────
+
+/**
+ * Internal mutation: persist the provider discount id + identifier immediately
+ * after the discount is created, while the local promo remains inactive and
+ * pending. This is the critical durability step: if code attachment or
+ * finalization fails afterwards, a retry reuses this id instead of colliding
+ * on the deterministic identifier.
+ */
+export const persistDiscountId = internalMutation({
+  args: {
+    promoCodeId: v.id('promo_codes'),
+    revenueCatDiscountId: v.string(),
+    revenueCatDiscountIdentifier: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const promo = await ctx.db.get(args.promoCodeId);
+    if (!promo) {
+      throw new Error('promo_code_not_found');
+    }
+    await ctx.db.patch(args.promoCodeId, {
+      revenueCatDiscountId: args.revenueCatDiscountId,
+      revenueCatDiscountIdentifier: args.revenueCatDiscountIdentifier,
+      updatedAt: Date.now(),
+    });
+    return { promoCodeId: args.promoCodeId };
+  },
+});
+
+/**
+ * Internal mutation: clear a stale provider discount id + identifier from the
+ * local promo. Used when a retry discovers the persisted provider discount no
+ * longer exists (enableDiscount returns 404), so the same provisioning attempt
+ * can create a fresh discount and persist the new id.
+ */
+export const clearStaleDiscountId = internalMutation({
+  args: {
+    promoCodeId: v.id('promo_codes'),
+  },
+  handler: async (ctx, args) => {
+    const promo = await ctx.db.get(args.promoCodeId);
+    if (!promo) {
+      throw new Error('promo_code_not_found');
+    }
+    await ctx.db.patch(args.promoCodeId, {
+      revenueCatDiscountId: undefined,
+      revenueCatDiscountIdentifier: undefined,
+      updatedAt: Date.now(),
+    });
+    return { promoCodeId: args.promoCodeId };
+  },
+});
+
+/**
+ * Internal mutation: finalize a discount promo after the provider discount +
+ * code are created and the id is persisted. Sets active=true,
+ * provisioning=provisioned, clears any provisioning error. If an activeTo is
+ * set, schedules an exact-time expiry via ctx.scheduler.runAt.
+ */
+export const finalizeDiscountProvisioning = internalMutation({
+  args: {
+    promoCodeId: v.id('promo_codes'),
+  },
+  handler: async (ctx, args) => {
+    const promo = await ctx.db.get(args.promoCodeId);
+    if (!promo) {
+      throw new Error('promo_code_not_found');
+    }
+    await ctx.db.patch(args.promoCodeId, {
+      active: true,
+      revenueCatProvisioningStatus: 'provisioned',
+      provisioningError: undefined,
+      updatedAt: Date.now(),
+    });
+    // Schedule exact-time expiry if activeTo is in the future. The hourly
+    // reconciliation is the fallback if this scheduled function is lost.
+    if (typeof promo.activeTo === 'number' && promo.activeTo > Date.now()) {
+      await ctx.scheduler.runAt(promo.activeTo, internal.admin.disableExpiredDiscount, {
+        promoCodeId: args.promoCodeId,
+      });
+    }
+    return { promoCodeId: args.promoCodeId };
+  },
+});
+
+/**
+ * Internal mutation: mark a discount promo as failed provisioning. Called by
+ * the provisioning action when a step fails. The promo stays inactive so it
+ * can never be presented as usable. Stores the error message for admin
+ * diagnostics. Preserves any persisted revenueCatDiscountId so a retry can
+ * reuse the provider discount.
+ */
+export const markDiscountProvisioningFailed = internalMutation({
+  args: {
+    promoCodeId: v.id('promo_codes'),
+    error: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const promo = await ctx.db.get(args.promoCodeId);
+    if (!promo) {
+      throw new Error('promo_code_not_found');
+    }
+    await ctx.db.patch(args.promoCodeId, {
+      active: false,
+      revenueCatProvisioningStatus: 'failed',
+      provisioningError: args.error,
+      updatedAt: Date.now(),
+    });
+    return { promoCodeId: args.promoCodeId };
+  },
+});
+
+/**
+ * Internal mutation: load a discount promo for provisioning. Returns the
+ * fields the action needs to call RevenueCat. Internal so it cannot be called
+ * from the client; admin auth is enforced by the action that calls it.
+ */
+export const getDiscountPromoForProvisioning = internalMutation({
+  args: {
+    promoCodeId: v.id('promo_codes'),
+  },
+  handler: async (ctx, args) => {
+    const promo = await ctx.db.get(args.promoCodeId);
+    if (!promo) {
+      throw new Error('promo_code_not_found');
+    }
+    if (promo.rewardType !== 'discount') {
+      throw new Error('not_a_discount_code');
+    }
+    return {
+      code: promo.code,
+      providerCode: promo.revenueCatProviderCode ?? promo.code.toUpperCase(),
+      discountPercent: promo.discountPercent ?? 0,
+      productKey: promo.productKey ?? null,
+      provisioningStatus: promo.revenueCatProvisioningStatus ?? null,
+      discountId: promo.revenueCatDiscountId ?? null,
+      activeTo: promo.activeTo ?? null,
+    };
+  },
+});
+
+/**
+ * Action: provision a RevenueCat discount + code for a discount promo.
+ *
+ * Real two-phase state machine:
+ *  1. createPromoCode inserted the promo as active=false, provisioning=pending.
+ *  2. Obtain a usable provider discount id:
+ *     - If no revenueCatDiscountId is persisted, create the provider discount
+ *       and persist its id immediately (persistDiscountId). The promo stays
+ *       pending.
+ *     - On retry with a persisted id, enable the discount first (a prior
+ *       compensating cleanup may have disabled it). If the provider discount
+ *       is gone (404), the persisted id is stale: clear it locally
+ *       (clearStaleDiscountId) and create a fresh discount in this same
+ *       attempt, then persist the new id.
+ *  3. Attach the code via ensureDiscountCode (idempotent: 409 -> verify the
+ *     code exists on this exact discount).
+ *  4. finalizeDiscountProvisioning sets active=true, provisioning=provisioned,
+ *     and schedules exact-time expiry if activeTo is set.
+ *  5. On any failure, compensating cleanup ensures no usable provider code
+ *     remains while the local promo is inactive:
+ *     - Case A: the discount was created this run but persistDiscountId failed.
+ *       Best-effort DELETE the orphan provider discount. If delete fails,
+ *       surface a manual cleanup error (safe automatic retry is impossible
+ *       because the deterministic identifier would collide).
+ *     - Case B (all other failures with a known discountId): best-effort delete
+ *       the provider code and disable the provider discount, regardless of
+ *       whether ensureDiscountCode reported success. The code may be attached
+ *       remotely despite a thrown response (5xx/network after remote success),
+ *       so cleanup is always attempted. Both operations are idempotent
+ *       (404-safe). The persisted id is preserved so a retry can re-enable and
+ *       re-attach. If cleanup fails, surface a manual cleanup error.
+ *     markDiscountProvisioningFailed keeps the local promo inactive and
+ *     records the error (including any cleanup failure).
+ *
+ * Admin-only (enforced via getPromoCode which calls requireAdmin). Safe to
+ * retry: a retry reuses the persisted discount id, re-enables it (or recovers
+ * automatically if the provider discount is gone), and idempotently re-attaches
+ * the code.
+ */
+export const provisionDiscountPromo = action({
+  args: {
+    promoCodeId: v.id('promo_codes'),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error('Not authenticated');
+    }
+    // Enforce admin via getPromoCode (requireAdmin).
+    const promoDetail = await ctx.runQuery(api.admin.getPromoCode, {
+      promoCodeId: args.promoCodeId,
+    });
+    if (!promoDetail) {
+      throw new Error('promo_code_not_found');
+    }
+
+    const promo = await ctx.runMutation(
+      internal.admin.getDiscountPromoForProvisioning,
+      { promoCodeId: args.promoCodeId }
+    );
+
+    if (!promo.productKey) {
+      throw new Error('discount_product_key_missing');
+    }
+    const productIdentifier = getDefaultWebProductIdentifierForProductKey(promo.productKey);
+    if (!productIdentifier) {
+      throw new Error('discount_product_identifier_not_found');
+    }
+
+    const identifier = buildRevenueCatDiscountIdentifier(promo.code);
+    let discountId = promo.discountId;
+    let discountCreatedThisRun = false;
+    let idPersistedThisRun = false;
+
+    try {
+      // Phase 1: obtain a usable provider discount id.
+      if (!discountId) {
+        // No persisted id: create a new provider discount.
+        const discount = await createPercentageDiscount({
+          identifier,
+          customerFacingName: `Promo ${promo.code}`,
+          percentage: promo.discountPercent,
+          productIdentifier,
+        });
+        discountId = discount.id;
+        discountCreatedThisRun = true;
+        // Persist the id immediately so a retry can reuse it even if the
+        // next step fails. The promo stays inactive/pending.
+        await ctx.runMutation(internal.admin.persistDiscountId, {
+          promoCodeId: args.promoCodeId,
+          revenueCatDiscountId: discountId,
+          revenueCatDiscountIdentifier: identifier,
+        });
+        idPersistedThisRun = true;
+      } else {
+        // Retry path: the discount exists at the provider but may have been
+        // disabled by a prior compensating cleanup. Enable it before
+        // re-attaching the code so the code is usable after finalization.
+        // If the provider discount is gone (404), the persisted id is stale:
+        // clear it locally and create a fresh discount in this same attempt.
+        try {
+          await enableDiscount({ discountId });
+        } catch (enableErr) {
+          if (isDiscountNotFoundError(enableErr)) {
+            // Stale provider id: clear it and create a fresh discount.
+            await ctx.runMutation(internal.admin.clearStaleDiscountId, {
+              promoCodeId: args.promoCodeId,
+            });
+            const discount = await createPercentageDiscount({
+              identifier,
+              customerFacingName: `Promo ${promo.code}`,
+              percentage: promo.discountPercent,
+              productIdentifier,
+            });
+            discountId = discount.id;
+            discountCreatedThisRun = true;
+            await ctx.runMutation(internal.admin.persistDiscountId, {
+              promoCodeId: args.promoCodeId,
+              revenueCatDiscountId: discountId,
+              revenueCatDiscountIdentifier: identifier,
+            });
+            idPersistedThisRun = true;
+          } else {
+            throw enableErr;
+          }
+        }
+      }
+
+      // Phase 2: attach the code idempotently. On 409, ensureDiscountCode
+      // verifies the code exists on this exact discount before treating as
+      // success. Note: a 5xx or network error after the provider accepted the
+      // code means the code may be attached remotely even though this call
+      // threw. The catch block handles that by always cleaning up.
+      await ensureDiscountCode({
+        discountId,
+        code: promo.providerCode,
+      });
+
+      // Phase 3: finalize. Sets active=true, provisioning=provisioned, and
+      // schedules exact-time expiry if activeTo is set.
+      await ctx.runMutation(internal.admin.finalizeDiscountProvisioning, {
+        promoCodeId: args.promoCodeId,
+      });
+
+      return { ok: true as const, promoCodeId: args.promoCodeId };
+    } catch (error) {
+      const message =
+        error instanceof RevenueCatV2Error
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'unknown_provisioning_error';
+
+      // Compensating cleanup so no usable provider code remains while the
+      // local promo is inactive. The persisted id is preserved so a retry can
+      // re-enable the discount and re-attach the code.
+      //
+      // Case A: we created the discount this run but persistDiscountId failed
+      // (idPersistedThisRun is false). The discount exists at the provider with
+      // no local id, and a retry would collide on the deterministic identifier.
+      // Best-effort DELETE that orphan discount. If delete fails, surface a
+      // manual cleanup error because safe automatic retry is not possible.
+      //
+      // Case B (all other failures with a known discountId): the id was
+      // persisted (this run or a prior run) and any step after that failed.
+      // The code may be attached at the provider even if ensureDiscountCode
+      // threw (5xx/network after remote success), so we always best-effort
+      // delete the provider code and disable the provider discount. Both
+      // operations are idempotent (404-safe). The persisted id is kept so a
+      // retry can re-enable and re-attach.
+      let cleanupError: string | undefined;
+      if (discountCreatedThisRun && !idPersistedThisRun && discountId) {
+        // Case A: orphan discount with no local id.
+        try {
+          await deleteDiscount({ discountId });
+        } catch (cleanupErr) {
+          cleanupError =
+            cleanupErr instanceof RevenueCatV2Error
+              ? cleanupErr.message
+              : String(cleanupErr);
+        }
+      } else if (discountId) {
+        // Case B: any failure after the id was persisted or reused. Always
+        // attempt to delete the provider code and disable the discount,
+        // regardless of whether ensureDiscountCode reported success. The
+        // code may be attached remotely despite a thrown response.
+        try {
+          await deleteDiscountCode({
+            discountId,
+            code: promo.providerCode,
+          });
+        } catch (cleanupErr) {
+          cleanupError =
+            cleanupErr instanceof RevenueCatV2Error
+              ? cleanupErr.message
+              : String(cleanupErr);
+        }
+        try {
+          await disableDiscount({ discountId });
+        } catch (cleanupErr) {
+          const disableErr =
+            cleanupErr instanceof RevenueCatV2Error
+              ? cleanupErr.message
+              : String(cleanupErr);
+          cleanupError = cleanupError
+            ? `${cleanupError}; ${disableErr}`
+            : disableErr;
+        }
+      }
+
+      const finalError = cleanupError
+        ? `${message}. Manual provider cleanup required: ${cleanupError}`
+        : message;
+
+      await ctx.runMutation(internal.admin.markDiscountProvisioningFailed, {
+        promoCodeId: args.promoCodeId,
+        error: finalError,
+      });
+
+      return { ok: false as const, error: finalError };
+    }
+  },
+});
+
+/**
+ * Internal mutation: mark a discount promo as disable_pending (active=false,
+ * provider not yet disabled). Used by the deactivation action when the
+ * provider disable could not complete (env not configured or transient
+ * failure). Validation rejects disable_pending, so the code is not usable
+ * locally. The hourly reconciliation retries the provider disable.
+ */
+export const markDiscountDisablePending = internalMutation({
+  args: {
+    promoCodeId: v.id('promo_codes'),
+    reason: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const promo = await ctx.db.get(args.promoCodeId);
+    if (!promo) {
+      throw new Error('promo_code_not_found');
+    }
+    const metadata = promo.metadata ?? {};
+    await ctx.db.patch(args.promoCodeId, {
+      active: false,
+      revenueCatProvisioningStatus: 'disable_pending',
+      updatedAt: Date.now(),
+      metadata: { ...metadata, deactivationReason: args.reason },
+    });
+    return { promoCodeId: args.promoCodeId };
+  },
+});
+
+/**
+ * Internal mutation: mark a discount promo as fully disabled (active=false,
+ * provider disabled). Used after a successful provider disable (or 404).
+ */
+export const markDiscountDisabled = internalMutation({
+  args: {
+    promoCodeId: v.id('promo_codes'),
+  },
+  handler: async (ctx, args) => {
+    const promo = await ctx.db.get(args.promoCodeId);
+    if (!promo) {
+      throw new Error('promo_code_not_found');
+    }
+    await ctx.db.patch(args.promoCodeId, {
+      active: false,
+      revenueCatProvisioningStatus: 'disabled',
+      updatedAt: Date.now(),
+    });
+    return { promoCodeId: args.promoCodeId };
+  },
+});
+
+/**
+ * Action: deactivate a discount promo. Admin-only.
+ *
+ * Sets local active=false immediately (via markDiscountDisablePending) so
+ * validation rejects the code, then attempts the provider disable. If the
+ * provider disable succeeds (or 404), marks the promo fully disabled. If it
+ * fails (env not configured or transient error), the promo stays
+ * disable_pending and the hourly reconciliation retries the provider disable.
+ * The error is surfaced to the admin.
+ */
+export const deactivateDiscountPromo = action({
+  args: {
+    promoCodeId: v.id('promo_codes'),
+    reason: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Enforce admin via getPromoCode (requireAdmin).
+    const promoDetail = await ctx.runQuery(api.admin.getPromoCode, {
+      promoCodeId: args.promoCodeId,
+    });
+    if (!promoDetail) {
+      throw new Error('promo_code_not_found');
+    }
+
+    const promo = promoDetail.promoCode;
+    if (promo.rewardType !== 'discount') {
+      // Token codes: just run the local deactivation mutation.
+      await ctx.runMutation(api.admin.deactivatePromoCode, {
+        promoCodeId: args.promoCodeId,
+        reason: args.reason,
+      });
+      return { ok: true as const };
+    }
+
+    // Discount codes: set disable_pending first (local active=false), then
+    // attempt the provider disable. This ordering means the code is never
+    // usable locally while the provider coupon might still be active.
+    await ctx.runMutation(internal.admin.markDiscountDisablePending, {
+      promoCodeId: args.promoCodeId,
+      reason: args.reason,
+    });
+
+    if (!promo.revenueCatDiscountId) {
+      // No provider discount to disable (e.g. provisioning never completed).
+      // Mark fully disabled.
+      await ctx.runMutation(internal.admin.markDiscountDisabled, {
+        promoCodeId: args.promoCodeId,
+      });
+      return { ok: true as const };
+    }
+
+    try {
+      await disableDiscount({ discountId: promo.revenueCatDiscountId });
+      await ctx.runMutation(internal.admin.markDiscountDisabled, {
+        promoCodeId: args.promoCodeId,
+      });
+      return { ok: true as const };
+    } catch (error) {
+      const message =
+        error instanceof RevenueCatV2Error ? error.message : String(error);
+      // Provider disable failed. The promo is already disable_pending (local
+      // active=false). The hourly reconciliation will retry. Surface the error.
+      return { ok: false as const, error: message, disablePending: true };
+    }
+  },
+});
+
+/**
+ * Internal query: list discount promos that need provider disable
+ * reconciliation. NO AUTH (called by the unauthenticated cron/internal action).
+ * Returns promos in two states:
+ *  - provisioned + activeTo passed (expired)
+ *  - disable_pending (deactivation could not reach the provider)
+ * Both need the provider discount disabled; only on success does the status
+ * become `disabled`.
+ */
+export const listDiscountsNeedingReconciliation = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const provisioned = await ctx.db
+      .query('promo_codes')
+      .withIndex('by_rc_provisioning', (q) => q.eq('revenueCatProvisioningStatus', 'provisioned'))
+      .collect();
+    const disablePending = await ctx.db
+      .query('promo_codes')
+      .withIndex('by_rc_provisioning', (q) => q.eq('revenueCatProvisioningStatus', 'disable_pending'))
+      .collect();
+    const expired = provisioned.filter(
+      (promo) =>
+        promo.rewardType === 'discount' &&
+        typeof promo.activeTo === 'number' &&
+        promo.activeTo <= now &&
+        promo.active !== false
+    );
+    const pending = disablePending.filter((promo) => promo.rewardType === 'discount');
+    return [...expired, ...pending].map((promo) => ({
+      promoCodeId: promo._id,
+      revenueCatDiscountId: promo.revenueCatDiscountId ?? null,
+      activeTo: promo.activeTo ?? null,
+    }));
+  },
+});
+
+/**
+ * Internal action: disable a single expired discount promo. Scheduled via
+ * ctx.scheduler.runAt(activeTo) at provisioning time for exact-time expiry.
+ * Idempotent: if the promo is already disabled/not found, returns ok.
+ */
+export const disableExpiredDiscount = internalAction({
+  args: {
+    promoCodeId: v.id('promo_codes'),
+  },
+  handler: async (ctx, args) => {
+    const promo = await ctx.runQuery(internal.admin.getPromoCodeForReconciliation, {
+      promoCodeId: args.promoCodeId,
+    });
+    if (!promo) {
+      return { ok: true as const, skipped: 'not_found' };
+    }
+    // Only act on provisioned promos whose activeTo has passed. If already
+    // disabled or disable_pending, the hourly reconciliation handles it.
+    if (promo.revenueCatProvisioningStatus !== 'provisioned') {
+      return { ok: true as const, skipped: 'already_reconciling' };
+    }
+    const now = Date.now();
+    if (typeof promo.activeTo === 'number' && promo.activeTo > now) {
+      return { ok: true as const, skipped: 'not_yet_expired' };
+    }
+    // Mark disable_pending first (local active=false) so the code is not
+    // usable even if the provider disable fails.
+    await ctx.runMutation(internal.admin.markDiscountDisablePending, {
+      promoCodeId: args.promoCodeId,
+      reason: 'scheduled_expiry',
+    });
+    if (!promo.revenueCatDiscountId) {
+      await ctx.runMutation(internal.admin.markDiscountDisabled, {
+        promoCodeId: args.promoCodeId,
+      });
+      return { ok: true as const };
+    }
+    try {
+      await disableDiscount({ discountId: promo.revenueCatDiscountId });
+      await ctx.runMutation(internal.admin.markDiscountDisabled, {
+        promoCodeId: args.promoCodeId,
+      });
+      return { ok: true as const };
+    } catch (error) {
+      const message =
+        error instanceof RevenueCatV2Error ? error.message : String(error);
+      // Leave as disable_pending; hourly reconciliation retries.
+      return { ok: false as const, error: message };
+    }
+  },
+});
+
+/**
+ * Internal query: load a single discount promo for reconciliation. NO AUTH
+ * (called by the unauthenticated scheduled action).
+ */
+export const getPromoCodeForReconciliation = internalQuery({
+  args: {
+    promoCodeId: v.id('promo_codes'),
+  },
+  handler: async (ctx, args) => {
+    const promo = await ctx.db.get(args.promoCodeId);
+    if (!promo) {
+      return null;
+    }
+    return {
+      promoCodeId: promo._id,
+      rewardType: promo.rewardType,
+      active: promo.active,
+      activeTo: promo.activeTo ?? null,
+      revenueCatProvisioningStatus: promo.revenueCatProvisioningStatus ?? null,
+      revenueCatDiscountId: promo.revenueCatDiscountId ?? null,
+    };
+  },
+});
+
+/**
+ * Internal action: hourly reconciliation. Disables RevenueCat discounts for:
+ *  - expired provisioned promos (activeTo passed)
+ *  - disable_pending promos (deactivation that could not reach the provider)
+ *
+ * Best-effort: each promo is handled independently so one provider failure
+ * does not block the rest. Only marks `disabled` after a successful provider
+ * disable (or 404). NO AUTH (called by the cron).
+ */
+export const reconcileDiscountLifecycle = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    const items = await ctx.runQuery(internal.admin.listDiscountsNeedingReconciliation, {});
+    const results: { promoCodeId: string; ok: boolean; error?: string }[] = [];
+    for (const item of items) {
+      // Ensure disable_pending is set (local active=false) before attempting
+      // the provider disable, so the code is not usable locally even if the
+      // provider disable fails this round.
+      await ctx.runMutation(internal.admin.markDiscountDisablePending, {
+        promoCodeId: item.promoCodeId,
+        reason: 'reconciliation_expiry_or_deactivation',
+      });
+      if (!item.revenueCatDiscountId) {
+        await ctx.runMutation(internal.admin.markDiscountDisabled, {
+          promoCodeId: item.promoCodeId,
+        });
+        results.push({ promoCodeId: item.promoCodeId, ok: true });
+        continue;
+      }
+      try {
+        await disableDiscount({ discountId: item.revenueCatDiscountId });
+        await ctx.runMutation(internal.admin.markDiscountDisabled, {
+          promoCodeId: item.promoCodeId,
+        });
+        results.push({ promoCodeId: item.promoCodeId, ok: true });
+      } catch (error) {
+        const message =
+          error instanceof RevenueCatV2Error ? error.message : String(error);
+        // Leave as disable_pending for the next reconciliation round.
+        results.push({ promoCodeId: item.promoCodeId, ok: false, error: message });
+      }
+    }
+    return { processed: results.length, results };
   },
 });

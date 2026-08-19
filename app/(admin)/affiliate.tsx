@@ -10,6 +10,11 @@ function formatMoney(micros: number, currencyCode: string) {
   return `${(micros / 1_000_000).toFixed(2)} ${currencyCode}`;
 }
 
+function formatDeadline(epoch: number | null): string {
+  if (epoch === null) return 'No deadline';
+  return new Date(epoch).toLocaleDateString();
+}
+
 export default function AffiliateDashboardScreen() {
   const dashboard = useQuery(api.affiliate.getMyDashboard, {});
 
@@ -39,13 +44,8 @@ export default function AffiliateDashboardScreen() {
               ) : (
                 <Stat label="Type" value="Free tokens" />
               )}
+              <Stat label="Auto-deadline" value={formatDeadline(item.activeTo)} />
             </View>
-            {item.checkoutDiscountBlocked ? (
-              <Text style={styles.muted}>
-                Checkout discounts are stored but not applied yet. Earnings appear after website
-                checkout coupons exist.
-              </Text>
-            ) : null}
             {item.earningsByCurrency.length === 0 ? (
               <Text style={styles.muted}>No attributed sales yet.</Text>
             ) : (
@@ -53,6 +53,10 @@ export default function AffiliateDashboardScreen() {
                 <View key={row.currencyCode} style={styles.currencyBlock}>
                   <Text style={styles.currencyTitle}>{row.currencyCode}</Text>
                   <View style={styles.grid}>
+                    <Stat
+                      label="Total sales"
+                      value={formatMoney(row.totalSaleMicros, row.currencyCode)}
+                    />
                     <Stat
                       label="Average sale"
                       value={formatMoney(row.averageSaleMicros, row.currencyCode)}

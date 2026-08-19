@@ -93,3 +93,27 @@ export function findTokenProductByStoreProductId(
       : product.androidProductId === productId;
   });
 }
+
+/**
+ * Resolve the RevenueCat product identifier used by web checkout for a given
+ * product key. Web (RC Billing / Stripe) reuses the Android product id, so
+ * this returns `androidProductId` for the matching active product. Returns
+ * null if the product key is unknown or inactive.
+ */
+export function getWebProductIdentifierForProductKey(
+  products: TokenProductSeed[],
+  productKey: string
+): string | null {
+  const product = products.find((p) => p.isActive && p.productKey === productKey);
+  return product ? product.androidProductId : null;
+}
+
+/**
+ * Resolve the web product identifier for a product key using the default
+ * catalog. Convenience wrapper for callers without a custom catalog.
+ */
+export function getDefaultWebProductIdentifierForProductKey(
+  productKey: string
+): string | null {
+  return getWebProductIdentifierForProductKey(DEFAULT_TOKEN_PRODUCTS, productKey);
+}

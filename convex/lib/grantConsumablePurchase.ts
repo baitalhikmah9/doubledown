@@ -7,6 +7,10 @@ import {
   type TokenProductSeed,
 } from './paymentCatalog';
 import { buildPurchaseGrantIdempotencyKey } from './paymentWebhook';
+import {
+  consumeDiscountClaimForPurchase,
+  priceToMicros,
+} from './promoDiscountClaim';
 
 export async function grantConsumablePurchase(
   ctx: MutationCtx,
@@ -20,6 +24,10 @@ export async function grantConsumablePurchase(
     revenueCatEventId,
     purchasedAt,
     rawEvent,
+    priceAmountMicros,
+    currencyCode,
+    discountIdentifier,
+    discountPercentage,
   }: {
     products: TokenProductSeed[];
     purchaserAccountId: string;
@@ -30,6 +38,12 @@ export async function grantConsumablePurchase(
     revenueCatEventId: string;
     purchasedAt?: number;
     rawEvent?: unknown;
+    priceAmountMicros?: number;
+    currencyCode?: string;
+    /** RevenueCat webhook event.discount_identifier (applied discount). */
+    discountIdentifier?: string;
+    /** RevenueCat webhook event.discount_percentage (applied percentage). */
+    discountPercentage?: number;
   }
 ): Promise<{ granted: boolean; balance: number; tokensGranted: number }> {
   const product = findTokenProductByStoreProductId(products, store, productId);
@@ -50,6 +64,7 @@ export async function grantConsumablePurchase(
     return { granted: false, balance: wallet.balance, tokensGranted: 0 };
   }
 
+  const now = purchasedAt ?? Date.now();
   const purchaseId = await ctx.db.insert('store_purchases', {
     purchaserAccountId,
     productKey: product.productKey,
@@ -58,9 +73,12 @@ export async function grantConsumablePurchase(
     storeTransactionId: transactionId,
     originalStoreTransactionId: transactionId,
     revenueCatEventId,
-    purchasedAt: purchasedAt ?? Date.now(),
+    purchasedAt: now,
     status: 'granted',
     rawEvent: rawEvent ?? { source: 'client_sync' },
+    priceAmountMicros:
+      typeof priceAmountMicros === 'number' ? priceAmountMicros : undefined,
+    currencyCode,
   });
 
   await ctx.db.insert('wallet_transactions', {
@@ -76,10 +94,31 @@ export async function grantConsumablePurchase(
     storeTransactionId: transactionId,
     originalStoreTransactionId: transactionId,
     purchaseId,
+    priceAmountMicros:
+      typeof priceAmountMicros === 'number' ? priceAmountMicros : undefined,
+    currencyCode,
   });
 
   const nextBalance = wallet.balance + product.tokensGranted;
   await ctx.db.patch(wallet._id, { balance: nextBalance });
+
+  // Attribute the purchase to a pending discount claim if one exists for this
+  // purchaser + product. The claim consumption re-checks the promo state,
+  // product restriction, caps, claim expiry, and crucially verifies that the
+  // webhook discount_identifier matches the promo's RevenueCat discount
+  // identifier and that the applied percentage matches the configured one.
+  // If the evidence does not match, the claim is rejected (marked expired)
+  // and the purchase is NOT attributed. No-op for non-discount purchases.
+  await consumeDiscountClaimForPurchase(ctx, {
+    purchaserAccountId,
+    productKey: product.productKey,
+    purchaseId,
+    priceAmountMicros,
+    currencyCode,
+    discountIdentifier,
+    discountPercentage,
+    now: Date.now(),
+  });
 
   return {
     granted: true,
@@ -87,3 +126,5 @@ export async function grantConsumablePurchase(
     tokensGranted: product.tokensGranted,
   };
 }
+
+export { priceToMicros };

@@ -120,7 +120,10 @@ export function useTokenPurchases({ catalog, enabled }: UseTokenPurchasesOptions
   }, [enabled, platformProductIds, session.appUserId, session.error, session.ready]);
 
   const purchase = useCallback(
-    async (catalogProduct: TokenCatalogProduct): Promise<TokenPurchaseOutcome> => {
+    async (
+      catalogProduct: TokenCatalogProduct,
+      options?: { discountCode?: string }
+    ): Promise<TokenPurchaseOutcome> => {
       if (!enabled) throw new Error('Purchases are not enabled.');
       if (!isRevenueCatSupported())
         throw new Error('Purchases are only available in the iOS, Android, and web apps.');
@@ -151,7 +154,7 @@ export function useTokenPurchases({ catalog, enabled }: UseTokenPurchasesOptions
       setError(null);
       try {
         const purchaseResult = isWeb
-          ? await purchaseWebProduct(product)
+          ? await purchaseWebProduct(product, { discountCode: options?.discountCode })
           : await purchaseStoreProduct(product);
 
         // Web purchases are webhook-authoritative: the client never forges a

@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+  evaluateDiscountProductRestriction,
   evaluatePromoAccountRestriction,
   evaluateDuplicateRedemption,
   evaluatePromoRedemption,
@@ -96,12 +97,45 @@ describe('promoRules', () => {
     ).toEqual({ ok: true });
   });
 
-  it('blocks discount codes until web checkout coupons exist', () => {
-    expect(evaluatePromoRewardType('discount')).toEqual({
+  it('allows discount reward types (validated via the web checkout path)', () => {
+    expect(evaluatePromoRewardType('discount')).toEqual({ ok: true });
+    expect(evaluatePromoRewardType('tokens')).toEqual({ ok: true });
+    expect(evaluatePromoRewardType('unknown')).toEqual({
       ok: false,
       reason: 'discount_checkout_unavailable',
     });
-    expect(evaluatePromoRewardType('tokens')).toEqual({ ok: true });
+  });
+
+  it('restricts discount codes to their configured bundle', () => {
+    expect(
+      evaluateDiscountProductRestriction({
+        rewardType: 'discount',
+        promoProductKey: 'bundle_50',
+        requestedProductKey: 'bundle_50',
+      })
+    ).toEqual({ ok: true });
+    expect(
+      evaluateDiscountProductRestriction({
+        rewardType: 'discount',
+        promoProductKey: 'bundle_50',
+        requestedProductKey: 'bundle_30',
+      })
+    ).toEqual({ ok: false, reason: 'discount_product_mismatch' });
+    expect(
+      evaluateDiscountProductRestriction({
+        rewardType: 'discount',
+        promoProductKey: undefined,
+        requestedProductKey: 'bundle_30',
+      })
+    ).toEqual({ ok: false, reason: 'discount_product_mismatch' });
+    // Token reward types bypass the product restriction.
+    expect(
+      evaluateDiscountProductRestriction({
+        rewardType: 'tokens',
+        promoProductKey: 'bundle_50',
+        requestedProductKey: 'bundle_30',
+      })
+    ).toEqual({ ok: true });
   });
 
   it('generates unambiguous uppercase codes of the requested length', () => {

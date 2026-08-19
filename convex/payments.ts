@@ -4,6 +4,7 @@ import { v } from 'convex/values';
 import { ensureWalletDoc } from './lib/ensureWallet';
 import {
   buildPurchaseReversalIdempotencyKey,
+  extractPurchasePrice,
   normalizeRevenueCatAliases,
   normalizeRevenueCatStore,
 } from './lib/paymentWebhook';
@@ -508,6 +509,28 @@ export const processRevenueCatWebhook = internalMutation({
         return await markWebhook('failed', 'invalid_product');
       }
 
+      // Extract the truthful price + currency from the webhook event.
+      // Prefers `price_in_purchased_currency` + `currency` (the actual charged
+      // amount in the purchase currency). Falls back to USD `price` only when
+      // the purchased-currency fields are missing. Never combines a USD `price`
+      // with a non-USD purchase currency.
+      const { priceAmountMicros, currencyCode: persistedCurrencyCode } =
+        extractPurchasePrice({
+          price: event.price,
+          priceInPurchasedCurrency: event.price_in_purchased_currency,
+          currency: event.currency,
+        });
+
+      // Discount evidence: RevenueCat webhook purchase events expose
+      // `discount_identifier` (the applied discount's identifier) and
+      // `discount_percentage`. These are threaded to claim consumption so
+      // attribution only happens when the configured discount was actually
+      // applied at checkout. Without this evidence, a pending claim is
+      // rejected and the purchase is not attributed to any promo.
+      const discountIdentifier = asString(event.discount_identifier) || undefined;
+      const discountPercentage =
+        typeof event.discount_percentage === 'number' ? event.discount_percentage : undefined;
+
       await grantConsumablePurchase(ctx, {
         products,
         purchaserAccountId: purchaserAccount.appUserId,
@@ -519,6 +542,10 @@ export const processRevenueCatWebhook = internalMutation({
         purchasedAt:
           typeof event.purchased_at_ms === 'number' ? event.purchased_at_ms : Date.now(),
         rawEvent: args.payloadJson,
+        priceAmountMicros,
+        currencyCode: persistedCurrencyCode,
+        discountIdentifier,
+        discountPercentage,
       });
 
       return await markWebhook('processed');

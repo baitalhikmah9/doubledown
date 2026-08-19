@@ -24,7 +24,7 @@ describe('AffiliateDashboardScreen', () => {
           discountPercent: 10,
           productKey: 'bundle_50',
           commissionPercent: 10,
-          checkoutDiscountBlocked: true,
+          activeTo: null,
           earningsByCurrency: [
             {
               currencyCode: 'GBP',
@@ -35,6 +35,8 @@ describe('AffiliateDashboardScreen', () => {
               averageCommissionMicros: 800_000,
             },
           ],
+          totalSaleMicros: 16_000_000,
+          totalCommissionMicros: 1_600_000,
         },
       ],
     });
@@ -43,9 +45,11 @@ describe('AffiliateDashboardScreen', () => {
 
     expect(screen.getByText('MIKHAIL10')).toBeTruthy();
     expect(screen.getByText('10000')).toBeTruthy();
+    expect(screen.getByText('16.00 GBP')).toBeTruthy();
     expect(screen.getByText('8.00 GBP')).toBeTruthy();
     expect(screen.getByText('0.80 GBP')).toBeTruthy();
     expect(screen.getByText('1.60 GBP')).toBeTruthy();
+    expect(screen.getByText('No deadline')).toBeTruthy();
     expect(screen.queryByText('Promo Codes')).toBeNull();
     expect(screen.queryByText('Wallets')).toBeNull();
     expect(screen.queryByText('Audit Log')).toBeNull();

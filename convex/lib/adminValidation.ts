@@ -1,6 +1,6 @@
 import { isAffiliateEmail, normalizeAffiliateEmail } from './affiliateStats';
 import { DEFAULT_TOKEN_PRODUCTS } from './paymentCatalog';
-import { isUnlimitedUsageCap } from './promoRules';
+import { isUnlimitedUsageCap, isValidDiscountCodeFormat } from './promoRules';
 
 /**
  * Pure validation helpers for admin operations.
@@ -117,6 +117,7 @@ function validatePercent(value: number | undefined, reason: string) {
 
 export function validateCreatePromoCodeArgs(args: {
   normalizedCode: string;
+  rawCode?: string;
   rewardAmount: number;
   usageCap: number;
   mode?: string;
@@ -134,6 +135,12 @@ export function validateCreatePromoCodeArgs(args: {
     return { ok: false, reason: 'reward_type_invalid' };
   }
   if (rewardType === 'discount') {
+    // Discount codes are sent to RevenueCat and must match ^[A-Za-z0-9_]+$.
+    // Validate the raw (pre-normalization) form so we reject spaces/symbols
+    // before any provider call.
+    if (!args.rawCode || !isValidDiscountCodeFormat(args.rawCode)) {
+      return { ok: false, reason: 'discount_code_format_invalid' };
+    }
     const percent = validatePercent(args.discountPercent, 'discount_percent_invalid');
     if (!percent.ok) return percent;
     if (!args.productKey || !isKnownTokenProductKey(args.productKey)) {

@@ -76,3 +76,50 @@ export function normalizeRevenueCatStore(store?: string | null): PaymentStore | 
 
   return null;
 }
+
+/**
+ * Extract the truthful price + currency from a RevenueCat webhook purchase
+ * event.
+ *
+ * RevenueCat exposes two price fields:
+ *  - `price`: USD-normalized price (float in major currency units).
+ *  - `price_in_purchased_currency`: the actual charged amount in the purchase
+ *    currency (float in major currency units).
+ *  - `currency`: ISO 4217 currency code for the purchase currency.
+ *
+ * We persist the purchased-currency amount + currency when BOTH are present
+ * (the truthful post-discount charged amount). If only the USD `price` is
+ * present, we persist it with currency USD. We never combine a USD `price`
+ * with a non-USD purchase currency, because that would record an incorrect
+ * amount for commission math.
+ *
+ * Returns `{ priceAmountMicros, currencyCode }` where either field may be
+ * undefined when no usable price is present.
+ */
+export function extractPurchasePrice(args: {
+  price?: unknown;
+  priceInPurchasedCurrency?: unknown;
+  currency?: unknown;
+}): { priceAmountMicros?: number; currencyCode?: string } {
+  const purchasedMicros = priceToMicros(args.priceInPurchasedCurrency);
+  const usdMicros = priceToMicros(args.price);
+  const currencyCode = asString(args.currency);
+  if (purchasedMicros !== null && currencyCode) {
+    return { priceAmountMicros: purchasedMicros, currencyCode };
+  }
+  if (usdMicros !== null) {
+    return { priceAmountMicros: usdMicros, currencyCode: 'USD' };
+  }
+  return {};
+}
+
+function priceToMicros(price: unknown): number | null {
+  if (typeof price !== 'number' || !Number.isFinite(price) || price < 0) {
+    return null;
+  }
+  return Math.round(price * 1_000_000);
+}
+
+function asString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}

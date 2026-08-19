@@ -8,7 +8,7 @@ import {
   ScrollView,
   useWindowDimensions,
 } from 'react-native';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, useAction } from 'convex/react';
 import { useRouter } from 'expo-router';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
@@ -73,6 +73,10 @@ const BUNDLE_OPTIONS = DEFAULT_TOKEN_PRODUCTS.map((product) => ({
   label: `${product.tokensGranted}-token bundle`,
 }));
 
+/** Affiliate preset auto-deadline: 30 days from creation. Admins can clear or
+ * change it after creation via the promo detail editor. */
+const AFFILIATE_PRESET_DEADLINE_DAYS = 30;
+
 type WalletSearchResult = {
   wallet: {
     _id: string;
@@ -114,6 +118,7 @@ export default function PromoCodesScreen() {
     limit: 50,
   });
   const createPromo = useMutation(api.admin.createPromoCode);
+  const provisionDiscount = useAction(api.admin.provisionDiscountPromo);
 
   const [showCreate, setShowCreate] = useState(false);
   const [code, setCode] = useState('');
@@ -126,6 +131,7 @@ export default function PromoCodesScreen() {
   const [affiliatePreset, setAffiliatePreset] = useState(false);
   const [affiliateEmail, setAffiliateEmail] = useState('');
   const [commissionPercent, setCommissionPercent] = useState('');
+  const [affiliateDeadlineEnabled, setAffiliateDeadlineEnabled] = useState(true);
   const [mode, setMode] = useState<CouponMode>('public_single_use');
   const [accountQuery, setAccountQuery] = useState('');
   const [selectedAccount, setSelectedAccount] = useState<WalletSearchResult | null>(null);
@@ -139,6 +145,16 @@ export default function PromoCodesScreen() {
   const parsedCommission = parseInt(commissionPercent, 10);
   const cap = parseInt(usageCap, 10);
   const needsCap = selectedMode.requiresCap && !unlimited;
+  // Affiliate preset auto-deadline: 30 days from creation, surfaced so admins
+  // see the exact expiry before submitting. They can disable it here or clear
+  // it later from the promo detail editor.
+  const affiliateDeadlineEpoch =
+    affiliatePreset && affiliateDeadlineEnabled
+      ? Date.now() + AFFILIATE_PRESET_DEADLINE_DAYS * 24 * 60 * 60 * 1000
+      : undefined;
+  const affiliateDeadlineLabel = affiliateDeadlineEpoch
+    ? new Date(affiliateDeadlineEpoch).toLocaleString()
+    : null;
   const isSubmitDisabled =
     submitting ||
     !code.trim() ||
@@ -206,7 +222,7 @@ export default function PromoCodesScreen() {
 
     try {
       setSubmitting(true);
-      await createPromo({
+      const result = await createPromo({
         code: code.trim(),
         rewardAmount: parsedAmount,
         usageCap: parsedCap,
@@ -218,8 +234,27 @@ export default function PromoCodesScreen() {
         productKey: rewardType === 'discount' ? productKey : undefined,
         affiliateEmail: affiliatePreset ? affiliateEmail.trim() : undefined,
         commissionPercent: affiliatePreset ? parsedCommissionValue : undefined,
+        activeTo: affiliateDeadlineEpoch,
         metadata: campaignName || notes ? { campaignName: campaignName || undefined, notes: notes || undefined } : undefined,
       });
+
+      // Discount codes are inserted inactive + provisioning_pending. Provision
+      // the RevenueCat discount + code now. On failure the local row stays
+      // inactive and the error is surfaced; no unusable code is presented.
+      if (rewardType === 'discount') {
+        const promoCodeId = result.promoCodeId as Id<'promo_codes'>;
+        const provisioned = await provisionDiscount({ promoCodeId });
+        if (!provisioned.ok) {
+          setError(
+            `Local code created but RevenueCat provisioning failed: ${provisioned.error}. ` +
+              'The code is inactive and not usable. Fix the configuration and retry from the promo detail page.'
+          );
+          // Keep the form open so the admin sees the error and can retry.
+          setSubmitting(false);
+          return;
+        }
+      }
+
       setCode('');
       setRewardType('tokens');
       setRewardAmount('');
@@ -230,6 +265,7 @@ export default function PromoCodesScreen() {
       setAffiliatePreset(false);
       setAffiliateEmail('');
       setCommissionPercent('');
+      setAffiliateDeadlineEnabled(true);
       setMode('public_single_use');
       setAccountQuery('');
       setSelectedAccount(null);
@@ -361,7 +397,10 @@ export default function PromoCodesScreen() {
                   />
                 </View>
                 <Text style={styles.helperText}>
-                  Stored only. Checkout cannot apply this discount until a website coupon path exists.
+                  Creating this discount provisions a RevenueCat percentage
+                  discount and code automatically. The code is usable on web
+                  checkout only after provisioning succeeds. If provisioning
+                  fails, the code stays inactive and is not presented to users.
                 </Text>
               </>
             )}
@@ -394,6 +433,7 @@ export default function PromoCodesScreen() {
                     setMode('public_multi_use');
                     setAccountQuery('');
                     setSelectedAccount(null);
+                    setAffiliateDeadlineEnabled(true);
                   }
                 }}
               />
@@ -428,6 +468,26 @@ export default function PromoCodesScreen() {
                     keyboardType="numeric"
                   />
                 </View>
+                <View style={styles.checkboxRow}>
+                  <AdminButton
+                    label={
+                      affiliateDeadlineEnabled
+                        ? `Auto-deadline on (${affiliateDeadlineLabel ?? ''})`
+                        : 'Auto-deadline off'
+                    }
+                    variant={affiliateDeadlineEnabled ? 'primary' : 'secondary'}
+                    accessibilityLabel="Toggle 30-day affiliate auto-deadline"
+                    onPress={() => setAffiliateDeadlineEnabled((value) => !value)}
+                  />
+                </View>
+                {affiliateDeadlineEnabled && (
+                  <Text style={styles.helperText}>
+                    Auto-deadline: {AFFILIATE_PRESET_DEADLINE_DAYS} days from creation
+                    {affiliateDeadlineLabel ? ` (${affiliateDeadlineLabel})` : ''}. The code
+                    stops working after this date. Clear or change it later from the promo
+                    detail editor.
+                  </Text>
+                )}
               </>
             )}
             {needsCap && (
