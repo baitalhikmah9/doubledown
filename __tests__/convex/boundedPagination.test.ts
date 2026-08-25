@@ -112,6 +112,7 @@ describe('scanIndexPage', () => {
       r.createdAt % 2 === 0 ? { ...r, keep: true } : { ...r, keep: false }
     );
     const { items, nextCursor } = await scanIndexPage(
+      // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
       fakeFetch(rows as any),
       (r) => r.createdAt,
       (r: any) => r.keep,

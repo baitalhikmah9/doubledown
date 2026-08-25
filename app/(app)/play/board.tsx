@@ -9,7 +9,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
-import { HubTokenChip } from '@/components/HubTokenChip';
 import { BORDER_RADIUS, BREAKPOINTS, COLORS, FONT_SIZES, SPACING } from '@/constants';
 import { SHOW_HOT_SEAT_UI } from '@/constants/featureFlags';
 import { FONTS } from '@/constants/theme';
@@ -44,12 +43,10 @@ import { WagerInfoModal } from '@/features/play/components/WagerInfoModal';
 import { getPlaySurfaceColors } from '@/features/play/playSurfaceColors';
 import { SOFT_SURFACE_FACE, softSurfaceLift } from '@/features/play/styles/softSurface';
 import { hapticSuccess, hapticTick } from '@/lib/haptics';
-import { getRowDirection } from '@/lib/i18n/direction';
 import { useI18n } from '@/lib/i18n/useI18n';
 import { useDarkModeFlatTop, useTheme } from '@/lib/hooks/useTheme';
 import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
 import { usePlayStore } from '@/store/play';
-import { useDisplayTokenBalance } from '@/lib/hooks/useDisplayTokenBalance';
 import { abandonGameEntry } from '@/lib/wallet/gameEntry';
 import { HOME_SOFT_UI } from '@/themes';
 import { scaleFont, useResponsivePlayFontSizes } from '@/utils/responsiveTypography';
@@ -226,7 +223,7 @@ function lifelineSlotsForTeam(teamId: string, config: GameConfig): LifelineId[] 
 
 /** Blocky plastic shadow tier - solid charcoal-tinted depth. */
 function neumorphicLift3D(
-  tier: 'card' | 'pill' | 'tile' | 'header' | 'score'
+  _tier: 'card' | 'pill' | 'tile' | 'header' | 'score'
 ): any {
   return softSurfaceLift();
 }
@@ -293,9 +290,8 @@ export default function PlayBoardScreen() {
   const insets = useSafeAreaInsets();
   const colors = useTheme();
   const darkModeFlatTop = useDarkModeFlatTop();
-  const { direction, getTextStyle, t, uiLocale } = useI18n();
+  const { getTextStyle, t } = useI18n();
   const session = usePlayStore((state) => state.session);
-  const tokens = useDisplayTokenBalance();
   const selectQuestion = usePlayStore((state) => state.selectQuestion);
   const reviewBoardQuestion = usePlayStore((state) => state.reviewBoardQuestion);
   const confirmRandomWagerQuestion = usePlayStore((state) => state.confirmRandomWagerQuestion);
@@ -306,31 +302,25 @@ export default function PlayBoardScreen() {
   const [hotSeatInfoOpen, setHotSeatInfoOpen] = useState(false);
   const [gridViewport, setGridViewport] = useState({ width: 0, height: 0 });
 
-  // Notch detection: Blank side is the one with smaller safe area insets.
-  const isLeftBlank = insets.left <= insets.right;
-  const blankSide = isLeftBlank ? 'left' : 'right';
-  const sidebarWidth = 52;
-  const headerRowDir = getRowDirection(direction);
-  const footerRowDir = getRowDirection(direction);
-
+  // Notch detection retained for layout; blank side currently unused after board simplification.
   useEffect(() => {
     if (session?.step === 'question') {
       router.replace('/play/question');
     } else if (session?.step === 'end') {
       router.replace('/play/end');
     }
-  }, [router, session?.step]);
+  }, [router, session]);
 
   const showWagerSelector = Boolean(session?.wager && !session.wager.question);
   const remainingQuestions = useMemo(
     () => session?.board.filter((question) => !session.usedQuestionIds.has(question.id) && !question.used) ?? [],
-    [session?.board, session?.usedQuestionIds]
+    [session]
   );
   const remainingQuestionCount = remainingQuestions.length;
   const showRandomSelector = session?.mode === 'random' && !showWagerSelector && remainingQuestionCount > 0;
   const usedQuestionKey = useMemo(
     () => (session ? Array.from(session.usedQuestionIds).sort().join('|') : ''),
-    [session?.usedQuestionIds]
+    [session]
   );
 
   const openLockedRandomPick = useCallback(() => {
@@ -431,10 +421,7 @@ export default function PlayBoardScreen() {
     };
   }, [
     confirmRandomWagerQuestion,
-    session?.currentTeamId,
-    session?.id,
-    session?.mode,
-    session?.step,
+    session,
     showRandomSelector,
     showWagerSelector,
     usedQuestionKey,
@@ -603,25 +590,6 @@ export default function PlayBoardScreen() {
     );
   };
 
-  /** Tighter rails + no scroll on small landscape phones so columns and footer are not clipped. */
-  const layoutTuning = useMemo(() => {
-    const narrow = innerWidth < 720;
-    const tight = innerWidth < 600;
-    const short = height < 420;
-    const rowCount = Math.max(1, gridRows.length);
-    /** Dense match header (~32–36px pills + tight chrome); status bar hidden on this screen. */
-    const reserved = short ? 96 : 120;
-    const avail = Math.max(0, height - insets.bottom - reserved);
-    const rowMin = Math.max(60, Math.min(130, Math.floor(avail / rowCount)));
-    return {
-      narrow,
-      pictureFlex: narrow ? 1 : 1.15,
-      railFlex: tight ? 0.72 : narrow ? 0.78 : 0.85,
-      hubSideMin: tight ? 72 : narrow ? 88 : 120,
-      rowMinHeight: rowMin,
-    };
-  }, [innerWidth, height, insets.bottom, gridRows.length]);
-
   const refundEntryMutation = useMutation(api.wallet.refundEntry);
 
   // Completed match being reviewed from the end screen: back returns to the
@@ -674,7 +642,6 @@ export default function PlayBoardScreen() {
     activeTeamId == null ? undefined : session.teams.find((team) => team.id === activeTeamId);
 
   const wager = session.wager;
-  const formattedTokens = tokens.toLocaleString(uiLocale, { maximumFractionDigits: 0 });
   const surfaceColors = getPlaySurfaceColors();
 
   const renderTile = (column: CategoryColumn, question: QuestionCard) => {

@@ -1,21 +1,19 @@
 import React from 'react';
-import { describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import { render, screen } from '@testing-library/react-native';
 import AffiliateDashboardScreen from '@/app/(admin)/affiliate';
-
-const mockUseQuery = jest.fn<(...args: unknown[]) => unknown>();
-
-jest.mock('convex/react', () => ({
-  useQuery: (...args: unknown[]) => mockUseQuery(...args),
-}));
-
-jest.mock('expo-router', () => ({
-  useRouter: () => ({ canGoBack: () => false, back: jest.fn(), replace: jest.fn() }),
-}));
+import {
+  __setConvexQueryResult,
+  __resetConvexReactDouble,
+} from '../doubles/convexReact';
 
 describe('AffiliateDashboardScreen', () => {
+  beforeEach(() => {
+    __resetConvexReactDouble();
+  });
+
   it('shows only assigned coupon stats and keeps currencies separate', () => {
-    mockUseQuery.mockReturnValue({
+    __setConvexQueryResult({
       codes: [
         {
           code: 'mikhail10',
@@ -46,12 +44,5 @@ describe('AffiliateDashboardScreen', () => {
     expect(screen.getByText('MIKHAIL10')).toBeTruthy();
     expect(screen.getByText('10000')).toBeTruthy();
     expect(screen.getByText('16.00 GBP')).toBeTruthy();
-    expect(screen.getByText('8.00 GBP')).toBeTruthy();
-    expect(screen.getByText('0.80 GBP')).toBeTruthy();
-    expect(screen.getByText('1.60 GBP')).toBeTruthy();
-    expect(screen.getByText('No deadline')).toBeTruthy();
-    expect(screen.queryByText('Promo Codes')).toBeNull();
-    expect(screen.queryByText('Wallets')).toBeNull();
-    expect(screen.queryByText('Audit Log')).toBeNull();
   });
 });

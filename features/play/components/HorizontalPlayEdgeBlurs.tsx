@@ -22,6 +22,7 @@ type HorizontalPlayEdgeBlursProps = {
  */
 export function HorizontalPlayEdgeBlurs({ stripWidth }: HorizontalPlayEdgeBlursProps) {
   const colors = useTheme();
+  // SAFETY: theme palette values are always CSS color strings.
   const bg = colors.background as string;
 
   const a = (x: number) => hexToRgba(bg, x);

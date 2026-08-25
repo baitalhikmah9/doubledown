@@ -1,11 +1,7 @@
 import React from 'react';
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import { StyleSheet } from 'react-native';
 import { render, screen } from '@testing-library/react-native';
-
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
 
 import { HubTokenChip } from '@/components/HubTokenChip';
 

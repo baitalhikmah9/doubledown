@@ -6,27 +6,6 @@ import {
   PlayMatchMenuModal,
 } from '@/features/play/components/PlayMatchMenuModal';
 
-jest.mock('@/lib/i18n/useI18n', () => ({
-  useI18n: () => ({
-    t: (key: string) => {
-      const messages: Record<string, string> = {
-        'common.close': 'Close',
-        'common.settings': 'Settings',
-        'play.exitGame': 'Exit Game',
-      };
-      return messages[key] ?? key;
-    },
-  }),
-}));
-
-jest.mock('@/features/play/playSurfaceColors', () => ({
-  getPlaySurfaceColors: () => ({
-    surface: '#FFFFFF',
-    textPrimary: '#111111',
-    isDark: false,
-  }),
-}));
-
 describe('PlayMatchMenuModal', () => {
   it('scales proportionally with web viewport area', () => {
     expect(getMatchMenuViewportScale(1200, 675)).toBe(1);

@@ -93,6 +93,7 @@ describe('adminValidation', () => {
       ).toEqual({ ok: false, reason: 'usage_cap_positive' });
     });
 
+    // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
     it('treats usage cap 0 as unlimited for multi-use modes', () => {
       expect(
         derivePromoModeDefaults({

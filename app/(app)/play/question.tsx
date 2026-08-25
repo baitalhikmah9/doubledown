@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Platform,
   View,
@@ -8,7 +8,6 @@ import {
   useWindowDimensions,
   type ViewStyle,
 } from 'react-native';
-import { showThemedAlert } from '@/store/themedAlert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
@@ -37,7 +36,7 @@ import { HOME_SOFT_UI } from '@/themes';
 const T = HOME_SOFT_UI.colors;
 
 /** Deeper solid depth - matches extruded raised plastic pattern. */
-function neumorphicLift3D(tier: 'hero' | 'pill'): ViewStyle {
+function neumorphicLift3D(_tier: 'hero' | 'pill'): ViewStyle {
   return SOFT_SURFACE_STYLES.raised;
 }
 
@@ -147,7 +146,7 @@ const QUESTION_MAX_SECONDS = 10 * 60;
 const WAGER_FAB_ICON = require('@/assets/wager.webp');
 
 type RumbleChipTranslate = (
-  key: string,
+  key: 'play.rumbleChipHiddenName' | 'play.rumbleChipLocked' | 'play.rumbleChipAnswering',
   values?: Record<string, string | number>
 ) => string;
 
@@ -255,11 +254,6 @@ export default function PlayQuestionScreen() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [wagerInfoOpen, setWagerInfoOpen] = useState(false);
 
-  const openHotSeatInfo = useCallback(() => {
-    showThemedAlert(t('play.hotSeatInfoTitle'), t('play.hotSeatInfoBody'), [
-      { text: t('common.close') },
-    ]);
-  }, [t]);
 
   const currentTeam = useMemo(() => {
     return session?.teams.find((t) => t.id === session.currentTeamId);
@@ -411,7 +405,7 @@ export default function PlayQuestionScreen() {
   const rumblePartyPhase = isRumbleQuestion ? getRumblePartyPhase(elapsedSeconds) : null;
   const rumblePartySlots = isRumbleQuestion
     ? getRumblePartySlots(elapsedSeconds)
-    : { firstRevealed: false, secondRevealed: false, activeSlot: null as const };
+    : { firstRevealed: false, secondRevealed: false, activeSlot: null as null };
   const rumbleTimingGuide =
     rumblePartyPhase === 'waiting'
       ? t('play.rumbleWaiting')
@@ -560,7 +554,7 @@ export default function PlayQuestionScreen() {
           active={rumblePartySlots.activeSlot === 'first'}
           locked={!rumblePartySlots.firstRevealed}
           compact={isCompactHeader}
-          t={t}
+          t={(key, values) => t(key, values)}
         />
         <RumblePartyChip
           role="second"
@@ -568,7 +562,7 @@ export default function PlayQuestionScreen() {
           active={rumblePartySlots.activeSlot === 'second'}
           locked={!rumblePartySlots.secondRevealed}
           compact={isCompactHeader}
-          t={t}
+          t={(key, values) => t(key, values)}
         />
       </View>
       {canSkipRumbleWait ? (
@@ -642,7 +636,6 @@ export default function PlayQuestionScreen() {
               minimumFontScale: 0.62,
               maxFontSizeMultiplier: 1.2,
             })}
-        includeFontPadding={false}
       >
         {q.prompt}
       </Text>
@@ -1000,7 +993,6 @@ export default function PlayQuestionScreen() {
                         minimumFontScale: 0.72,
                         maxFontSizeMultiplier: 1.2,
                       })}
-                  includeFontPadding={false}
                 >
                   {q.prompt}
                 </Text>

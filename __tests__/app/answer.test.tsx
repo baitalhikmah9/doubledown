@@ -1,73 +1,10 @@
 import React from 'react';
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import { render, screen } from '@testing-library/react-native';
 import type { GameConfig, GameSessionState, QuestionCard } from '@/features/shared';
 
 import PlayAnswerScreen from '@/app/(app)/play/answer';
 import { usePlayStore } from '@/store/play';
-
-const mockReplace = jest.fn();
-
-jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    replace: mockReplace,
-  }),
-}));
-
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  __esModule: true,
-  getItem: jest.fn(async () => null),
-  setItem: jest.fn(async () => {}),
-  removeItem: jest.fn(async () => {}),
-  default: {
-    getItem: jest.fn(async () => null),
-    setItem: jest.fn(async () => {}),
-    removeItem: jest.fn(async () => {}),
-  },
-}));
-
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
-}));
-
-jest.mock('expo-image', () => ({
-  Image: 'Image',
-}));
-
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
-jest.mock('@/lib/i18n/useI18n', () => ({
-  useI18n: () => ({
-    direction: 'ltr',
-    getTextStyle: () => ({}),
-    t: (key: string) => {
-      const messages: Record<string, string> = {
-        'common.loading': 'Loading',
-        'common.leave': 'Leave',
-        'common.stay': 'Stay',
-        'play.correctAnswer': 'Correct Answer',
-        'play.finishMatch': 'Finish Match',
-        'play.leaveMatchBody': 'Leaving now will discard the active play session.',
-        'play.leaveMatchTitle': 'Leave Match?',
-        'play.neitherTeam': 'Neither Team',
-        'play.nextTurn': 'Next Turn',
-        'play.noPointsAwarded': 'No points awarded',
-        'play.originalQuestion': 'Original Question',
-        'play.pointsAwarded': 'Points awarded.',
-        'play.resolveTurnTitle': 'Review the Answer',
-        'play.wagerNextTeam': 'Wager on Next Team',
-        'play.whoGetsPoints': 'Who gets the points?',
-      };
-      return messages[key] ?? key;
-    },
-  }),
-}));
-
-jest.mock('@/features/play/components/PlayScaffold', () => ({
-  PlayScaffold: ({ children }: { children: React.ReactNode }) => children,
-}));
 
 function createQuestion(
   overrides: Partial<QuestionCard> & Pick<QuestionCard, 'id' | 'canonicalKey'>
@@ -156,7 +93,6 @@ function createSession(overrides: Partial<GameSessionState> = {}): GameSessionSt
 
 describe('PlayAnswerScreen', () => {
   beforeEach(() => {
-    mockReplace.mockClear();
     usePlayStore.setState({ session: null, tokens: 5, rapidFire: null });
   });
 

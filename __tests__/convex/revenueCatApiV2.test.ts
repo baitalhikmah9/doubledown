@@ -14,14 +14,40 @@ import {
   buildRevenueCatDiscountIdentifier,
 } from '../../convex/lib/revenueCatApiV2';
 
-function mockResponse(body: unknown, status = 200): Response {
+type JsonObject = { [key: string]: JsonBody };
+type JsonBody = string | number | boolean | null | JsonBody[] | JsonObject;
+
+function isJsonObject(body: JsonBody): body is JsonObject {
+  return body !== null && typeof body === 'object' && !Array.isArray(body);
+}
+
+function mockResponse(body: JsonBody, status = 200): Response {
+  const ok = status >= 200 && status < 300;
+  const textBody = isJsonObject(body) || Array.isArray(body) ? JSON.stringify(body) : String(body);
+  // SAFETY: Partial Response stub is sufficient for the RevenueCat client under test.
   return {
-    ok: status >= 200 && status < 300,
+    ok,
     status,
-    json: async () => body as Record<string, unknown>,
-    text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+    json: async () => (isJsonObject(body) || Array.isArray(body) ? body : { raw: String(body) }),
+    text: async () => textBody,
+  // SAFETY: Controlled test boundary cast under fixture invariants.
   } as Response;
 }
+
+function asFetch(impl: (...args: never[]) => Promise<Response>): typeof fetch {
+  // SAFETY: Test doubles only need the subset of fetch used by the V2 client.
+  return impl as typeof fetch;
+}
+
+type FetchCall = [input: RequestInfo | URL, init?: RequestInit];
+function lastFetchCall(mock: { mock: { calls: unknown[] } }): FetchCall {
+  const call = mock.mock.calls.at(-1);
+  if (!call || !Array.isArray(call)) {
+    throw new Error('expected fetch mock call');
+  }
+  return call as FetchCall;
+}
+
 
 describe('revenueCatApiV2', () => {
   const origEnv = { ...process.env };
@@ -78,34 +104,39 @@ describe('revenueCatApiV2', () => {
         customerFacingName: 'Promo mikhail10',
         percentage: 10,
         productIdentifier: 'com.backfire.tokens50',
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
       expect(result).toEqual({ id: 'dis_123', identifier: 'promo_mikhail10' });
       expect(fetchMock).toHaveBeenCalledTimes(1);
-      const [url, init] = fetchMock.mock.calls[0];
-      expect(url).toContain('/projects/proj_test_123/discounts');
+      const [url, init] = lastFetchCall(fetchMock);
+      expect(String(url)).toContain('/projects/proj_test_123/discounts');
       expect(init?.method).toBe('POST');
-      const body = JSON.parse((init as RequestInit).body as string);
+      const bodyText = init?.body != null && String(init.body) === init.body ? init.body : '';
+      // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
+      const body = JSON.parse(bodyText) as {
+        type: string;
+        percentage: number;
+        duration_mode: string;
+        product_identifiers: string[];
+      };
       expect(body.type).toBe('percentage');
       expect(body.percentage).toBe(10);
       expect(body.duration_mode).toBe('one_time');
       expect(body.product_identifiers).toEqual(['com.backfire.tokens50']);
-      expect((init as RequestInit).headers).toMatchObject({
+      expect(init?.headers).toMatchObject({
         Authorization: 'Bearer sk_v2_test_secret',
       });
     });
 
     it('throws RevenueCatV2Error on non-2xx response', async () => {
-      const fetchMock = jest.fn(async () =>
-        mockResponse({ error: 'bad request' }, 400)
-      );
+      const fetchMock = jest.fn(async () => mockResponse({ error: 'bad request' }, 400));
       await expect(
         createPercentageDiscount({
           identifier: 'promo_test',
           customerFacingName: 'Test',
           percentage: 10,
           productIdentifier: 'com.test.product',
-          fetchImpl: fetchMock as unknown as typeof fetch,
+          fetchImpl: asFetch(fetchMock),
         })
       ).rejects.toThrow(RevenueCatV2Error);
     });
@@ -130,7 +161,7 @@ describe('revenueCatApiV2', () => {
           customerFacingName: 'Test',
           percentage: 10,
           productIdentifier: 'com.test.product',
-          fetchImpl: fetchMock as unknown as typeof fetch,
+          fetchImpl: asFetch(fetchMock),
         })
       ).rejects.toThrow('revenuecat_v2_create_discount_malformed');
     });
@@ -142,12 +173,14 @@ describe('revenueCatApiV2', () => {
       const result = await createDiscountCode({
         discountId: 'dis_123',
         code: 'MIKHAIL10',
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
       expect(result).toEqual({ code: 'MIKHAIL10' });
-      const [url, init] = fetchMock.mock.calls[0];
-      expect(url).toContain('/discounts/dis_123/discount_codes');
-      const body = JSON.parse((init as RequestInit).body as string);
+      const [url, init] = lastFetchCall(fetchMock);
+      expect(String(url)).toContain('/discounts/dis_123/discount_codes');
+      const bodyText = init?.body != null && String(init.body) === init.body ? init.body : '';
+      // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
+      const body = JSON.parse(bodyText) as { codes: string[] };
       expect(body.codes).toEqual(['MIKHAIL10']);
     });
   });
@@ -157,19 +190,20 @@ describe('revenueCatApiV2', () => {
       const fetchMock = jest.fn(async () => mockResponse({}, 200));
       await disableDiscount({
         discountId: 'dis_123',
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
-      const [url, init] = fetchMock.mock.calls[0];
-      expect(url).toContain('/discounts/dis_123/actions/disable');
+      const [url, init] = lastFetchCall(fetchMock);
+      expect(String(url)).toContain('/discounts/dis_123/actions/disable');
       expect(init?.method).toBe('POST');
     });
 
+    // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
     it('treats 404 as success (idempotent)', async () => {
       const fetchMock = jest.fn(async () => mockResponse('not found', 404));
       await expect(
         disableDiscount({
           discountId: 'dis_gone',
-          fetchImpl: fetchMock as unknown as typeof fetch,
+          fetchImpl: asFetch(fetchMock),
         })
       ).resolves.toBeUndefined();
     });
@@ -179,7 +213,7 @@ describe('revenueCatApiV2', () => {
       await expect(
         disableDiscount({
           discountId: 'dis_123',
-          fetchImpl: fetchMock as unknown as typeof fetch,
+          fetchImpl: asFetch(fetchMock),
         })
       ).rejects.toThrow(RevenueCatV2Error);
     });
@@ -191,20 +225,21 @@ describe('revenueCatApiV2', () => {
       await deleteDiscountCode({
         discountId: 'dis_123',
         code: 'MIKHAIL10',
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
-      const [url, init] = fetchMock.mock.calls[0];
-      expect(url).toContain('/discounts/dis_123/discount_codes/MIKHAIL10');
+      const [url, init] = lastFetchCall(fetchMock);
+      expect(String(url)).toContain('/discounts/dis_123/discount_codes/MIKHAIL10');
       expect(init?.method).toBe('DELETE');
     });
 
+    // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
     it('treats 404 as success (idempotent)', async () => {
       const fetchMock = jest.fn(async () => mockResponse('not found', 404));
       await expect(
         deleteDiscountCode({
           discountId: 'dis_123',
           code: 'GONE',
-          fetchImpl: fetchMock as unknown as typeof fetch,
+          fetchImpl: asFetch(fetchMock),
         })
       ).resolves.toBeUndefined();
     });
@@ -217,11 +252,11 @@ describe('revenueCatApiV2', () => {
       );
       const codes = await listDiscountCodes({
         discountId: 'dis_123',
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
       expect(codes).toEqual(['MIKHAIL10', 'OTHER20']);
-      const [url, init] = fetchMock.mock.calls[0];
-      expect(url).toContain('/discounts/dis_123/discount_codes');
+      const [url, init] = lastFetchCall(fetchMock);
+      expect(String(url)).toContain('/discounts/dis_123/discount_codes');
       expect(init?.method).toBe('GET');
     });
 
@@ -229,7 +264,7 @@ describe('revenueCatApiV2', () => {
       const fetchMock = jest.fn(async () => mockResponse({}));
       const codes = await listDiscountCodes({
         discountId: 'dis_123',
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
       expect(codes).toEqual([]);
     });
@@ -239,7 +274,7 @@ describe('revenueCatApiV2', () => {
       await expect(
         listDiscountCodes({
           discountId: 'dis_123',
-          fetchImpl: fetchMock as unknown as typeof fetch,
+          fetchImpl: asFetch(fetchMock),
         })
       ).rejects.toThrow(RevenueCatV2Error);
     });
@@ -251,24 +286,24 @@ describe('revenueCatApiV2', () => {
       const result = await ensureDiscountCode({
         discountId: 'dis_123',
         code: 'MIKHAIL10',
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
       expect(result).toEqual({ attached: true });
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
+    // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
     it('treats 409 as success when the code exists on the discount', async () => {
       const fetchMock = jest.fn(async (_url: string, init?: RequestInit) => {
         if (init?.method === 'POST') {
           return mockResponse('conflict', 409);
         }
-        // GET list returns the code
         return mockResponse({ data: [{ code: 'MIKHAIL10' }] });
       });
       const result = await ensureDiscountCode({
         discountId: 'dis_123',
         code: 'MIKHAIL10',
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
       expect(result).toEqual({ attached: true });
       expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -285,7 +320,7 @@ describe('revenueCatApiV2', () => {
         ensureDiscountCode({
           discountId: 'dis_123',
           code: 'MIKHAIL10',
-          fetchImpl: fetchMock as unknown as typeof fetch,
+          fetchImpl: asFetch(fetchMock),
         })
       ).rejects.toThrow('revenuecat_v2_code_conflict_on_different_discount');
     });
@@ -296,7 +331,7 @@ describe('revenueCatApiV2', () => {
         ensureDiscountCode({
           discountId: 'dis_123',
           code: 'MIKHAIL10',
-          fetchImpl: fetchMock as unknown as typeof fetch,
+          fetchImpl: asFetch(fetchMock),
         })
       ).rejects.toThrow(RevenueCatV2Error);
     });
@@ -307,51 +342,47 @@ describe('revenueCatApiV2', () => {
       const fetchMock = jest.fn(async () => mockResponse({}, 200));
       await enableDiscount({
         discountId: 'dis_123',
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
-      const [url, init] = fetchMock.mock.calls[0];
-      expect(url).toContain('/discounts/dis_123/actions/enable');
+      const [url, init] = lastFetchCall(fetchMock);
+      expect(String(url)).toContain('/discounts/dis_123/actions/enable');
       expect(init?.method).toBe('POST');
     });
 
     it('throws on 404 so the caller can recover (stale persisted id)', async () => {
-      // A 404 means the persisted provider discount id is stale (the discount
-      // was deleted at the provider). Throwing lets the caller branch into
-      // automatic recovery instead of silently retrying against a nonexistent
-      // discount forever.
       const fetchMock = jest.fn(async () => mockResponse('not found', 404));
       await expect(
         enableDiscount({
           discountId: 'dis_gone',
-          fetchImpl: fetchMock as unknown as typeof fetch,
+          fetchImpl: asFetch(fetchMock),
         })
       ).rejects.toThrow(RevenueCatV2Error);
     });
 
     it('isDiscountNotFoundError identifies the 404 enable error', async () => {
       const fetchMock = jest.fn(async () => mockResponse('not found', 404));
-      let caught: unknown;
+      let caught: Error | null = null;
       try {
         await enableDiscount({
           discountId: 'dis_gone',
-          fetchImpl: fetchMock as unknown as typeof fetch,
+          fetchImpl: asFetch(fetchMock),
         });
       } catch (e) {
-        caught = e;
+        caught = e instanceof Error ? e : new Error(String(e));
       }
       expect(isDiscountNotFoundError(caught)).toBe(true);
     });
 
     it('isDiscountNotFoundError returns false for non-404 errors', async () => {
       const fetchMock = jest.fn(async () => mockResponse('server error', 500));
-      let caught: unknown;
+      let caught: Error | null = null;
       try {
         await enableDiscount({
           discountId: 'dis_123',
-          fetchImpl: fetchMock as unknown as typeof fetch,
+          fetchImpl: asFetch(fetchMock),
         });
       } catch (e) {
-        caught = e;
+        caught = e instanceof Error ? e : new Error(String(e));
       }
       expect(isDiscountNotFoundError(caught)).toBe(false);
     });
@@ -361,7 +392,7 @@ describe('revenueCatApiV2', () => {
       await expect(
         enableDiscount({
           discountId: 'dis_123',
-          fetchImpl: fetchMock as unknown as typeof fetch,
+          fetchImpl: asFetch(fetchMock),
         })
       ).rejects.toThrow(RevenueCatV2Error);
     });
@@ -372,21 +403,22 @@ describe('revenueCatApiV2', () => {
       const fetchMock = jest.fn(async () => mockResponse({}, 200));
       await deleteDiscount({
         discountId: 'dis_123',
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
-      const [url, init] = fetchMock.mock.calls[0];
-      expect(url).toContain('/discounts/dis_123');
-      expect(url).not.toContain('/actions/');
-      expect(url).not.toContain('/discount_codes/');
+      const [url, init] = lastFetchCall(fetchMock);
+      expect(String(url)).toContain('/discounts/dis_123');
+      expect(String(url)).not.toContain('/actions/');
+      expect(String(url)).not.toContain('/discount_codes/');
       expect(init?.method).toBe('DELETE');
     });
 
+    // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
     it('treats 404 as success (idempotent)', async () => {
       const fetchMock = jest.fn(async () => mockResponse('not found', 404));
       await expect(
         deleteDiscount({
           discountId: 'dis_gone',
-          fetchImpl: fetchMock as unknown as typeof fetch,
+          fetchImpl: asFetch(fetchMock),
         })
       ).resolves.toBeUndefined();
     });
@@ -396,7 +428,7 @@ describe('revenueCatApiV2', () => {
       await expect(
         deleteDiscount({
           discountId: 'dis_123',
-          fetchImpl: fetchMock as unknown as typeof fetch,
+          fetchImpl: asFetch(fetchMock),
         })
       ).rejects.toThrow(RevenueCatV2Error);
     });

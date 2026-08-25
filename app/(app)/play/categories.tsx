@@ -82,6 +82,13 @@ type CategoryListItem =
       marginBottom: number;
     };
 
+type CategoryItemLayout = { length: number; offset: number };
+type CategoryListData = {
+  rows: CategoryListItem[];
+  layouts: CategoryItemLayout[];
+  slugToIndex: Map<string, number>;
+};
+
 function buildCategoryListData(
   sections: CategorySection[],
   cols: number,
@@ -89,13 +96,9 @@ function buildCategoryListData(
   cardH: number,
   gridGap: number,
   sectionTitleHeight: number
-): {
-  rows: CategoryListItem[];
-  layouts: { length: number; offset: number }[];
-  slugToIndex: Map<string, number>;
-} {
+): CategoryListData {
   const rows: CategoryListItem[] = [];
-  const layouts: { length: number; offset: number }[] = [];
+  const layouts: CategoryItemLayout[] = [];
   const slugToIndex = new Map<string, number>();
   let offset = SPACING.xs;
 
@@ -337,6 +340,7 @@ export default function CategorySelectionScreen() {
 
   const required = useMemo(() => {
     if (!session) return 0;
+    // SAFETY: session.mode is always a GameMode from the play store.
     return getModeCategoryCount(
       session.mode as GameMode,
       session.config.quickPlayTopicCount ?? 3
@@ -475,9 +479,11 @@ export default function CategorySelectionScreen() {
   const sectionTitleHeight = Math.round(sectionTitleSize * 1.2);
   const { categoryListRows, categoryItemLayouts, categorySlugToIndex } = useMemo(() => {
     if (!categorySections.length) {
+      const emptyRows: CategoryListItem[] = [];
+      const emptyLayouts: CategoryItemLayout[] = [];
       return {
-        categoryListRows: [] as CategoryListItem[],
-        categoryItemLayouts: [] as { length: number; offset: number }[],
+        categoryListRows: emptyRows,
+        categoryItemLayouts: emptyLayouts,
         categorySlugToIndex: new Map<string, number>(),
       };
     }

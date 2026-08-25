@@ -135,6 +135,7 @@ export function TopicColumnPickerModal({
                   {picture ? (
                     <Image
                       source={picture}
+                      // SAFETY: StyleSheet image style is compatible with expo-image StyleProp.
                       style={styles.heroImage as never}
                       contentFit="cover"
                       loading="lazy"

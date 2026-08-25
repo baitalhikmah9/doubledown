@@ -39,13 +39,12 @@ const SYSTEM_FONT_LOCALES = new Set<SupportedLocale>([
   'zh-Hans',
 ]);
 
-export const LOCALE_LABELS: Record<
-  SupportedLocale,
-  {
-    nativeName: string;
-    englishName: string;
-  }
-> = {
+export type LocaleLabel = {
+  nativeName: string;
+  englishName: string;
+};
+
+export const LOCALE_LABELS = {
   en: { nativeName: 'English', englishName: 'English' },
   ar: { nativeName: 'العربية', englishName: 'Arabic' },
   es: { nativeName: 'Español', englishName: 'Spanish' },
@@ -57,10 +56,11 @@ export const LOCALE_LABELS: Record<
   ru: { nativeName: 'Русский', englishName: 'Russian' },
   id: { nativeName: 'Bahasa Indonesia', englishName: 'Indonesian' },
   bn: { nativeName: 'বাংলা', englishName: 'Bengali' },
-};
+} as const satisfies Record<SupportedLocale, LocaleLabel>;
 
 export function isSupportedLocale(value: string): value is SupportedLocale {
-  return SUPPORTED_LOCALES.includes(value as SupportedLocale);
+  // SAFETY: SUPPORTED_LOCALES is the closed set of SupportedLocale string literals.
+  return (SUPPORTED_LOCALES as readonly string[]).includes(value);
 }
 
 export function isNonEnglishContentLocale(

@@ -37,7 +37,10 @@ export function LegalDocumentBody({
         </>
       ) : null}
 
-      <View style={styles.englishBody}>
+      <View
+        // SAFETY: writingDirection is accepted at runtime on web View; RN ViewStyle typings omit it.
+        style={[styles.englishBody, { writingDirection: 'ltr' } as object]}
+      >
         {sections.map((section, index) => (
           <View
             key={section.heading}
@@ -70,9 +73,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: SPACING.sm,
   },
-  englishBody: {
-    writingDirection: 'ltr',
-  },
+  englishBody: {},
   section: {
     marginTop: SPACING.lg,
     gap: SPACING.sm,

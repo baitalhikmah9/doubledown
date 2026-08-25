@@ -14,6 +14,7 @@ import {
 } from '@expo-google-fonts/noto-sans-arabic';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { SplashHider } from '@/components/SplashHider';
+import { WebLandscapeGate } from '@/components/WebLandscapeGate';
 import { WebSeoHead } from '@/components/WebSeoHead';
 import { Providers } from '@/lib/providers';
 import { useThemeStore } from '@/store/theme';
@@ -47,6 +48,16 @@ function hideSystemStatusBar() {
   } catch {
     /* Expo Go / OS may reject; immersive UI still usable */
   }
+}
+
+function lockLandscapeOrientation() {
+  void import('expo-screen-orientation')
+    .then((ScreenOrientation) =>
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
+    )
+    .catch(() => {
+      /* web often rejects outside fullscreen; WebLandscapeGate covers UX */
+    });
 }
 
 export default function RootLayout() {
@@ -104,43 +115,20 @@ export default function RootLayout() {
   if (fontsLoaded) markOnce('fonts loaded');
 
   useEffect(() => {
-    if (Platform.OS === 'web') return;
-
-    // Immersive chrome: keep system status bar (time / battery / wifi) hidden so
-    // play UI gets vertical space. Users still open notifications / Control Center
-    // with an edge swipe; OS may flash bars briefly, then we re-hide on resume.
-    // Note: app.json UIStatusBarHidden only applies to standalone/dev builds, not Expo Go.
+    // Immersive chrome (native): keep system status bar hidden so play UI gets
+    // vertical space. app.json UIStatusBarHidden is standalone/dev only, not Expo Go.
     hideSystemStatusBar();
+    lockLandscapeOrientation();
 
-    let appStateSub: ReturnType<typeof AppState.addEventListener> | undefined;
-    let cancelled = false;
-
-    void import('expo-screen-orientation')
-      .then((ScreenOrientation) => {
-        if (cancelled) return;
-        const lockLandscape = () => {
-          void ScreenOrientation.lockAsync(
-            ScreenOrientation.OrientationLock.LANDSCAPE
-          );
-        };
-        lockLandscape();
-        appStateSub = AppState.addEventListener('change', (next) => {
-          if (next === 'active') {
-            lockLandscape();
-            hideSystemStatusBar();
-          }
-        });
-      })
-      .catch(() => {
-        /* orientation optional; avoid breaking app bootstrap */
-        appStateSub = AppState.addEventListener('change', (next) => {
-          if (next === 'active') hideSystemStatusBar();
-        });
-      });
+    const appStateSub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') {
+        lockLandscapeOrientation();
+        hideSystemStatusBar();
+      }
+    });
 
     return () => {
-      cancelled = true;
-      appStateSub?.remove();
+      appStateSub.remove();
     };
   }, []);
 
@@ -168,6 +156,7 @@ export default function RootLayout() {
             <Stack.Screen name="admin" options={ROOT_NESTED_STACK_SCREEN_OPTIONS} />
           </Stack>
         </ThemeProvider>
+        <WebLandscapeGate />
       </Providers>
     </ErrorBoundary>
   );

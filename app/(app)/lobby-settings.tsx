@@ -5,7 +5,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   SPACING,
   FONT_SIZES,
-  BORDER_RADIUS,
   FONTS,
   LAYOUT,
   SOFT_SURFACE_FACE,

@@ -11,12 +11,9 @@ import type { GameSessionState, TeamState } from '@/features/shared';
 import { getLeadingTeamId } from '@/features/play/categorySections';
 import { getPlaySurfaceColors } from '@/features/play/playSurfaceColors';
 import { getMatchScorePillMetrics } from '@/features/play/scorePillLayout';
-import { HOME_SOFT_UI } from '@/themes';
 import { usePlayTextScale } from '@/store/display';
 import { usePlayStore } from '@/store/play';
 import { useThemeStore } from '@/store/theme';
-
-const T = HOME_SOFT_UI;
 
 /** BackFire flame palette for the active-turn glow: hot red-orange core, ember warmth. */
 const FIRE = {

@@ -1,27 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { __resetAsyncStorageDouble, setItem, getItem } from '../doubles/asyncStorage';
 import type { GameSessionState, ScoreEvent } from '@/features/shared';
-
-const mockStorage = new Map<string, string>();
-
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  __esModule: true,
-  getItem: jest.fn(async (key: string) => mockStorage.get(key) ?? null),
-  setItem: jest.fn(async (key: string, value: string) => {
-    mockStorage.set(key, value);
-  }),
-  removeItem: jest.fn(async (key: string) => {
-    mockStorage.delete(key);
-  }),
-  default: {
-    getItem: jest.fn(async (key: string) => mockStorage.get(key) ?? null),
-    setItem: jest.fn(async (key: string, value: string) => {
-      mockStorage.set(key, value);
-    }),
-    removeItem: jest.fn(async (key: string) => {
-      mockStorage.delete(key);
-    }),
-  },
-}));
 
 import {
   enqueueOfflineSession,
@@ -60,7 +39,7 @@ function minimalSession(): GameSessionState {
 
 describe('offlineSessionQueue', () => {
   beforeEach(() => {
-    mockStorage.clear();
+    __resetAsyncStorageDouble();
   });
 
   it('queues completed sessions offline', async () => {
@@ -103,5 +82,34 @@ describe('offlineSessionQueue', () => {
     expect(remaining).toHaveLength(1);
     expect(remaining[0]?.payload.clientSessionId).toBe('c_fail');
     expect(remaining[0]?.flushAttempts).toBe(1);
+  });
+
+  it('preserves valid siblings when one queued row is corrupt', async () => {
+    await enqueueOfflineSession({
+      clientSessionId: 'c_valid',
+      deviceId: 'd1',
+      session: minimalSession(),
+      scoreEvents: [],
+    });
+
+    const key = 'backfire-offline-session-queue-v1';
+    const existingRaw = await getItem(key);
+    const existing = existingRaw ? JSON.parse(existingRaw) : [];
+    const mixed = [
+      { not: 'a-queue-item' },
+      ...existing,
+      null,
+      {
+        id: 'q_broken',
+        createdAt: 1,
+        flushAttempts: 0,
+        payload: { clientSessionId: 'x' },
+      },
+    ];
+    await setItem(key, JSON.stringify(mixed));
+
+    const q = await loadOfflineSessionQueue();
+    expect(q).toHaveLength(1);
+    expect(q[0]?.payload.clientSessionId).toBe('c_valid');
   });
 });

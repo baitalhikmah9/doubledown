@@ -22,7 +22,17 @@ function deploymentArgs(push = false): string[] {
   return ['--deployment-name', DEV_DEPLOYMENT];
 }
 
-function runConvex(functionName: string, args: unknown, options?: { push?: boolean }) {
+type ConvexCliJson =
+  | string
+  | number
+  | boolean
+  | null
+  | ConvexCliJson[]
+  | { readonly [key: string]: ConvexCliJson | undefined };
+
+type ConvexCliArgs = { readonly [key: string]: ConvexCliJson | undefined };
+
+function runConvex(functionName: string, args: ConvexCliArgs, options?: { push?: boolean }) {
   const cliArgs = ['convex', 'run'];
   if (options?.push) {
     cliArgs.push('--push');
@@ -83,10 +93,16 @@ function main() {
   pushCode();
 
   console.log(`Seeding ${categories.length} categories...`);
-  runConvex('seed:seedCategories', { categories }, { push: !prod });
+  runConvex('seed:seedCategories', {
+    // SAFETY: seed JSON is validated by the Convex seedCategories validator.
+    categories: categories as ConvexCliJson[],
+  }, { push: !prod });
 
   console.log(`Seeding ${translations.length} category translations...`);
-  runConvex('seed:seedCategoryTranslations', { translations });
+  runConvex('seed:seedCategoryTranslations', {
+    // SAFETY: seed JSON is validated by the Convex seedCategoryTranslations validator.
+    translations: translations as ConvexCliJson[],
+  });
 
   const activeSlugs = categories.map((category: { slug: string }) => category.slug);
   console.log('Retiring categories not in seed...');
@@ -101,7 +117,11 @@ function main() {
   console.log(`Seeding ${questions.length} questions in ${questionBatches.length} batches...`);
   for (let i = 0; i < questionBatches.length; i += 1) {
     const batch = questionBatches[i];
-    const result = runConvex('seed:seedQuestions', { questions: batch });
+    const result = runConvex('seed:seedQuestions', {
+      // SAFETY: seed JSON is validated by the Convex seedQuestions validator.
+      questions: batch as ConvexCliJson[],
+    });
+    // SAFETY: seed:seedQuestions returns { inserted, updated, skipped } counts.
     const parsed = JSON.parse(result) as { inserted: number; updated: number; skipped: number };
     inserted += parsed.inserted;
     updated += parsed.updated;

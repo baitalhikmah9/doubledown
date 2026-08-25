@@ -4,12 +4,6 @@ import { StyleSheet } from 'react-native';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import { BORDER_RADIUS } from '@/constants/theme';
 
-jest.mock('@/lib/i18n/useI18n', () => ({
-  useI18n: () => ({
-    getTextStyle: () => ({}),
-  }),
-}));
-
 import { Button } from '@/components/ui/Button';
 
 describe('Button', () => {

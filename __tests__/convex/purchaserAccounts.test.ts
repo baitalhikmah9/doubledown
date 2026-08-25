@@ -7,10 +7,13 @@ import {
 } from '@/convex/lib/purchaserAccounts';
 import type { Id } from '@/convex/_generated/dataModel';
 
+// SAFETY: Controlled test boundary cast under fixture invariants.
 const userA = 'users_a' as Id<'users'>;
+// SAFETY: Controlled test fixture boundary cast.
 const userB = 'users_b' as Id<'users'>;
 
 describe('purchaser account profile isolation', () => {
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('treats only unlinked guest accounts as pure guests', () => {
     expect(isPureGuestPurchaserAccount({ kind: 'guest' })).toBe(true);
     expect(isPureGuestPurchaserAccount({ kind: 'guest', linkedUserId: userA })).toBe(false);

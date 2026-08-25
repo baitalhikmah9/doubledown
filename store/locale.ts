@@ -17,15 +17,15 @@ const UI_LOCALE_STORAGE_KEY = 'backfire-ui-locale';
 const CONTENT_LOCALE_STORAGE_KEY = 'backfire-content-locales';
 
 async function getStoredLocaleItem(key: string): Promise<string | null> {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    return window.localStorage.getItem(key);
+  if (Platform.OS === 'web' && globalThis.localStorage) {
+    return globalThis.localStorage.getItem(key);
   }
   return SecureStore.getItemAsync(key);
 }
 
 async function setStoredLocaleItem(key: string, value: string): Promise<void> {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    window.localStorage.setItem(key, value);
+  if (Platform.OS === 'web' && globalThis.localStorage) {
+    globalThis.localStorage.setItem(key, value);
     return;
   }
   await SecureStore.setItemAsync(key, value);
@@ -71,7 +71,8 @@ export const useLocaleStore = create<LocaleStore>((set, get) => ({
 
   moveContentLocale: (from, to) => {
     const current = get().contentLocales;
-    const next = [...getResolvedContentLocaleChain(current).filter((locale) => locale !== 'en')] as NonEnglishContentLocale[];
+    // SAFETY: getResolvedContentLocaleChain always puts 'en' last; filtering it leaves only NonEnglishContentLocale values.
+    const next = getResolvedContentLocaleChain(current).filter((locale) => locale !== 'en') as NonEnglishContentLocale[];
     const [item] = next.splice(from, 1);
 
     if (!item) {
@@ -97,12 +98,12 @@ export const useLocaleStore = create<LocaleStore>((set, get) => ({
       }
 
       if (storedContentLocales) {
+        // SAFETY: payload shape is re-validated by normalizeContentLocales.
         const parsed = JSON.parse(storedContentLocales) as Partial<ContentLocalePriority>;
-        const normalized = normalizeContentLocales([
-          parsed.primary,
-          parsed.secondary,
-          parsed.tertiary,
-        ].filter(Boolean) as string[]);
+        const candidates = [parsed.primary, parsed.secondary, parsed.tertiary].flatMap((locale) =>
+          locale ? [locale] : []
+        );
+        const normalized = normalizeContentLocales(candidates);
 
         set({
           contentLocales: normalized,

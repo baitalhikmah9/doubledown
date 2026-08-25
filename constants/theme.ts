@@ -306,7 +306,7 @@ export const FONT_SIZES = {
   xxxl: TYPE_SCALE.h1.fontSize,
 };
 
-export const PALETTES: Record<ThemePaletteId, Record<string, string>> = {
+export const PALETTES = {
   default: {
     primary: COLORS.primary,
     secondary: COLORS.secondary,
@@ -433,7 +433,7 @@ export const PALETTES: Record<ThemePaletteId, Record<string, string>> = {
     boardCellUsed: '#22334A',
     shadow: 'rgba(0, 5, 15, 0.58)',
   },
-};
+} as const satisfies Record<ThemePaletteId, Record<string, string>>;
 
 /** sRGB luminance in 0–1; used for status bar and contrast heuristics */
 export function relativeLuminance(hex: string): number {

@@ -67,7 +67,7 @@ export default function WalletsScreen() {
       label: '',
       flex: 1,
       align: 'right',
-      render: (row) => <Text style={styles.link}>View</Text>,
+      render: (_row) => <Text style={styles.link}>View</Text>,
     },
   ];
 

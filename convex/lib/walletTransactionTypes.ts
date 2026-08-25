@@ -20,14 +20,14 @@ export const WALLET_TRANSACTION_SOURCES = [
 
 export type WalletTransactionSource = (typeof WALLET_TRANSACTION_SOURCES)[number];
 
-export const WALLET_TRANSACTION_SOURCE_LABELS: Record<WalletTransactionSource, string> = {
+export const WALLET_TRANSACTION_SOURCE_LABELS = {
   purchase: 'Purchase',
   gameplay: 'Gameplay',
   system: 'System',
   admin: 'Admin',
   promo: 'Promo',
   account_deletion: 'Account Deletion',
-};
+} as const satisfies Record<WalletTransactionSource, string>;
 
 export const WALLET_TRANSACTION_TYPES = [
   'purchase_grant',

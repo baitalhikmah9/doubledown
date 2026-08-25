@@ -96,11 +96,16 @@ export function normalizeRevenueCatStore(store?: string | null): PaymentStore | 
  * Returns `{ priceAmountMicros, currencyCode }` where either field may be
  * undefined when no usable price is present.
  */
+export type ExtractedPurchasePrice = {
+  priceAmountMicros?: number;
+  currencyCode?: string;
+};
+
 export function extractPurchasePrice(args: {
   price?: unknown;
   priceInPurchasedCurrency?: unknown;
   currency?: unknown;
-}): { priceAmountMicros?: number; currencyCode?: string } {
+}): ExtractedPurchasePrice {
   const purchasedMicros = priceToMicros(args.priceInPurchasedCurrency);
   const usdMicros = priceToMicros(args.price);
   const currencyCode = asString(args.currency);

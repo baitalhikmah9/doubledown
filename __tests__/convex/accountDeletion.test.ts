@@ -21,6 +21,7 @@ import {
 } from '@/convex/lib/purchaserAccounts';
 import type { Id } from '@/convex/_generated/dataModel';
 
+// SAFETY: Controlled test boundary cast under fixture invariants.
 const userA = 'users_a' as Id<'users'>;
 
 describe('account deletion helpers', () => {
@@ -73,6 +74,7 @@ describe('account deletion helpers', () => {
     expect(tx.status).toBe('posted');
   });
 
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('treats only active purchaser accounts as usable/reclaimable', () => {
     expect(isPurchaserAccountUsable({ state: PURCHASER_STATE_ACTIVE })).toBe(true);
     expect(isPurchaserAccountUsable({ state: PURCHASER_STATE_DELETED })).toBe(false);
@@ -100,6 +102,7 @@ describe('account deletion helpers', () => {
     );
   });
 
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('treats Clerk 404 as already deleted for safe retries', () => {
     expect(isClerkUserAlreadyDeleted(404)).toBe(true);
     expect(isClerkUserAlreadyDeleted(200)).toBe(false);

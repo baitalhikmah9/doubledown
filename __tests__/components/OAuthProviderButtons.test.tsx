@@ -3,10 +3,6 @@ import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { Platform, StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-jest.mock('@/lib/hooks/useTheme', () => ({
-  useDarkModeFlatTop: () => ({}),
-}));
-
 import { OAuthProviderButtons } from '@/components/OAuthProviderButtons';
 
 describe('OAuthProviderButtons', () => {
@@ -26,6 +22,7 @@ describe('OAuthProviderButtons', () => {
     });
   }
 
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('renders Google and Apple on iOS as equal half-width labeled buttons with outlines', () => {
     setOs('ios');
     const onGooglePress = jest.fn();
@@ -55,6 +52,7 @@ describe('OAuthProviderButtons', () => {
     expect(appleFlat.borderWidth).toBeGreaterThan(0);
   });
 
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('renders Google and Apple on web as equal half-width labeled buttons', () => {
     setOs('web');
     render(

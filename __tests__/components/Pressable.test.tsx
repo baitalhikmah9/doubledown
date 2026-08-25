@@ -1,19 +1,24 @@
 import React from 'react';
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { Text } from 'react-native';
+import { Platform, Text } from 'react-native';
 
 import { Pressable } from '@/components/ui/Pressable';
-import { hapticButtonPress } from '@/lib/haptics';
-
-jest.mock('@/lib/haptics', () => ({
-  hapticButtonPress: jest.fn(),
-}));
+import { impactAsync } from '../doubles/expoHaptics';
 
 describe('Pressable', () => {
+  const originalOS = Platform.OS;
+
   beforeEach(() => {
-    jest.clearAllMocks();
+    impactAsync.mockClear();
+    // Haptics are no-op on web; pin native so press feedback is exercised.
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'ios' });
   });
+
+  afterEach(() => {
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOS });
+  });
+
   it('triggers haptics by default', () => {
     render(
       <Pressable accessibilityRole="button">
@@ -23,7 +28,7 @@ describe('Pressable', () => {
 
     fireEvent(screen.getByRole('button'), 'pressIn');
 
-    expect(hapticButtonPress).toHaveBeenCalledTimes(1);
+    expect(impactAsync).toHaveBeenCalledTimes(1);
   });
 
   it('does not trigger haptics when explicitly disabled', () => {
@@ -35,7 +40,7 @@ describe('Pressable', () => {
 
     fireEvent(screen.getByRole('button'), 'pressIn');
 
-    expect(hapticButtonPress).not.toHaveBeenCalled();
+    expect(impactAsync).not.toHaveBeenCalled();
   });
 
   it('triggers haptics when explicitly enabled', () => {
@@ -47,6 +52,6 @@ describe('Pressable', () => {
 
     fireEvent(screen.getByRole('button'), 'pressIn');
 
-    expect(hapticButtonPress).toHaveBeenCalledTimes(1);
+    expect(impactAsync).toHaveBeenCalledTimes(1);
   });
 });

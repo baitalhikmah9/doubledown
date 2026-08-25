@@ -25,7 +25,7 @@ export function AdminButton({
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
 }) {
-  const colors: Record<AdminButtonVariant, { bg: string; text: string; border: string }> = {
+  const colors = {
     primary: {
       bg: ADMIN_THEME.colors.primary,
       text: ADMIN_THEME.colors.primaryForeground,
@@ -46,7 +46,7 @@ export function AdminButton({
       text: ADMIN_THEME.colors.destructiveForeground,
       border: ADMIN_THEME.colors.destructive,
     },
-  };
+  } as const satisfies Record<AdminButtonVariant, { bg: string; text: string; border: string }>;
   const palette = colors[variant];
 
   return (

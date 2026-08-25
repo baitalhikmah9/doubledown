@@ -1,42 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { GameConfig, GameSessionState, QuestionCard } from '@/features/shared';
 import { serializeGameSession } from '@/store/gameSessionPersistence';
+import { __setAuthDisabled, __resetAuthModeDouble } from '../doubles/authMode';
+import {
+  __asyncStorageMemory,
+  __resetAsyncStorageDouble,
+} from '../doubles/asyncStorage';
+import { __setFeatureFlags } from '../doubles/featureFlags';
+import { usePlayStore } from '@/store/play';
 
-const mockStorage = new Map<string, string>();
+const mockStorage = __asyncStorageMemory();
 
-const mockAsyncStorage = {
-  getItem: jest.fn(async (key: string) => mockStorage.get(key) ?? null),
-  setItem: jest.fn(async (key: string, value: string) => {
-    mockStorage.set(key, value);
-  }),
-  removeItem: jest.fn(async (key: string) => {
-    mockStorage.delete(key);
-  }),
-  clear: jest.fn(async () => {
-    mockStorage.clear();
-  }),
-};
-
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  __esModule: true,
-  getItem: mockAsyncStorage.getItem,
-  setItem: mockAsyncStorage.setItem,
-  removeItem: mockAsyncStorage.removeItem,
-  clear: mockAsyncStorage.clear,
-  default: mockAsyncStorage,
-}));
-
-const mockAuthDisabled = jest.fn(() => true);
-
-jest.mock('@/constants/featureFlags', () => ({
-  SHOW_HOT_SEAT_UI: true,
-}));
-
-jest.mock('@/lib/authMode', () => ({
-  isAuthDisabled: () => mockAuthDisabled(),
-}));
-
-const { usePlayStore } = require('@/store/play') as typeof import('@/store/play');
 
 const STORAGE_KEY = 'backfire-play-store-v1';
 
@@ -149,8 +123,9 @@ function seedPlayStorage(tokens: number, session: GameSessionState | null) {
 }
 
 beforeEach(async () => {
-  mockAuthDisabled.mockReturnValue(true);
-  mockStorage.clear();
+  __resetAuthModeDouble();
+  __setAuthDisabled(true);
+  __resetAsyncStorageDouble();
   jest.clearAllMocks();
   usePlayStore.setState({ session: null, tokens: 5, rapidFire: null });
   await usePlayStore.getState().hydrate();
@@ -885,6 +860,7 @@ describe('usePlayStore', () => {
   });
 
   it('only enables hot seat in classic and quick play', () => {
+    __setFeatureFlags({ SHOW_HOT_SEAT_UI: true });
     for (const mode of ['classic', 'quickPlay'] as const) {
       usePlayStore.setState({ session: null, tokens: 5, rapidFire: null });
       usePlayStore.getState().setMode(mode);
@@ -995,6 +971,7 @@ describe('usePlayStore', () => {
 
     usePlayStore.getState().resetSession();
 
+    // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
     const stored = JSON.parse(mockStorage.get(STORAGE_KEY) ?? '{}') as {
       state?: { tokens?: number; session?: unknown };
     };
@@ -1075,7 +1052,9 @@ describe('usePlayStore', () => {
 
     usePlayStore.setState({ session, tokens: 5, rapidFire: null });
 
+    // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
     const store = usePlayStore.getState() as typeof usePlayStore extends { getState: () => infer T } ? T : never;
+    // SAFETY: Controlled test fixture boundary cast.
     (store as any).adjustScoreByPoints('team_1', -50, 'host correction');
 
     const adjusted = usePlayStore.getState().session;
@@ -1113,6 +1092,7 @@ describe('usePlayStore', () => {
       awardedTeamId: 'team_1',
     });
 
+    // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
     (usePlayStore.getState() as any).reopenLastResolvedTurn();
 
     expect(usePlayStore.getState().session?.step).toBe('answer');
@@ -1228,7 +1208,7 @@ describe('usePlayStore', () => {
   });
 
   it('does not deduct local tokens when auth is enabled (server owns balance)', () => {
-    mockAuthDisabled.mockReturnValue(false);
+    __setAuthDisabled(false);
     usePlayStore.setState({ session: null, tokens: 20, rapidFire: null });
     usePlayStore.getState().startModeSession('classic');
     const categories = usePlayStore.getState().session?.availableCategories.slice(0, 6) ?? [];

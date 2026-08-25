@@ -2,19 +2,18 @@ import { describe, expect, it } from '@jest/globals';
 import {
   getOrCreateInstallationIdWithStore,
   INSTALL_KEY,
-  type InstallIdStore,
 } from '@/lib/deviceInstallationLogic';
 
-function memoryStore(): { store: InstallIdStore; map: Map<string, string> } {
+function memoryStore() {
   const map = new Map<string, string>();
   return {
     map,
     store: {
-      getItem: async (key) => map.get(key) ?? null,
-      setItem: async (key, value) => {
+      getItem: async (key: string) => map.get(key) ?? null,
+      setItem: async (key: string, value: string) => {
         map.set(key, value);
       },
-      deleteItem: async (key) => {
+      deleteItem: async (key: string) => {
         map.delete(key);
       },
     },

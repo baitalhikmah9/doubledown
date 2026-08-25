@@ -121,7 +121,7 @@ describe('buildDisplayBundles', () => {
   });
 
   it('uses native price string when available', () => {
-    const nativeProducts: Record<string, { priceString?: string }> = {
+    const nativeProducts = {
       consumable_3: { priceString: '$4.99' },
     };
     const result = buildDisplayBundles(mockCatalog, nativeProducts, 'ios');

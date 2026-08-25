@@ -13,7 +13,7 @@ export const ACCOUNT_DELETION_FORFEIT_TYPE = 'account_deletion_forfeit';
 export function isUserDeletionPending(user: {
   deletionPendingAt?: number;
 }): boolean {
-  return typeof user.deletionPendingAt === 'number';
+  return user.deletionPendingAt != null;
 }
 
 /** Active purchaser accounts may still be used; merged/deleted may not. */
@@ -30,14 +30,16 @@ export function isPurchaserAccountReclaimable(account: { state: string }): boole
 }
 
 /** Fields wiped when deletion begins (PII / preferences). clerkId kept until finalize. */
-export function buildAccountDeletionPiiPatch(now: number): {
+export type AccountDeletionPiiPatch = {
   deletionPendingAt: number;
   email: undefined;
   name: undefined;
   preferences: undefined;
   role: undefined;
   lastActiveAt: number;
-} {
+};
+
+export function buildAccountDeletionPiiPatch(now: number): AccountDeletionPiiPatch {
   return {
     deletionPendingAt: now,
     email: undefined,
@@ -49,11 +51,13 @@ export function buildAccountDeletionPiiPatch(now: number): {
 }
 
 /** Purchaser-account patch after unlink + forfeit. */
-export function buildDeletedPurchaserAccountPatch(now: number): {
+export type DeletedPurchaserAccountPatch = {
   state: typeof PURCHASER_STATE_DELETED;
   linkedUserId: undefined;
   lastSeenAt: number;
-} {
+};
+
+export function buildDeletedPurchaserAccountPatch(now: number): DeletedPurchaserAccountPatch {
   return {
     state: PURCHASER_STATE_DELETED,
     linkedUserId: undefined,
@@ -61,23 +65,19 @@ export function buildDeletedPurchaserAccountPatch(now: number): {
   };
 }
 
-export function buildDeviceUnlinkPatch(): {
+export type DeviceUnlinkPatch = {
   userId: undefined;
   purchaserAccountId: undefined;
-} {
+};
+
+export function buildDeviceUnlinkPatch(): DeviceUnlinkPatch {
   return {
     userId: undefined,
     purchaserAccountId: undefined,
   };
 }
 
-export function buildWalletForfeitTransaction(args: {
-  walletId: unknown;
-  amount: number;
-  now: number;
-  clerkId: string;
-  userId: string;
-}): {
+export type WalletForfeitTransactionDraft = {
   type: typeof ACCOUNT_DELETION_FORFEIT_TYPE;
   amount: number;
   source: typeof ACCOUNT_DELETION_FORFEIT_SOURCE;
@@ -85,7 +85,15 @@ export function buildWalletForfeitTransaction(args: {
   status: 'posted';
   idempotencyKey: string;
   metadata: { clerkId: string; userId: string };
-} {
+};
+
+export function buildWalletForfeitTransaction(args: {
+  walletId: string;
+  amount: number;
+  now: number;
+  clerkId: string;
+  userId: string;
+}): WalletForfeitTransactionDraft {
   return {
     type: ACCOUNT_DELETION_FORFEIT_TYPE,
     amount: -Math.abs(args.amount),

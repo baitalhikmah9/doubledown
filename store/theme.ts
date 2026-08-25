@@ -7,15 +7,15 @@ import { PALETTES } from '@/constants/theme';
 const THEME_STORAGE_KEY = 'backfire-theme-palette';
 
 async function getStoredTheme(): Promise<string | null> {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    return window.localStorage.getItem(THEME_STORAGE_KEY);
+  if (Platform.OS === 'web' && globalThis.localStorage) {
+    return globalThis.localStorage.getItem(THEME_STORAGE_KEY);
   }
   return SecureStore.getItemAsync(THEME_STORAGE_KEY);
 }
 
 async function setStoredTheme(id: ThemePaletteId): Promise<void> {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    window.localStorage.setItem(THEME_STORAGE_KEY, id);
+  if (Platform.OS === 'web' && globalThis.localStorage) {
+    globalThis.localStorage.setItem(THEME_STORAGE_KEY, id);
     return;
   }
   await SecureStore.setItemAsync(THEME_STORAGE_KEY, id);
@@ -27,7 +27,7 @@ interface ThemeStore {
   hydrate: () => Promise<void>;
 }
 
-export const useThemeStore = create<ThemeStore>((set, get) => ({
+export const useThemeStore = create<ThemeStore>((set) => ({
   paletteId: 'default',
 
   setPalette: (id) => {

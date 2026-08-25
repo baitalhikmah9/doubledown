@@ -43,6 +43,9 @@ export const STORE_PRODUCTS_UNAVAILABLE_ERROR =
 
 type PurchasesModule = Record<string, unknown> & {
   default?: Record<string, unknown>;
+  LOG_LEVEL?: { WARN?: string };
+  PRODUCT_CATEGORY?: { NON_SUBSCRIPTION?: string };
+  PURCHASE_TYPE?: { INAPP?: string };
 };
 
 let modulePromise: Promise<PurchasesModule> | null = null;
@@ -207,9 +210,14 @@ export function resolvePlatformProductIds(
   return [];
 }
 
+function toPurchasesModule(mod: object): PurchasesModule {
+  // Single boundary cast: SDK namespace is a bag of callables/enums this module probes at runtime.
+  return mod as PurchasesModule;
+}
+
 async function loadPurchasesModule(): Promise<PurchasesModule> {
   if (!modulePromise) {
-    modulePromise = import('react-native-purchases') as unknown as Promise<PurchasesModule>;
+    modulePromise = import('react-native-purchases').then((mod) => toPurchasesModule(mod));
   }
   return modulePromise;
 }
@@ -571,8 +579,8 @@ export async function getOfferings(): Promise<OfferingsSnapshot> {
   const module = await loadPurchasesModule();
   const Purchases = getPurchases(module);
   const offerings = await (Purchases.getOfferings as Function)();
-  const current = asRecord(offerings)?.current;
-  const all = asRecord(offerings)?.all ?? {};
+  const current = asRecord(asRecord(offerings)?.current);
+  const all = asRecord(asRecord(offerings)?.all) ?? {};
 
   return {
     currentOfferingIdentifier:

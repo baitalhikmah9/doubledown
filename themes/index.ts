@@ -47,6 +47,7 @@ function getSoftUiColors(): HomeSoftUiColors {
   };
 }
 
+// SAFETY: Proxy implements the HomeSoftUiColors surface via getSoftUiColors().
 const dynamicColors = new Proxy(homeSoftUi.colors, {
   get(_target, prop: keyof HomeSoftUiColors) {
     return getSoftUiColors()[prop];

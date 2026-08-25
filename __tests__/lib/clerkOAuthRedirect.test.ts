@@ -1,33 +1,10 @@
-import { jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { Platform } from 'react-native';
-
-const mockMakeRedirectUri = jest.fn(
-  () => 'exp://192.168.1.10:8081/--/sso-callback'
-);
-const mockIsRunningInExpoGo = jest.fn(() => false);
-
-jest.mock('expo-auth-session', () => ({
-  makeRedirectUri: (...args: unknown[]) => mockMakeRedirectUri(...args),
-}));
-
-jest.mock('expo', () => ({
-  isRunningInExpoGo: () => mockIsRunningInExpoGo(),
-}));
-
-jest.mock('expo-constants', () => ({
-  __esModule: true,
-  default: {
-    expoConfig: {
-      android: { package: 'com.playbackfire.app' },
-      ios: { bundleIdentifier: 'com.playbackfire.app' },
-    },
-  },
-}));
-
-// eslint-disable-next-line import/first
 import Constants from 'expo-constants';
-
-// eslint-disable-next-line import/first
+import { makeRedirectUri } from 'expo-auth-session';
+import { __setIsRunningInExpoGo, __resetExpoModuleDouble } from '../doubles/expoModule';
+import { __setExpoConstants, __resetExpoConstantsDouble } from '../doubles/expoConstants';
+import { __resetExpoAuthSessionDouble } from '../doubles/expoAuthSession';
 import {
   clerkNativeSsoCallbackRedirectUrl,
   clerkOAuthRedirectUrl,
@@ -85,13 +62,19 @@ describe('rewriteNativeOAuthCallbackPath', () => {
 describe('clerkNativeSsoCallbackRedirectUrl', () => {
   const originalOS = Platform.OS;
 
+  beforeEach(() => {
+    __resetExpoModuleDouble();
+    __resetExpoConstantsDouble();
+    __resetExpoAuthSessionDouble();
+  });
+
   afterEach(() => {
-    mockIsRunningInExpoGo.mockReturnValue(false);
-    mockMakeRedirectUri.mockClear();
+    __setIsRunningInExpoGo(false);
     Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOS });
-    Object.defineProperty(Constants, 'expoConfig', {
-      configurable: true,
-      value: {
+    __setExpoConstants({
+      expoConfig: {
+        extra: {},
+        scheme: 'backfire',
         android: { package: 'com.playbackfire.app' },
         ios: { bundleIdentifier: 'com.playbackfire.app' },
       },
@@ -99,20 +82,20 @@ describe('clerkNativeSsoCallbackRedirectUrl', () => {
   });
 
   it('uses AuthSession makeRedirectUri in Expo Go (not clerk:// package callback)', () => {
-    mockIsRunningInExpoGo.mockReturnValue(true);
+    __setIsRunningInExpoGo(true);
     Object.defineProperty(Platform, 'OS', { configurable: true, value: 'ios' });
 
     expect(clerkNativeSsoCallbackRedirectUrl()).toBe(
       'exp://192.168.1.10:8081/--/sso-callback'
     );
-    expect(mockMakeRedirectUri).toHaveBeenCalledWith({
+    expect(makeRedirectUri).toHaveBeenCalledWith({
       path: 'sso-callback',
       isTripleSlashed: true,
     });
   });
 
   it('uses clerk:// package callback outside Expo Go on iOS', () => {
-    mockIsRunningInExpoGo.mockReturnValue(false);
+    __setIsRunningInExpoGo(false);
     Object.defineProperty(Platform, 'OS', { configurable: true, value: 'ios' });
 
     expect(clerkNativeSsoCallbackRedirectUrl()).toBe(
@@ -121,7 +104,7 @@ describe('clerkNativeSsoCallbackRedirectUrl', () => {
   });
 
   it('uses clerk:// package callback outside Expo Go on Android', () => {
-    mockIsRunningInExpoGo.mockReturnValue(false);
+    __setIsRunningInExpoGo(false);
     Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
 
     expect(clerkNativeSsoCallbackRedirectUrl()).toBe(
@@ -130,7 +113,7 @@ describe('clerkNativeSsoCallbackRedirectUrl', () => {
   });
 
   it('falls back to the hardcoded package when expoConfig is missing on Android', () => {
-    mockIsRunningInExpoGo.mockReturnValue(false);
+    __setIsRunningInExpoGo(false);
     Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
     Object.defineProperty(Constants, 'expoConfig', { configurable: true, value: null });
 
@@ -143,13 +126,18 @@ describe('clerkNativeSsoCallbackRedirectUrl', () => {
 describe('clerkOAuthRedirectUrl', () => {
   const originalOS = Platform.OS;
 
+  beforeEach(() => {
+    __resetExpoModuleDouble();
+    __resetExpoAuthSessionDouble();
+  });
+
   afterEach(() => {
-    mockIsRunningInExpoGo.mockReturnValue(false);
+    __setIsRunningInExpoGo(false);
     Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOS });
   });
 
   it('returns Expo Go redirect on native when running in Expo Go', () => {
-    mockIsRunningInExpoGo.mockReturnValue(true);
+    __setIsRunningInExpoGo(true);
     Object.defineProperty(Platform, 'OS', { configurable: true, value: 'ios' });
 
     expect(clerkOAuthRedirectUrl('/(app)/')).toBe(

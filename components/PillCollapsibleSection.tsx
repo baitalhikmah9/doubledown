@@ -20,7 +20,9 @@ const HUB_CTA_RADIUS = BORDER_RADIUS.sm;
 
 export type PillTone = 'primary' | 'secondary' | 'tertiary' | 'accent';
 
-function pillPalette(tone: PillTone): { face: string; depth: string } {
+type PillPalette = { face: string; depth: string };
+
+function pillPalette(tone: PillTone): PillPalette {
   switch (tone) {
     case 'primary':
       return { face: COLORS.primary, depth: COLORS.accent };

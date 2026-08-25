@@ -34,6 +34,7 @@ describe('categoryPictures asset loading', () => {
     expect(getCategoryPictureSource('pc14')).toBeTruthy();
   });
 
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('exports MISSING as the placeholder label for absent art', () => {
     expect(MISSING_CATEGORY_PICTURE_LABEL).toBe('MISSING');
   });

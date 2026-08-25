@@ -95,6 +95,7 @@ export default function AdminSignInScreen() {
       );
     }
     if (userProfile?.role === 'admin') {
+      // SAFETY: adminHref returns a path string accepted by Expo Router Redirect.
       return <Redirect href={adminHref('/admin') as any} />;
     }
     if (shouldLoadAffiliate && affiliateDashboard === undefined) {
@@ -109,6 +110,7 @@ export default function AdminSignInScreen() {
       Array.isArray(affiliateDashboard.codes) &&
       affiliateDashboard.codes.length > 0
     ) {
+      // SAFETY: adminHref returns a path string accepted by Expo Router Redirect.
       return <Redirect href={adminHref('/admin/affiliate') as any} />;
     }
 

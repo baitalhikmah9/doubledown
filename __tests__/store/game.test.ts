@@ -1,32 +1,14 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { GameConfig, GameSessionState, QuestionCard } from '@/features/shared';
 import { serializeGameSession } from '@/store/gameSessionPersistence';
+import {
+  __asyncStorageMemory,
+  __resetAsyncStorageDouble,
+} from '../doubles/asyncStorage';
+import { useGameStore } from '@/store/game';
 
-const mockStorage = new Map<string, string>();
+const mockStorage = __asyncStorageMemory();
 
-const mockAsyncStorage = {
-  getItem: jest.fn(async (key: string) => mockStorage.get(key) ?? null),
-  setItem: jest.fn(async (key: string, value: string) => {
-    mockStorage.set(key, value);
-  }),
-  removeItem: jest.fn(async (key: string) => {
-    mockStorage.delete(key);
-  }),
-  clear: jest.fn(async () => {
-    mockStorage.clear();
-  }),
-};
-
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  __esModule: true,
-  getItem: mockAsyncStorage.getItem,
-  setItem: mockAsyncStorage.setItem,
-  removeItem: mockAsyncStorage.removeItem,
-  clear: mockAsyncStorage.clear,
-  default: mockAsyncStorage,
-}));
-
-const { useGameStore } = require('@/store/game') as typeof import('@/store/game');
 
 const STORAGE_KEY = 'backfire-legacy-game-store-v1';
 
@@ -109,7 +91,7 @@ function seedLegacyStorage(session: GameSessionState | null) {
 }
 
 beforeEach(() => {
-  mockStorage.clear();
+  __resetAsyncStorageDouble();
   jest.clearAllMocks();
   useGameStore.setState({ session: null });
 });
@@ -148,6 +130,7 @@ describe('useGameStore', () => {
 
     useGameStore.getState().resetSession();
 
+    // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
     const stored = JSON.parse(mockStorage.get(STORAGE_KEY) ?? '{}') as {
       state?: { session?: unknown };
     };

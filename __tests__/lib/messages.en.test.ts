@@ -57,6 +57,7 @@ describe('English mode copy', () => {
     }
   });
 
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('keeps quick mode labelled as Quick Play instead of rebranding the mode', () => {
     expect(en['play.mode.quick']).toBe('Quick Play');
     expect(en['play.quickLengthTitle']).toBe('Set Quick Play Length');

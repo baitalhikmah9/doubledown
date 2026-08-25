@@ -11,6 +11,7 @@ describe('getLandscapeStackScreenOptions', () => {
 
   it('paints contentStyle with the soft-UI canvas (not pure white)', () => {
     const options = getLandscapeStackScreenOptions(HOME_SOFT_UI.colors.canvas);
+    // SAFETY: Controlled test fixture boundary cast.
     const contentStyle = options.contentStyle as { backgroundColor?: string; flex?: number };
 
     expect(contentStyle.flex).toBe(1);
@@ -23,6 +24,7 @@ describe('getLandscapeStackScreenOptions', () => {
     useThemeStore.setState({ paletteId: 'dark' });
     const darkCanvas = PALETTES.dark.background;
     const options = getLandscapeStackScreenOptions(HOME_SOFT_UI.colors.canvas);
+    // SAFETY: Controlled test fixture boundary cast.
     const contentStyle = options.contentStyle as { backgroundColor?: string };
 
     expect(contentStyle.backgroundColor).toBe(darkCanvas);
@@ -33,6 +35,7 @@ describe('getLandscapeStackScreenOptions', () => {
 
   it('accepts an explicit canvas override', () => {
     const options = getLandscapeStackScreenOptions('#112233');
+    // SAFETY: Controlled test fixture boundary cast.
     const contentStyle = options.contentStyle as { backgroundColor?: string };
     expect(contentStyle.backgroundColor).toBe('#112233');
   });

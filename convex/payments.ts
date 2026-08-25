@@ -40,6 +40,10 @@ function asString(value: unknown) {
   return typeof value === 'string' ? value : undefined;
 }
 
+function asNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
 function asStringArray(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
@@ -528,8 +532,7 @@ export const processRevenueCatWebhook = internalMutation({
       // applied at checkout. Without this evidence, a pending claim is
       // rejected and the purchase is not attributed to any promo.
       const discountIdentifier = asString(event.discount_identifier) || undefined;
-      const discountPercentage =
-        typeof event.discount_percentage === 'number' ? event.discount_percentage : undefined;
+      const discountPercentage = asNumber(event.discount_percentage);
 
       await grantConsumablePurchase(ctx, {
         products,
@@ -539,8 +542,7 @@ export const processRevenueCatWebhook = internalMutation({
         productId,
         transactionId,
         revenueCatEventId: eventId,
-        purchasedAt:
-          typeof event.purchased_at_ms === 'number' ? event.purchased_at_ms : Date.now(),
+        purchasedAt: asNumber(event.purchased_at_ms) ?? Date.now(),
         rawEvent: args.payloadJson,
         priceAmountMicros,
         currencyCode: persistedCurrencyCode,

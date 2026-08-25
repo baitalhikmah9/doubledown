@@ -10,6 +10,8 @@ import type {
   QuestionCard,
 } from '@/features/shared';
 
+import { type LifelineId } from '@/features/lobby/lifelines';
+
 export type GameAction =
   | { type: 'INIT'; config: GameConfig; seed: string; questions: QuestionCard[] }
   | { type: 'SELECT_CATEGORIES'; categoryIds: string[] }
@@ -25,23 +27,6 @@ export type GameAction =
   | { type: 'SELECT_OVERTIME_TOPIC'; topic: string }
   | { type: 'COMPLETE' };
 
-import { type LifelineId } from '@/features/lobby/lifelines';
-
-function seededRandom(seed: string): () => number {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) {
-    h = (h << 5) - h + seed.charCodeAt(i);
-    h |= 0;
-  }
-  return () => {
-    h = (h * 1103515245 + 12345) & 0x7fffffff;
-    return h / 0x7fffffff;
-  };
-}
-
-function pickRandom<T>(arr: T[], rng: () => number): T {
-  return arr[Math.floor(rng() * arr.length)];
-}
 
 function createInitialState(
   config: GameConfig,

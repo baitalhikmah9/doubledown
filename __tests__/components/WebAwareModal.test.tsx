@@ -62,6 +62,7 @@ describe('WebAwareModal', () => {
 
     const modal = screen.UNSAFE_queryByType(Modal);
     expect(modal).not.toBeNull();
+    // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
     const orientations = modal?.props.supportedOrientations as string[] | undefined;
     expect(orientations).toEqual(
       expect.arrayContaining(['landscape', 'landscape-left', 'landscape-right'])

@@ -95,6 +95,7 @@ export async function createPercentageDiscount(args: {
   if (!response.ok) {
     throw await parseError(response, 'create_discount');
   }
+  // SAFETY: RC v2 create discount response includes id + identifier strings.
   const data = (await response.json()) as { id?: string; identifier?: string };
   if (!data.id || !data.identifier) {
     throw new RevenueCatV2Error(
@@ -163,10 +164,11 @@ export async function listDiscountCodes(args: {
   if (!response.ok) {
     throw await parseError(response, 'list_codes');
   }
+  // SAFETY: RC v2 list codes response is { data: { code }[] }.
   const data = (await response.json()) as { data?: { code?: string }[] };
   return (data.data ?? [])
-    .map((item) => (typeof item.code === 'string' ? item.code : null))
-    .filter((c): c is string => c !== null);
+    .map((item) => item.code)
+    .filter((c): c is string => c != null && c.length > 0);
 }
 
 /**

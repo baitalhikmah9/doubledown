@@ -10,10 +10,12 @@ export function isStarterGrantDuplicate(existingIdempotencyKeys: Set<string>, ke
   return existingIdempotencyKeys.has(key);
 }
 
+export type StarterGrantBalanceResult = { granted: boolean; balance: number };
+
 export function applyStarterGrantToBalance(
   balance: number,
   alreadyGranted: boolean
-): { granted: boolean; balance: number } {
+): StarterGrantBalanceResult {
   if (alreadyGranted) return { granted: false, balance };
   return { granted: true, balance: balance + STARTER_GRANT_AMOUNT };
 }

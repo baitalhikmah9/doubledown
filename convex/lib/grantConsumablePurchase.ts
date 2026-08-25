@@ -1,16 +1,32 @@
 import type { MutationCtx } from '../_generated/server';
-import type { Id } from '../_generated/dataModel';
-import { ensureWalletDoc } from './ensureWallet';
+import type { Id , Doc } from '../_generated/dataModel';
+import { ensureWalletDoc as defaultEnsureWalletDoc } from './ensureWallet';
 import {
   findTokenProductByStoreProductId,
   type PaymentStore,
   type TokenProductSeed,
 } from './paymentCatalog';
-import { buildPurchaseGrantIdempotencyKey } from './paymentWebhook';
 import {
-  consumeDiscountClaimForPurchase,
+  consumeDiscountClaimForPurchase as defaultConsumeDiscountClaimForPurchase,
   priceToMicros,
 } from './promoDiscountClaim';
+
+function buildPurchaseGrantIdempotencyKey(args: {
+  store: PaymentStore;
+  transactionId: string;
+}): string {
+  return `purchase:${args.store}:${args.transactionId}`;
+}
+
+export type GrantConsumableDeps = {
+  ensureWalletDoc: typeof defaultEnsureWalletDoc;
+  consumeDiscountClaimForPurchase: typeof defaultConsumeDiscountClaimForPurchase;
+};
+
+const defaultDeps: GrantConsumableDeps = {
+  ensureWalletDoc: defaultEnsureWalletDoc,
+  consumeDiscountClaimForPurchase: defaultConsumeDiscountClaimForPurchase,
+};
 
 export async function grantConsumablePurchase(
   ctx: MutationCtx,
@@ -28,6 +44,7 @@ export async function grantConsumablePurchase(
     currencyCode,
     discountIdentifier,
     discountPercentage,
+    deps,
   }: {
     products: TokenProductSeed[];
     purchaserAccountId: string;
@@ -37,15 +54,21 @@ export async function grantConsumablePurchase(
     transactionId: string;
     revenueCatEventId: string;
     purchasedAt?: number;
-    rawEvent?: unknown;
+    rawEvent?: Doc<'store_purchases'>['rawEvent'] | { source: string };
     priceAmountMicros?: number;
     currencyCode?: string;
     /** RevenueCat webhook event.discount_identifier (applied discount). */
     discountIdentifier?: string;
     /** RevenueCat webhook event.discount_percentage (applied percentage). */
     discountPercentage?: number;
+    /** Optional test seam; production omits this and uses real modules. */
+    deps?: Partial<GrantConsumableDeps>;
   }
 ): Promise<{ granted: boolean; balance: number; tokensGranted: number }> {
+  const { ensureWalletDoc, consumeDiscountClaimForPurchase } = {
+    ...defaultDeps,
+    ...deps,
+  };
   const product = findTokenProductByStoreProductId(products, store, productId);
   if (!product) {
     throw new Error('invalid_product');
@@ -76,8 +99,7 @@ export async function grantConsumablePurchase(
     purchasedAt: now,
     status: 'granted',
     rawEvent: rawEvent ?? { source: 'client_sync' },
-    priceAmountMicros:
-      typeof priceAmountMicros === 'number' ? priceAmountMicros : undefined,
+    priceAmountMicros: priceAmountMicros ?? undefined,
     currencyCode,
   });
 
@@ -95,7 +117,7 @@ export async function grantConsumablePurchase(
     originalStoreTransactionId: transactionId,
     purchaseId,
     priceAmountMicros:
-      typeof priceAmountMicros === 'number' ? priceAmountMicros : undefined,
+      priceAmountMicros ?? undefined,
     currencyCode,
   });
 

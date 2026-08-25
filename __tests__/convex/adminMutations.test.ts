@@ -1,42 +1,57 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import {
   createPromoCode,
   deactivatePromoCode,
   reversePurchaseGrant,
   updatePromoCode,
 } from '@/convex/admin';
+import { getConvexHandler } from '../helpers/convexHandler';
+import {
+  createConvexTestCtx,
+  userDoc,
+  type ConvexDoc,
+} from '../helpers/convexTestCtx';
 
-jest.mock('@/convex/lib/auth', () => ({
-  requireAdmin: jest.fn(async () => ({
-    _id: 'users_admin',
+type AnyArgs = Record<string, string | number | boolean | undefined | { campaignName?: string; notes?: string }>;
+
+const reverseHandler = getConvexHandler<ReturnType<typeof createConvexTestCtx>, AnyArgs, unknown>(
+  reversePurchaseGrant
+);
+const deactivateHandler = getConvexHandler<
+  ReturnType<typeof createConvexTestCtx>,
+  AnyArgs,
+  unknown
+>(deactivatePromoCode);
+const updateHandler = getConvexHandler<ReturnType<typeof createConvexTestCtx>, AnyArgs, unknown>(
+  updatePromoCode
+);
+const createHandler = getConvexHandler<ReturnType<typeof createConvexTestCtx>, AnyArgs, unknown>(
+  createPromoCode
+);
+
+function adminCtx(tables: Record<string, ConvexDoc[]> = {}) {
+  const admin = userDoc({
+    id: 'users_admin',
+    clerkId: 'clerk_admin',
     email: 'admin@example.com',
     role: 'admin',
-  })),
-}));
-
-function mockCtx() {
-  const db = {
-    get: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
-    insert: jest.fn<(...args: unknown[]) => Promise<unknown>>(async () => 'new_id'),
-    patch: jest.fn<(...args: unknown[]) => Promise<unknown>>(async () => {}),
-    query: jest.fn(() => ({
-      withIndex: () => ({
-        unique: async () => null,
-        collect: async () => [],
-        order: () => ({ take: async () => [], collect: async () => [] }),
-      }),
-      collect: async () => [],
-    })),
-  };
-  return { db, auth: { getUserIdentity: jest.fn() } };
+  });
+  return createConvexTestCtx({
+    identity: { subject: 'clerk_admin', email: 'admin@example.com' },
+    tables: {
+      users: [admin],
+      ...tables,
+    },
+  });
 }
 
 describe('reversePurchaseGrant reason validation', () => {
   it('rejects empty and whitespace-only reasons before any read or write', async () => {
-    const ctx = mockCtx();
+    const ctx = adminCtx();
     await expect(
-      (reversePurchaseGrant as any)._handler(ctx as any, {
-        purchaseId: 'store_purchases_1' as any,
+      reverseHandler(ctx, {
+        // SAFETY: Test fixture id branded as Convex Id<'store_purchases'>.
+        purchaseId: 'store_purchases_1' as never,
         reason: '   ',
       })
     ).rejects.toThrow('reason_required');
@@ -46,10 +61,11 @@ describe('reversePurchaseGrant reason validation', () => {
   });
 
   it('rejects an empty string reason', async () => {
-    const ctx = mockCtx();
+    const ctx = adminCtx();
     await expect(
-      (reversePurchaseGrant as any)._handler(ctx as any, {
-        purchaseId: 'store_purchases_1' as any,
+      reverseHandler(ctx, {
+        // SAFETY: Test fixture id branded as Convex Id<'store_purchases'>.
+        purchaseId: 'store_purchases_1' as never,
         reason: '',
       })
     ).rejects.toThrow('reason_required');
@@ -59,10 +75,11 @@ describe('reversePurchaseGrant reason validation', () => {
 
 describe('deactivatePromoCode reason validation', () => {
   it('rejects empty reasons before any read or write', async () => {
-    const ctx = mockCtx();
+    const ctx = adminCtx();
     await expect(
-      (deactivatePromoCode as any)._handler(ctx as any, {
-        promoCodeId: 'promo_codes_1' as any,
+      deactivateHandler(ctx, {
+        // SAFETY: Test fixture id branded as Convex Id<'promo_codes'>.
+        promoCodeId: 'promo_codes_1' as never,
         reason: '  ',
       })
     ).rejects.toThrow('reason_required');
@@ -71,14 +88,15 @@ describe('deactivatePromoCode reason validation', () => {
   });
 
   it('preserves existing metadata when recording the deactivation reason', async () => {
-    const ctx = mockCtx();
-    ctx.db.get.mockResolvedValue({
+    const promo: ConvexDoc = {
       _id: 'promo_codes_1',
       active: true,
       metadata: { campaignName: 'Spring 2025', notes: 'internal' },
-    });
-    await (deactivatePromoCode as any)._handler(ctx as any, {
-      promoCodeId: 'promo_codes_1' as any,
+    };
+    const ctx = adminCtx({ promo_codes: [promo] });
+    await deactivateHandler(ctx, {
+      // SAFETY: Test fixture id branded as Convex Id<'promo_codes'>.
+      promoCodeId: 'promo_codes_1' as never,
       reason: 'abuse',
     });
     expect(ctx.db.patch).toHaveBeenCalledWith(
@@ -96,7 +114,7 @@ describe('deactivatePromoCode reason validation', () => {
 });
 
 describe('updatePromoCode clear contract and metadata preservation', () => {
-  const promo = {
+  const promo: ConvexDoc = {
     _id: 'promo_codes_1',
     rewardAmount: 100,
     usageCap: 50,
@@ -108,11 +126,12 @@ describe('updatePromoCode clear contract and metadata preservation', () => {
     metadata: { campaignName: 'Camp', deactivationReason: 'abuse' },
   };
 
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('passes clearActiveFrom through to the patch as undefined (field removal)', async () => {
-    const ctx = mockCtx();
-    ctx.db.get.mockResolvedValue({ ...promo });
-    await (updatePromoCode as any)._handler(ctx as any, {
-      promoCodeId: 'promo_codes_1' as any,
+    const ctx = adminCtx({ promo_codes: [{ ...promo }] });
+    await updateHandler(ctx, {
+      // SAFETY: Test fixture id branded as Convex Id<'promo_codes'>.
+      promoCodeId: 'promo_codes_1' as never,
       clearActiveFrom: true,
     });
     expect(ctx.db.patch).toHaveBeenCalledWith(
@@ -122,13 +141,15 @@ describe('updatePromoCode clear contract and metadata preservation', () => {
   });
 
   it('merges edited metadata instead of replacing it', async () => {
-    const ctx = mockCtx();
-    ctx.db.get.mockResolvedValue({ ...promo });
-    await (updatePromoCode as any)._handler(ctx as any, {
-      promoCodeId: 'promo_codes_1' as any,
+    const ctx = adminCtx({ promo_codes: [{ ...promo }] });
+    await updateHandler(ctx, {
+      // SAFETY: Test fixture id branded as Convex Id<'promo_codes'>.
+      promoCodeId: 'promo_codes_1' as never,
       metadata: { campaignName: 'Renamed' },
     });
-    const patch = (ctx.db.patch as any).mock.calls[0][1] as Record<string, unknown>;
+    const patchCall = ctx.db.patch.mock.calls[0];
+    // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
+    const patch = patchCall?.[1] as { metadata?: Record<string, string> };
     expect(patch.metadata).toEqual({
       campaignName: 'Renamed',
       deactivationReason: 'abuse',
@@ -136,11 +157,11 @@ describe('updatePromoCode clear contract and metadata preservation', () => {
   });
 
   it('rejects zero perUserLimit at the mutation boundary', async () => {
-    const ctx = mockCtx();
-    ctx.db.get.mockResolvedValue({ ...promo });
+    const ctx = adminCtx({ promo_codes: [{ ...promo }] });
     await expect(
-      (updatePromoCode as any)._handler(ctx as any, {
-        promoCodeId: 'promo_codes_1' as any,
+      updateHandler(ctx, {
+        // SAFETY: Test fixture id branded as Convex Id<'promo_codes'>.
+        promoCodeId: 'promo_codes_1' as never,
         perUserLimit: 0,
       })
     ).rejects.toThrow('per_user_limit_invalid');
@@ -148,11 +169,11 @@ describe('updatePromoCode clear contract and metadata preservation', () => {
   });
 
   it('rejects a schedule where activeFrom is not before activeTo', async () => {
-    const ctx = mockCtx();
-    ctx.db.get.mockResolvedValue({ ...promo });
+    const ctx = adminCtx({ promo_codes: [{ ...promo }] });
     await expect(
-      (updatePromoCode as any)._handler(ctx as any, {
-        promoCodeId: 'promo_codes_1' as any,
+      updateHandler(ctx, {
+        // SAFETY: Test fixture id branded as Convex Id<'promo_codes'>.
+        promoCodeId: 'promo_codes_1' as never,
         activeFrom: 3_000,
         activeTo: 2_000,
       })
@@ -161,10 +182,10 @@ describe('updatePromoCode clear contract and metadata preservation', () => {
   });
 
   it('allows clearing both schedule fields without an ordering conflict', async () => {
-    const ctx = mockCtx();
-    ctx.db.get.mockResolvedValue({ ...promo });
-    await (updatePromoCode as any)._handler(ctx as any, {
-      promoCodeId: 'promo_codes_1' as any,
+    const ctx = adminCtx({ promo_codes: [{ ...promo }] });
+    await updateHandler(ctx, {
+      // SAFETY: Test fixture id branded as Convex Id<'promo_codes'>.
+      promoCodeId: 'promo_codes_1' as never,
       clearActiveFrom: true,
       clearActiveTo: true,
     });
@@ -177,8 +198,8 @@ describe('updatePromoCode clear contract and metadata preservation', () => {
 
 describe('createPromoCode affiliate and discount', () => {
   it('stores an affiliate discount code with unlimited uses and no expiry', async () => {
-    const ctx = mockCtx();
-    await (createPromoCode as any)._handler(ctx as any, {
+    const ctx = adminCtx();
+    await createHandler(ctx, {
       code: 'Mikhail10',
       rewardAmount: 0,
       usageCap: 0,
@@ -206,9 +227,9 @@ describe('createPromoCode affiliate and discount', () => {
   });
 
   it('rejects a discount that is not scoped to a known bundle', async () => {
-    const ctx = mockCtx();
+    const ctx = adminCtx();
     await expect(
-      (createPromoCode as any)._handler(ctx as any, {
+      createHandler(ctx, {
         code: 'badbundle',
         rewardAmount: 0,
         usageCap: 0,

@@ -4,41 +4,6 @@ import { render, screen } from '@testing-library/react-native';
 import type { GameConfig, GameSessionState, TeamState } from '@/features/shared';
 import { PlayMatchTopBar } from '@/features/play/components/PlayMatchTopBar';
 
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  __esModule: true,
-  getItem: jest.fn(async () => null),
-  setItem: jest.fn(async () => {}),
-  removeItem: jest.fn(async () => {}),
-  default: {
-    getItem: jest.fn(async () => null),
-    setItem: jest.fn(async () => {}),
-    removeItem: jest.fn(async () => {}),
-  },
-}));
-
-jest.mock('@/lib/i18n/useI18n', () => ({
-  useI18n: () => ({
-    t: (key: string, values?: Record<string, string | number>) => {
-      const messages: Record<string, string> = {
-        'play.matchMenuA11y': 'Match menu',
-        'play.wagerHelpLink': 'Wager info',
-        'play.wagersUsed': `Wagers ${values?.used ?? 0}/${values?.total ?? 0}`,
-        'play.hotSeatInfoLink': 'Hot Seat info',
-        'play.hotSeatAllRoundsPlayed': 'All Hot Seat rounds played',
-      };
-      return messages[key] ?? key;
-    },
-  }),
-}));
-
-jest.mock('expo-image', () => ({
-  Image: 'Image',
-}));
-
-jest.mock('@/components/BackfireTitleLogo', () => ({
-  BackfireTitleLogo: () => null,
-}));
-
 function makeTeams(names: string[]): TeamState[] {
   return names.map((name, index) => ({
     id: `team_${index + 1}`,
@@ -148,6 +113,7 @@ describe('PlayMatchTopBar rumble score cards', () => {
     }
   });
 
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('shows every team name for two and four rumble teams as well', () => {
     for (const names of [
       ['Red Rockets', 'Blue Bombers'],

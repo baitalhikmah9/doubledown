@@ -62,7 +62,8 @@ export default function GameScreen() {
   const contentLocaleChain = getResolvedContentLocaleChain(
     useLocaleStore.getState().contentLocales
   );
-  const mode = (params.mode as 'classic' | 'quickPlay') ?? 'classic';
+  // SAFETY: route param is constrained to the two modes this screen supports.
+  const mode = (params.mode as 'classic' | 'quickPlay' | undefined) ?? 'classic';
   const { session, initSession, dispatch, resetSession } = useGameStore();
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionCard | null>(null);
 

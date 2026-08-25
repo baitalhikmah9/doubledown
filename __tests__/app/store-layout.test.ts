@@ -18,7 +18,7 @@ describe('store layout spacing', () => {
     expect(headerCenterBlock).toMatch(/position:\s*['"]absolute['"]/);
     expect(headerCenterBlock).toMatch(/left:\s*0/);
     expect(headerCenterBlock).toMatch(/right:\s*0/);
-    expect(source).toMatch(/styles\.headerCenter[^\}]*pointerEvents=["']none["']|headerCenter[^>]*pointerEvents=["']none["']/);
+    expect(source).toMatch(/styles\.headerCenter[^}]*pointerEvents=["']none["']|headerCenter[^>]*pointerEvents=["']none["']/);
   });
 
   it('uses equal outer vertical padding above STORE and below redeem', () => {

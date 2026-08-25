@@ -17,8 +17,25 @@ export type PromoCodeMode = (typeof PROMO_CODE_MODES)[number];
 
 export type PromoRedemptionScope = 'public' | 'account';
 
+export type PromoCodeMetadata = {
+  campaignName?: string;
+  notes?: string;
+  deactivationReason?: string;
+};
+
+export type PromoCodeAdminPatch = {
+  rewardAmount?: number;
+  usageCap?: number;
+  perUserLimit?: number;
+  activeFrom?: number;
+  activeTo?: number;
+  active?: boolean;
+  metadata?: PromoCodeMetadata;
+};
+
 export function isPromoCodeMode(value: string): value is PromoCodeMode {
-  return PROMO_CODE_MODES.includes(value as PromoCodeMode);
+  // SAFETY: PROMO_CODE_MODES is the closed set of PromoCodeMode literals.
+  return (PROMO_CODE_MODES as readonly string[]).includes(value);
 }
 
 export function isAccountPromoMode(mode: PromoCodeMode): boolean {
@@ -218,7 +235,7 @@ export function applyPromoCodeUpdate(
     active?: boolean;
     metadata?: { campaignName?: string; notes?: string };
   }
-): { ok: true; patch: Record<string, unknown> } | { ok: false; reason: string } {
+): { ok: true; patch: PromoCodeAdminPatch } | { ok: false; reason: string } {
   const baseValidation = validateUpdatePromoCodeArgs(promo, {
     rewardAmount: updates.rewardAmount,
     usageCap: updates.usageCap,
@@ -265,7 +282,7 @@ export function applyPromoCodeUpdate(
     return { ok: false, reason: 'active_from_before_active_to' };
   }
 
-  const patch: Record<string, unknown> = {};
+  const patch: PromoCodeAdminPatch = {};
   if (updates.rewardAmount !== undefined) patch.rewardAmount = updates.rewardAmount;
   if (updates.usageCap !== undefined) patch.usageCap = updates.usageCap;
   if (updates.perUserLimit !== undefined) patch.perUserLimit = updates.perUserLimit;
@@ -276,8 +293,7 @@ export function applyPromoCodeUpdate(
   if (updates.clearActiveTo) patch.activeTo = undefined;
   if (updates.active !== undefined) patch.active = updates.active;
   if (updates.metadata !== undefined) {
-    const existing =
-      typeof promo.metadata === 'object' && promo.metadata !== null ? promo.metadata : {};
+    const existing = promo.metadata ?? {};
     // Merge so unrelated metadata (e.g. deactivationReason) survives edits.
     patch.metadata = { ...existing, ...updates.metadata };
   }

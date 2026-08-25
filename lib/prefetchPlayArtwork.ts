@@ -16,8 +16,8 @@ export function prefetchPlayArtwork(): Promise<void> {
   if (inflight) return inflight;
 
   inflight = (async () => {
-    const load = typeof Image.loadAsync === 'function' ? Image.loadAsync.bind(Image) : null;
-    if (!load) return;
+    const loadAsync = Image.loadAsync?.bind(Image);
+    if (!loadAsync) return;
 
     const sources: ImageSource[] = [
       BACKFIRE_LOGO,
@@ -27,7 +27,7 @@ export function prefetchPlayArtwork(): Promise<void> {
       ...getAllCategoryPictureSources(),
     ];
     // Fire in parallel; failures are non-fatal (first real render still loads).
-    await Promise.allSettled(sources.map((source) => load(source)));
+    await Promise.allSettled(sources.map((source) => loadAsync(source)));
   })();
 
   return inflight;

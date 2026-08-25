@@ -4,13 +4,14 @@ import { getPlayableCategories } from '@/features/play/data';
 
 describe('category sections', () => {
   it('uses the requested section and topic order; Pokémon is pop culture only', () => {
+    // SAFETY: Minimal category fixtures satisfy PlayableCategory fields used by grouping.
     const categories = [
       { id: 'g7', slug: 'minecraft', title: 'Minecraft', questionCount: 10 },
       { id: 'pc17', slug: 'pokemon', title: 'Pokemon', questionCount: 10 },
       { id: 'gen1', slug: 'corporations', title: 'Corporations', questionCount: 10 },
       { id: 'h1', slug: '19th-century', title: '19th Century', questionCount: 10 },
       { id: 's2', slug: 'cricket', title: 'Cricket', questionCount: 10 },
-    ] as any;
+    ] as never;
 
     const sections = groupCategoriesBySection(categories);
 
@@ -28,6 +29,7 @@ describe('category sections', () => {
     expect(sections.flatMap((section) => section.categories).map((category) => category.title)).not.toContain('Guess the Flag');
   });
 
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('does not classify gen-prefixed topics as gaming', () => {
     expect(getCategorySectionId('gen9')).toBe('general');
     expect(getCategorySectionId('g9')).toBe('gaming');

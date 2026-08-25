@@ -1,21 +1,18 @@
 import React from 'react';
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import { render, waitFor } from '@testing-library/react-native';
 import { Text } from 'react-native';
 import { useConvexUserProfileSync } from '@/lib/hooks/useConvexUserProfileSync';
-
-const mockUseUser = jest.fn();
-const mockUseConvexAuth = jest.fn();
-const mockUpsertOnFirstSignIn = jest.fn(() => Promise.resolve('user_123'));
-
-jest.mock('@clerk/clerk-expo', () => ({
-  useUser: () => mockUseUser(),
-}));
-
-jest.mock('convex/react', () => ({
-  useConvexAuth: () => mockUseConvexAuth(),
-  useMutation: () => mockUpsertOnFirstSignIn,
-}));
+import {
+  __setConvexAuthState,
+  __setConvexMutation,
+  __resetConvexReactDouble,
+} from '../doubles/convexReact';
+import {
+  __setClerkUser,
+  __setClerkUserLoaded,
+  __resetClerkExpoDouble,
+} from '../doubles/clerkExpo';
 
 function ProfileSyncHarness() {
   useConvexUserProfileSync();
@@ -23,31 +20,33 @@ function ProfileSyncHarness() {
 }
 
 describe('useConvexUserProfileSync', () => {
+  const mutationCalls: Record<string, string | undefined>[] = [];
+
   beforeEach(() => {
-    mockUseUser.mockReset();
-    mockUseConvexAuth.mockReset();
-    mockUseConvexAuth.mockReturnValue({ isAuthenticated: true, isLoading: false });
-    mockUpsertOnFirstSignIn.mockClear();
+    __resetConvexReactDouble();
+    __resetClerkExpoDouble();
+    mutationCalls.length = 0;
+    __setConvexMutation(async (args) => {
+      // SAFETY: mutation args are email/name records in this hook path.
+      mutationCalls.push(args as Record<string, string | undefined>);
+      return 'user_123';
+    });
+    __setConvexAuthState({ isAuthenticated: true, isLoading: false });
   });
 
   it('upserts the Convex user from the loaded Clerk user', async () => {
-    mockUseUser.mockReturnValue({
-      isLoaded: true,
-      user: {
-        id: 'clerk_user_123',
-        primaryEmailAddress: { emailAddress: 'admin@example.com' },
-        emailAddresses: [],
-        fullName: 'Admin User',
-        firstName: 'Admin',
-        lastName: 'User',
-        username: 'admin',
-      },
+    __setClerkUser({
+      id: 'clerk_user_123',
+      primaryEmailAddress: { emailAddress: 'admin@example.com' },
+      fullName: 'Admin User',
+      firstName: 'Admin',
+      lastName: 'User',
     });
 
     render(<ProfileSyncHarness />);
 
     await waitFor(() => {
-      expect(mockUpsertOnFirstSignIn).toHaveBeenCalledWith({
+      expect(mutationCalls).toContainEqual({
         email: 'admin@example.com',
         name: 'Admin User',
       });
@@ -55,27 +54,21 @@ describe('useConvexUserProfileSync', () => {
   });
 
   it('does not upsert before Clerk user state loads', () => {
-    mockUseUser.mockReturnValue({ isLoaded: false, user: null });
-
+    __setClerkUserLoaded(false);
+    __setClerkUser(null);
     render(<ProfileSyncHarness />);
-
-    expect(mockUpsertOnFirstSignIn).not.toHaveBeenCalled();
+    expect(mutationCalls).toHaveLength(0);
   });
 
   it('waits for Convex auth before upserting', () => {
-    mockUseConvexAuth.mockReturnValue({ isAuthenticated: false, isLoading: true });
-    mockUseUser.mockReturnValue({
-      isLoaded: true,
-      user: {
-        id: 'clerk_user_123',
-        primaryEmailAddress: { emailAddress: 'admin@example.com' },
-        emailAddresses: [],
-        fullName: 'Admin User',
-      },
+    __setConvexAuthState({ isAuthenticated: false, isLoading: true });
+    __setClerkUser({
+      id: 'clerk_user_123',
+      primaryEmailAddress: { emailAddress: 'admin@example.com' },
+      fullName: 'Admin User',
     });
 
     render(<ProfileSyncHarness />);
-
-    expect(mockUpsertOnFirstSignIn).not.toHaveBeenCalled();
+    expect(mutationCalls).toHaveLength(0);
   });
 });

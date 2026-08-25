@@ -182,7 +182,7 @@ export function useTokenPurchases({ catalog, enabled }: UseTokenPurchasesOptions
               store: purchaseResult.store,
             });
 
-            if (typeof sync.balance === 'number') {
+            if (sync.balance != null) {
               setTokenBalance(sync.balance);
             }
 
@@ -221,7 +221,7 @@ export function useTokenPurchases({ catalog, enabled }: UseTokenPurchasesOptions
             store: purchaseResult.store,
           });
 
-          if (typeof sync.balance === 'number') {
+          if (sync.balance != null) {
             setTokenBalance(sync.balance);
           }
 

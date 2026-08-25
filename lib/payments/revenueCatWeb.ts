@@ -115,8 +115,9 @@ async function loadWebSdk(): Promise<WebPurchasesModule> {
     // --experimental-vm-modules can resolve it. The .then() keeps the load
     // async and off the native critical path; on native this module is never
     // imported so the require never runs.
-    sdkPromise = Promise.resolve().then(
-      () => require('@revenuecat/purchases-js') as WebPurchasesModule
+    sdkPromise = Promise.resolve().then(() =>
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- Jest lacks experimental VM modules; native never imports this web module.
+      require('@revenuecat/purchases-js') as WebPurchasesModule
     );
   }
   return sdkPromise;

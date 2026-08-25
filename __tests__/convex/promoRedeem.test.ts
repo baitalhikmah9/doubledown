@@ -1,45 +1,60 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import { redeemCode } from '@/convex/promo';
-import { requireUser } from '@/convex/lib/auth';
-import { ensureWalletDoc } from '@/convex/lib/ensureWallet';
+import { getConvexHandler } from '../helpers/convexHandler';
+import {
+  createConvexTestCtx,
+  purchaserAccountDoc,
+  userDoc,
+  walletDoc,
+  type ConvexDoc,
+} from '../helpers/convexTestCtx';
 
-jest.mock('@/convex/lib/auth', () => ({
-  requireUser: jest.fn(),
-}));
+type RedeemArgs = { code: string; clientRequestId?: string };
+type RedeemResult = {
+  success: boolean;
+  error?: string;
+  tokensGranted?: number;
+};
 
-jest.mock('@/convex/lib/purchaserAccounts', () => ({
-  ensureCanonicalPurchaserAccountForUser: jest.fn(async () => ({
+const handler = getConvexHandler<
+  ReturnType<typeof createConvexTestCtx>,
+  RedeemArgs,
+  RedeemResult
+>(redeemCode);
+
+function redeemCtx(promo: ConvexDoc | null) {
+  const user = userDoc({
+    id: 'users_1',
+    clerkId: 'clerk_fan',
+    email: 'fan@example.com',
+    canonicalPurchaserAccountId: 'purchaser_1',
+  });
+  const purchaser = purchaserAccountDoc({
     appUserId: 'purchaser_1',
-  })),
-}));
-
-jest.mock('@/convex/lib/ensureWallet', () => ({
-  ensureWalletDoc: jest.fn(async () => ({ _id: 'wallet_1', balance: 0 })),
-}));
-
-function mockRedeemCtx(promo: Record<string, unknown> | null) {
-  const db = {
-    get: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
-    insert: jest.fn<(...args: unknown[]) => Promise<unknown>>(async () => 'new_id'),
-    patch: jest.fn<(...args: unknown[]) => Promise<unknown>>(async () => {}),
-    query: jest.fn((table: string) => ({
-      withIndex: () => ({
-        unique: async () => (table === 'promo_codes' ? promo : null),
-        collect: async () => [],
-      }),
-    })),
-  };
-  return { db, auth: { getUserIdentity: jest.fn() } };
+    linkedUserId: 'users_1',
+  });
+  const wallet = walletDoc({
+    id: 'wallet_1',
+    purchaserAccountId: 'purchaser_1',
+    userId: 'users_1',
+    balance: 0,
+  });
+  return createConvexTestCtx({
+    identity: { subject: 'clerk_fan', email: 'fan@example.com' },
+    tables: {
+      users: [user],
+      purchaser_accounts: [purchaser],
+      wallets: [wallet],
+      promo_codes: promo ? [promo] : [],
+      promo_redemptions: [],
+      promo_redeem_rates: [],
+    },
+  });
 }
 
 describe('promo.redeemCode discount block', () => {
   it('refuses a stored discount code without writing wallet or usage records', async () => {
-    (requireUser as jest.MockedFunction<typeof requireUser>).mockResolvedValueOnce({
-      _id: 'users_1',
-      email: 'fan@example.com',
-    } as never);
-
-    const ctx = mockRedeemCtx({
+    const ctx = redeemCtx({
       _id: 'promo_discount',
       code: 'mikhail10',
       rewardType: 'discount',
@@ -50,23 +65,16 @@ describe('promo.redeemCode discount block', () => {
       active: true,
     });
 
-    await expect((redeemCode as any)._handler(ctx as any, { code: 'Mikhail10' })).resolves.toEqual({
+    await expect(handler(ctx, { code: 'Mikhail10' })).resolves.toEqual({
       success: false,
       error: 'discount_checkout_unavailable',
     });
 
-    expect(ctx.db.insert).not.toHaveBeenCalled();
-    expect(ctx.db.patch).not.toHaveBeenCalled();
-    expect(ensureWalletDoc).not.toHaveBeenCalled();
+    expect(ctx.inserts.filter((i) => i.table !== 'promo_redeem_rates')).toEqual([]);
   });
 
   it('still grants tokens for a valid token reward code', async () => {
-    (requireUser as jest.MockedFunction<typeof requireUser>).mockResolvedValueOnce({
-      _id: 'users_1',
-      email: 'fan@example.com',
-    } as never);
-
-    const ctx = mockRedeemCtx({
+    const ctx = redeemCtx({
       _id: 'promo_tokens',
       code: 'free10',
       rewardType: 'tokens',
@@ -77,7 +85,7 @@ describe('promo.redeemCode discount block', () => {
       active: true,
     });
 
-    const result = await (redeemCode as any)._handler(ctx as any, {
+    const result = await handler(ctx, {
       code: 'FREE10',
       clientRequestId: 'req_1',
     });

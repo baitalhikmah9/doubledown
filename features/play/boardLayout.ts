@@ -62,13 +62,20 @@ export function getBoardGridRowSpacerCount(
  * Equal top/bottom padding that Y-centers the topic block when it is shorter
  * than the board body (e.g. quick play 3 topics / single row).
  */
+export type BoardGridVerticalInsets = {
+  paddingTop: number;
+  paddingBottom: number;
+  freeSpace: number;
+};
+
 export function getBoardGridVerticalInsets(input: {
   viewportHeight: number;
   edgePadding: number;
   rowCount: number;
   rowHeight: number;
   rowGap: number;
-}): { paddingTop: number; paddingBottom: number; freeSpace: number } {
+}): BoardGridVerticalInsets {
+
   const rows = Math.max(1, Math.floor(input.rowCount));
   const edge = Math.max(0, input.edgePadding);
   const rowHeight = Math.max(0, input.rowHeight);
@@ -252,12 +259,18 @@ export function getBoardRailWidth(cellWidth: number): number {
  * Square mode: side = pill height (rail expands). Fill mode: tile spans the
  * full rail width so pills scale horizontally with the cell.
  */
+export type BoardPointTileBox = {
+  width: number;
+  height: number;
+  railWidth: number;
+};
+
 export function getBoardPointTileBox(input: {
   pillHeight: number;
   railWidth: number;
   /** When true, tile is square and rail must be at least the side length. */
   squareTiles: boolean;
-}): { width: number; height: number; railWidth: number } {
+}): BoardPointTileBox {
   const height = Math.max(1, input.pillHeight);
   if (input.squareTiles) {
     return {

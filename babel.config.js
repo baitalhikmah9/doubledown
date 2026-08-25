@@ -1,5 +1,6 @@
 module.exports = function (api) {
-  api.cache(true);
+  const isTest = api.env('test');
+  api.cache.using(() => (isTest ? 'test' : 'runtime'));
   return {
     presets: [
       [
@@ -11,16 +12,20 @@ module.exports = function (api) {
         },
       ],
     ],
-    plugins: [
-      [
-        'module-resolver',
-        {
-          root: ['.'],
-          alias: {
-            '@': '.',
-          },
-        },
-      ],
-    ],
+    plugins: isTest
+      ? []
+      : [
+          // Metro resolves `@/` via tsconfig paths + this plugin in app builds.
+          // Skipped under Jest so moduleNameMapper doubles can intercept `@/` imports.
+          [
+            'module-resolver',
+            {
+              root: ['.'],
+              alias: {
+                '@': '.',
+              },
+            },
+          ],
+        ],
   };
 };

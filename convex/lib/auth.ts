@@ -15,7 +15,7 @@ export async function getCurrentUser(
 
   // Mid-deletion users keep a Clerk session until finalize; treat as signed out
   // for normal product paths so they cannot keep earning/spending tokens.
-  if (user && typeof user.deletionPendingAt === 'number') {
+  if (user && user.deletionPendingAt != null) {
     return null;
   }
 

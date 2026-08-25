@@ -6,6 +6,7 @@ import {
 } from '../../convex/lib/promoDiscountClaim';
 
 const basePromo: Doc<'promo_codes'> = {
+  // SAFETY: Controlled test boundary cast under fixture invariants.
   _id: 'promo_1' as Id<'promo_codes'>,
   _creationTime: 0,
   code: 'mikhail10',
@@ -87,6 +88,7 @@ describe('discountEvidenceMatches', () => {
     ).toBe(true);
   });
 
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('matches when applied percentage is sent as a fraction 0.2 for configured 20%', () => {
     expect(
       discountEvidenceMatches({

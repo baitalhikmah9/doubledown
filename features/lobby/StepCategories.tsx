@@ -1,11 +1,10 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform } from 'react-native';
 import { Pressable } from '@/components/ui/Pressable';
-import { SPACING, FONTS, COLORS, BORDER_RADIUS } from '@/constants';
+import { SPACING, FONTS } from '@/constants';
 import { CategoryCard } from './CategoryCard';
 import { getPlaySurfaceColors } from '@/features/play/playSurfaceColors';
 import { HOME_SOFT_UI } from '@/themes';
-import { LinearGradient } from 'expo-linear-gradient';
 import { getCategoryPictureSource } from '@/constants/categoryPictures';
 import { useDarkModeFlatTop } from '@/lib/hooks/useTheme';
 import { useThemeStore } from '@/store/theme';

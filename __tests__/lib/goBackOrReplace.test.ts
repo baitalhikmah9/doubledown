@@ -8,6 +8,7 @@ describe('goBackOrReplace', () => {
       replace: jest.fn(),
     };
 
+    // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
     goBackOrReplace(router as never, '/(app)/');
 
     expect(router.back).toHaveBeenCalledTimes(1);
@@ -21,6 +22,7 @@ describe('goBackOrReplace', () => {
       replace: jest.fn(),
     };
 
+    // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
     goBackOrReplace(router as never, '/(app)/');
 
     expect(router.back).not.toHaveBeenCalled();

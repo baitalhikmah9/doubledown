@@ -60,9 +60,11 @@ export default function ForgotPasswordScreen() {
         setError('Password reset is not available for this account.');
         return;
       }
+      // SAFETY: reset_password_email_code factors always include emailAddressId in Clerk's API.
+      const emailAddressId = (resetFactor as { emailAddressId: string }).emailAddressId;
       await signIn.prepareFirstFactor({
         strategy: 'reset_password_email_code' as const,
-        emailAddressId: (resetFactor as { emailAddressId: string }).emailAddressId,
+        emailAddressId,
       });
       setSubmitted(true);
     } catch (e) {

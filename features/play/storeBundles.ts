@@ -74,7 +74,7 @@ export const STORE_BUNDLES: StoreBundle[] = [
 export const BUNDLE_DISPLAY_BY_TOKENS: Record<number, StoreBundle | undefined> =
   Object.fromEntries(STORE_BUNDLES.map((b) => [b.tokens, b]));
 
-/** Formatter for token counts (e.g. 1 000 → "1,000"). */
+/** Formatter for token counts (e.g. 1,000 → "1,000"). */
 export function formatTokens(n: number): string {
   return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }

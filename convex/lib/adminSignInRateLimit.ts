@@ -50,10 +50,12 @@ export function evaluateAdminSignInGate(
  * When already at max failures, does not append so lockout cannot be extended forever
  * and the stored array cannot grow unbounded.
  */
+export type AppendFailureTimestampResult = { next: number[]; recorded: boolean };
+
 export function appendFailureTimestamp(
   prunedTimestamps: readonly number[],
   nowMs: number
-): { next: number[]; recorded: boolean } {
+): AppendFailureTimestampResult {
   if (prunedTimestamps.length >= ADMIN_SIGN_IN_MAX_FAILURES) {
     return {
       next: prunedTimestamps.slice(0, ADMIN_SIGN_IN_MAX_STORED_FAILURES),

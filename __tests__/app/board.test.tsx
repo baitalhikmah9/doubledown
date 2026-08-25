@@ -9,99 +9,7 @@ import { PALETTES } from '@/constants/theme';
 import { getPlaySurfaceColors } from '@/features/play/playSurfaceColors';
 import { usePlayStore } from '@/store/play';
 import { useThemeStore } from '@/store/theme';
-
-const mockReplace = jest.fn();
-const mockPush = jest.fn();
-
-jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    push: mockPush,
-    replace: mockReplace,
-  }),
-}));
-
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  __esModule: true,
-  getItem: jest.fn(async () => null),
-  setItem: jest.fn(async () => {}),
-  removeItem: jest.fn(async () => {}),
-  default: {
-    getItem: jest.fn(async () => null),
-    setItem: jest.fn(async () => {}),
-    removeItem: jest.fn(async () => {}),
-  },
-}));
-
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
-}));
-
-jest.mock('expo-image', () => ({
-  Image: 'Image',
-}));
-
-jest.mock('@/lib/i18n/useI18n', () => ({
-  useI18n: () => ({
-    direction: 'ltr',
-    getTextStyle: () => ({}),
-    t: (key: string, values?: Record<string, string | number>) => {
-      const messages: Record<string, string> = {
-        'common.close': 'Close',
-        'common.leave': 'Leave',
-        'common.loading': 'Loading',
-        'common.points': `${values?.count ?? 0} points`,
-        'common.settings': 'Settings',
-        'common.stay': 'Stay',
-        'common.teamOne': 'Team 1',
-        'common.teamTwo': 'Team 2',
-        'common.tokens': 'Tokens',
-        'play.boardCurrentTurnA11y': 'Current turn',
-        'play.boardExit': 'Exit',
-        'play.boardLifelines': 'Lifelines',
-        'play.drawRandomQuestion': 'Draw Random Question',
-        'play.exitGame': 'Exit Game',
-        'play.leaveMatchBody': 'Leaving now will discard the active play session.',
-        'play.leaveMatchTitle': 'Leave Match?',
-        'play.matchMenuA11y': 'Match menu',
-        'play.noQuestionsLeft': 'No Questions Left',
-        'play.questionBoardTitle': 'Question Board',
-        'play.randomSelectorAction': 'Reveal Random Question',
-        'play.randomSelectorIdleBody': 'A random remaining question will be drawn from the board.',
-        'play.randomSelectorIdleTitle': 'Random Question Select',
-        'play.randomSelectorRollingBody': 'Picking a random question now…',
-        'play.randomSelectorRollingTitle': 'Random Question Select',
-        'play.wagerModeBody': `${values?.wageringTeam ?? 'Team 1'} wagered on ${values?.targetTeam ?? 'Team 2'}. A random tile is being selected.`,
-        'play.wagerModeTitle': 'Wager Mode',
-        'play.wagerSelectorBody': `${values?.wageringTeam ?? 'Team 1'} is drawing a random question for ${values?.targetTeam ?? 'Team 2'}.`,
-        'play.wagerSelectorTitle': 'Random Question Select',
-      };
-      return messages[key] ?? key;
-    },
-    uiLocale: 'en',
-  }),
-}));
-
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
-jest.mock('@/features/play/components/PlayScaffold', () => ({
-  PlayScaffold: ({
-    children,
-    customHeader,
-    footer,
-  }: {
-    children: React.ReactNode;
-    customHeader?: React.ReactNode;
-    footer?: React.ReactNode;
-  }) => (
-    <>
-      {customHeader}
-      {children}
-      {footer}
-    </>
-  ),
-}));
+import { router } from '../doubles/expoRouter';
 
 function createQuestion(
   overrides: Partial<QuestionCard> & Pick<QuestionCard, 'id' | 'canonicalKey'>
@@ -191,8 +99,6 @@ function createSession(overrides: Partial<GameSessionState> = {}): GameSessionSt
 
 describe('PlayBoardScreen', () => {
   beforeEach(() => {
-    mockPush.mockClear();
-    mockReplace.mockClear();
     useThemeStore.setState({ paletteId: 'default' });
     usePlayStore.setState({ session: null, tokens: 5, rapidFire: null });
     jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
@@ -208,14 +114,19 @@ describe('PlayBoardScreen', () => {
 
     // Inactive team uses the default pill face (not the fire active-turn glow).
     const teamName = screen.getByText('Beta');
-    let node: { parent?: unknown; props?: { style?: unknown } } | null = teamName as never;
-    let pillStyle: Record<string, unknown> | undefined;
+    type StyleNode = { parent?: unknown; props?: { style?: unknown } };
+    // Test renderer nodes expose parent/props for style walking.
+    let node: StyleNode | null = teamName as StyleNode;
+    let pillStyle: Record<string, string | number | boolean | null> | undefined;
     for (let i = 0; i < 8 && node; i += 1) {
-      const flat = StyleSheet.flatten(node.props?.style);
-      if (flat?.backgroundColor && typeof flat.borderRadius === 'number') {
-        pillStyle = flat as Record<string, unknown>;
+      const flat = StyleSheet.flatten(node.props?.style) as
+        | Record<string, string | number | boolean | null | undefined>
+        | undefined;
+      if (flat?.backgroundColor && Number.isFinite(Number(flat.borderRadius))) {
+        pillStyle = flat as Record<string, string | number | boolean | null>;
         break;
       }
+      // SAFETY: Controlled test fixture boundary cast.
       node = (node as { parent?: typeof node }).parent ?? null;
     }
 
@@ -245,7 +156,7 @@ describe('PlayBoardScreen', () => {
 
     fireEvent.press(screen.getByLabelText('Settings'));
 
-    expect(mockPush).toHaveBeenCalledWith('/(app)/settings');
+    expect(router.push).toHaveBeenCalledWith('/(app)/settings');
     expect(screen.queryByTestId('play-match-menu-modal')).toBeNull();
   });
 
@@ -300,17 +211,18 @@ describe('PlayBoardScreen', () => {
     // Single-sided point rows are mirrored onto both rails, so the locked id can appear twice.
     const lockedTiles = screen.getAllByTestId('board-random-pick-locked');
     const locked = lockedTiles[0]!;
+    // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
     const lockedLabel = locked.props.accessibilityLabel as string;
     const otherLabel = lockedLabel.includes('200') ? '400 points' : '200 points';
 
     fireEvent.press(screen.getAllByLabelText(otherLabel)[0]!);
     expect(usePlayStore.getState().session?.step).toBe('board');
-    expect(mockReplace).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
 
     fireEvent.press(locked);
     expect(usePlayStore.getState().session?.step).toBe('question');
     expect(usePlayStore.getState().session?.currentQuestion?.id).toBeTruthy();
-    expect(mockReplace).toHaveBeenCalledWith('/play/question');
+    expect(router.replace).toHaveBeenCalledWith('/play/question');
   });
 
   it('reuses the same board flash lock while a wager question is being drawn', async () => {
@@ -377,7 +289,7 @@ describe('PlayBoardScreen', () => {
     expect(usePlayStore.getState().session?.step).toBe('answer');
     expect(usePlayStore.getState().session?.reviewingUsedQuestion).toBe(true);
     expect(usePlayStore.getState().session?.currentQuestion?.answer).toBe('Used answer');
-    expect(mockReplace).toHaveBeenCalledWith('/play/question');
+    expect(router.replace).toHaveBeenCalledWith('/play/question');
   });
 
   it('shows every rumble team name and score in the match header', () => {

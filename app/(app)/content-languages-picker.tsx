@@ -137,16 +137,27 @@ export default function ContentLanguagesPickerScreen() {
                 </View>
                 <View style={styles.priorityActions}>
                   <Pressable
-                    onPress={() => index > 0 && moveContentLocale(index as 0 | 1 | 2, (index - 1) as 0 | 1 | 2)}
+                    onPress={() => {
+                      if (index <= 0) return;
+                      // SAFETY: selected content locales are at most 3 entries (indices 0..2).
+                      const from = index as 0 | 1 | 2;
+                      // SAFETY: from > 0 so from - 1 is still 0..2.
+                      const to = (index - 1) as 0 | 1 | 2;
+                      moveContentLocale(from, to);
+                    }}
                     disabled={index === 0}
                   >
                     <Ionicons name="arrow-up" size={18} color={index === 0 ? 'rgba(51,51,51,0.32)' : textMuted} />
                   </Pressable>
                   <Pressable
-                    onPress={() =>
-                      index < selected.length - 1 &&
-                      moveContentLocale(index as 0 | 1 | 2, (index + 1) as 0 | 1 | 2)
-                    }
+                    onPress={() => {
+                      if (index >= selected.length - 1) return;
+                      // SAFETY: selected content locales are at most 3 entries (indices 0..2).
+                      const from = index as 0 | 1 | 2;
+                      // SAFETY: from < last so from + 1 is still 0..2.
+                      const to = (index + 1) as 0 | 1 | 2;
+                      moveContentLocale(from, to);
+                    }}
                     disabled={index === selected.length - 1}
                   >
                     <Ionicons

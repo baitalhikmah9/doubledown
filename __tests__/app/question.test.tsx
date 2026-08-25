@@ -11,69 +11,7 @@ import PlayQuestionScreen, {
 import { PALETTES } from '@/constants/theme';
 import { usePlayStore } from '@/store/play';
 import { useThemeStore } from '@/store/theme';
-
-const mockReplace = jest.fn();
-
-jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    replace: mockReplace,
-  }),
-}));
-
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  __esModule: true,
-  getItem: jest.fn(async () => null),
-  setItem: jest.fn(async () => {}),
-  removeItem: jest.fn(async () => {}),
-  default: {
-    getItem: jest.fn(async () => null),
-    setItem: jest.fn(async () => {}),
-    removeItem: jest.fn(async () => {}),
-  },
-}));
-
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
-}));
-
-jest.mock('expo-image', () => ({
-  Image: 'Image',
-}));
-
-jest.mock('@/lib/i18n/useI18n', () => ({
-  useI18n: () => ({
-    direction: 'ltr',
-    getTextStyle: () => ({}),
-    t: (key: string, values?: Record<string, string | number>) => {
-      const messages: Record<string, string> = {
-        'common.back': 'Back',
-        'common.loading': 'Loading',
-        'play.rumbleWaiting': 'Team 1 appears after 30s, answers by 60. Team 2 appears after 1:15.',
-        'play.rumbleFirstWindow': `${values?.team ?? 'Team'} answers by 60s.`,
-        'play.rumbleTransitionWindow': 'Next team appears at 01:16.',
-        'play.rumbleSecondWindow': `${values?.team ?? 'Team'} answers now. Round ends at 01:30.`,
-        'play.rumbleRoundEnded': 'Round ended.',
-        'play.rumbleChipAnswering': 'Answering',
-        'play.rumbleChipLocked': 'Locked',
-        'play.rumbleChipHiddenName': '?',
-        'play.rumbleSkipWait': 'Skip wait',
-        'play.showAnswer': 'Show Answer',
-        'play.timeUpTitle': "Time's up",
-        'play.timeUpBody': 'The question expired. The answer is revealed and no points are awarded.',
-        'play.noPointsAwarded': 'No points awarded',
-        'play.hotSeatActiveTitle': 'Hot Seat',
-        'play.nextTurn': 'Next Turn',
-        'play.whoGetsPoints': 'Who gets the points?',
-        'play.pointsAwarded': 'Points awarded.',
-      };
-      return messages[key] ?? key;
-    },
-  }),
-}));
-
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
+import { router } from '../doubles/expoRouter';
 
 function createQuestion(
   overrides: Partial<QuestionCard> & Pick<QuestionCard, 'id' | 'canonicalKey'>
@@ -178,7 +116,6 @@ describe('question viewport sizing', () => {
 describe('PlayQuestionScreen', () => {
   beforeEach(() => {
     jest.useFakeTimers();
-    mockReplace.mockClear();
     jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
     usePlayStore.setState({ session: null, tokens: 5, rapidFire: null });
   });
@@ -353,7 +290,7 @@ describe('PlayQuestionScreen', () => {
     render(<PlayQuestionScreen />);
 
     fireEvent.press(screen.getByText('SHOW ANSWER'));
-    expect(mockReplace).not.toHaveBeenCalledWith('/play/answer');
+    expect(router.replace).not.toHaveBeenCalledWith('/play/answer');
 
     jest.spyOn(Date, 'now').mockReturnValue(1_076_000);
     act(() => {
@@ -361,11 +298,10 @@ describe('PlayQuestionScreen', () => {
     });
 
     fireEvent.press(screen.getByText('SHOW ANSWER'));
-    expect(mockReplace).not.toHaveBeenCalledWith('/play/answer');
+    expect(router.replace).not.toHaveBeenCalledWith('/play/answer');
     expect(screen.getByText('Who gets the points?')).toBeTruthy();
     expect(screen.getByText('42')).toBeTruthy();
 
-    mockReplace.mockClear();
     act(() => {
       usePlayStore.setState({
         session: createSession({

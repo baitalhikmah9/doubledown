@@ -1,8 +1,8 @@
 import React from 'react';
 import { Image } from 'expo-image';
-import { View, Text, StyleSheet, type ViewStyle, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, type ViewStyle, Dimensions } from 'react-native';
 import { Pressable } from '@/components/ui/Pressable';
-import { SPACING, FONTS, COLORS, SHADOWS } from '@/constants/theme';
+import { SPACING, FONTS } from '@/constants/theme';
 import { MISSING_CATEGORY_PICTURE_LABEL } from '@/constants/categoryPictures';
 import { getPlaySurfaceColors } from '@/features/play/playSurfaceColors';
 import { HOME_SOFT_UI } from '@/themes';
@@ -49,7 +49,6 @@ export function CategoryCard({
     useThemeStore((state) => state.paletteId);
     const surfaceColors = getPlaySurfaceColors();
     const surface = surfaceColors.surface;
-    const textPrimary = surfaceColors.textPrimary;
     const accentColor = T.colors.resumeAccent;
     const isActive = Boolean(isSelected);
     const darkModeFlatTop = useDarkModeFlatTop();

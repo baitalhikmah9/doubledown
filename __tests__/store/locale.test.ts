@@ -1,27 +1,15 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import {
   getResolvedContentLocaleChain,
   normalizeContentLocales,
 } from '@/lib/i18n/config';
+import { setItemAsync } from 'expo-secure-store';
+import { __resetSecureStoreDouble } from '../doubles/expoSecureStore';
+import { useLocaleStore } from '@/store/locale';
 
-const mockSetItemAsync = jest.fn<() => Promise<void>>().mockResolvedValue();
-const mockGetItemAsync = jest.fn<() => Promise<string | null>>().mockResolvedValue(null);
-
-jest.mock('expo-secure-store', () => ({
-  __esModule: true,
-  setItemAsync: mockSetItemAsync,
-  getItemAsync: mockGetItemAsync,
-  default: {
-    setItemAsync: mockSetItemAsync,
-    getItemAsync: mockGetItemAsync,
-  },
-}));
-
-const { useLocaleStore } = require('@/store/locale') as typeof import('@/store/locale');
 
 beforeEach(() => {
-  mockSetItemAsync.mockClear();
-  mockGetItemAsync.mockClear();
+  __resetSecureStoreDouble();
   useLocaleStore.setState({
     uiLocale: 'en',
     contentLocales: {
@@ -65,7 +53,7 @@ describe('useLocaleStore', () => {
       secondary: 'fr',
       tertiary: 'ur',
     });
-    expect(mockSetItemAsync).toHaveBeenCalled();
+    expect(setItemAsync).toHaveBeenCalled();
   });
 
   it('reorders selected content locales by priority', () => {

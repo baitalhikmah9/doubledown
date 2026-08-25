@@ -15,11 +15,13 @@ import { useThemeStore } from '@/store/theme';
 
 const T = HOME_SOFT_UI;
 
+type AlertButtonFace = { backgroundColor: string; color: string };
+
 function buttonFace(
   style: ThemedAlertButtonStyle | undefined,
   isDark: boolean,
   textPrimary: string
-): { backgroundColor: string; color: string } {
+): AlertButtonFace {
   if (style === 'destructive') {
     return { backgroundColor: '#FF3B30', color: '#FFFFFF' };
   }

@@ -1,132 +1,22 @@
 import React from 'react';
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Modal, Platform, StyleSheet } from 'react-native';
-
-/** Controllable viewport for compact (phone landscape) fill-height assertions. */
-const mockUseWindowDimensions = jest.fn(() => ({
-  width: 800,
-  height: 700,
-  scale: 2,
-  fontScale: 1,
-}));
-
-jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
-  __esModule: true,
-  default: () => mockUseWindowDimensions(),
-}));
-
-jest.mock('react-native-safe-area-context', () => ({
-  SafeAreaView: ({ children, ...props }: { children?: React.ReactNode }) => {
-    const ReactLib = require('react');
-    const { View } = require('react-native');
-    return ReactLib.createElement(View, props, children);
-  },
-  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
-}));
 
 import AppHubScreen from '@/app/(app)/index';
 import { COLORS, FONTS } from '@/constants';
 import { usePlayStore } from '@/store/play';
 import { useThemeStore } from '@/store/theme';
-
-const mockPush = jest.fn();
-const mockUseAuth = jest.fn(() => ({ isLoaded: true, isSignedIn: true }));
-const mockIsAuthDisabled = jest.fn(() => false);
-
-jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    push: mockPush,
-  }),
-}));
-
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  __esModule: true,
-  getItem: jest.fn(async () => null),
-  setItem: jest.fn(async () => {}),
-  removeItem: jest.fn(async () => {}),
-  default: {
-    getItem: jest.fn(async () => null),
-    setItem: jest.fn(async () => {}),
-    removeItem: jest.fn(async () => {}),
-  },
-}));
-
-jest.mock('@/lib/i18n/useI18n', () => ({
-  useI18n: () => ({
-    direction: 'ltr',
-    uiLocale: 'en',
-    t: (key: string) => {
-      const messages: Record<string, string> = {
-        'common.close': 'Close',
-        'common.tokens': 'Tokens',
-        'home.continueGame': 'Continue Game',
-        'home.logoCapline': 'TRIVIA',
-        'home.logoWordmark': 'BackFire',
-        'home.newGame': 'New Game',
-        'home.playTriviaA11yResume':
-          'Play trivia. You have a game in progress; opens a choice to continue or start new.',
-        'home.playTriviaCta': 'PLAY TRIVIA',
-        'home.playTriviaSub': 'Start a new challenge',
-        'home.resumeModalBody':
-          'You have a game in progress. Continue where you left off or start a new game.',
-        'home.resumeModalTitle': 'Continue or start fresh?',
-        'home.secondaryHelp': 'How to play',
-        'home.secondaryStore': 'Store',
-        'play.mode.classic': 'Classic',
-        'play.mode.classicCopy': 'Full board, wagers, six topics.',
-        'play.mode.quick': 'Quick Play',
-        'play.mode.quickCopy': 'Pick 1–5 topics for a faster match with wagers.',
-        'play.mode.random': 'Random',
-        'play.mode.randomCopy': 'Random questions each turn.',
-        'play.mode.rumble': 'Rumble',
-        'play.mode.rumbleCopy': 'Three or more teams and steals.',
-        'common.settings': 'Settings',
-        'profile.guest.createAccount': 'CREATE ACCOUNT',
-        'auth.signUp.signIn': 'Sign in',
-        'home.signInToPlay': 'Sign in',
-      };
-      return messages[key] ?? key;
-    },
-  }),
-}));
-
-jest.mock('@clerk/clerk-expo', () => ({
-  useAuth: () => mockUseAuth(),
-}));
-
-jest.mock('@/lib/authMode', () => ({
-  isAuthDisabled: () => mockIsAuthDisabled(),
-}));
-
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
-jest.mock('expo-image', () => {
-  const React = require('react');
-  const { View } = require('react-native');
-  function MockImage(props: {
-    accessibilityLabel?: string;
-    testID?: string;
-    accessibilityRole?: string;
-  }) {
-    return React.createElement(View, {
-      accessibilityLabel: props.accessibilityLabel,
-      accessibilityRole: props.accessibilityRole,
-      testID: props.testID,
-    });
-  }
-  MockImage.loadAsync = jest.fn(async () => ({}));
-  return { Image: MockImage };
-});
+import { __setAuthDisabled } from '../doubles/authMode';
+import { __setClerkAuth } from '../doubles/clerkExpo';
+import { router } from '../doubles/expoRouter';
+import { __setWindowDimensions } from '../doubles/windowDimensions';
 
 describe('AppHubScreen', () => {
   beforeEach(async () => {
-    mockPush.mockClear();
-    mockUseAuth.mockReturnValue({ isLoaded: true, isSignedIn: true });
-    mockIsAuthDisabled.mockReturnValue(false);
-    mockUseWindowDimensions.mockReturnValue({
+    __setClerkAuth({ isLoaded: true, isSignedIn: true });
+    __setAuthDisabled(false);
+    __setWindowDimensions({
       width: 800,
       height: 700,
       scale: 2,
@@ -145,7 +35,7 @@ describe('AppHubScreen', () => {
     await waitFor(() => {
       expect(usePlayStore.getState().session?.mode).toBe('quickPlay');
       expect(usePlayStore.getState().session?.step).toBe('quick-play-length');
-      expect(mockPush).toHaveBeenCalledWith('/play/quick-length');
+      expect(router.push).toHaveBeenCalledWith('/play/quick-length');
     });
   });
 
@@ -157,7 +47,7 @@ describe('AppHubScreen', () => {
     await waitFor(() => {
       expect(usePlayStore.getState().session?.mode).toBe('classic');
       expect(usePlayStore.getState().session?.step).toBe('team-setup');
-      expect(mockPush).toHaveBeenCalledWith('/play/team-setup');
+      expect(router.push).toHaveBeenCalledWith('/play/team-setup');
     });
   });
 
@@ -195,7 +85,7 @@ describe('AppHubScreen', () => {
 
     fireEvent.press(screen.getByTestId('home-open-settings'));
 
-    expect(mockPush).toHaveBeenCalledWith('/(app)/settings');
+    expect(router.push).toHaveBeenCalledWith('/(app)/settings');
   });
 
   it('prompts to continue or start new when a session is already in progress', () => {
@@ -218,7 +108,7 @@ describe('AppHubScreen', () => {
     expect(screen.getByText('Continue or start fresh?')).toBeTruthy();
     expect(screen.getByText('CONTINUE GAME')).toBeTruthy();
     expect(screen.getByText('NEW GAME')).toBeTruthy();
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it('continues the current game route from the resume prompt', () => {
@@ -239,7 +129,7 @@ describe('AppHubScreen', () => {
     fireEvent.press(screen.getByLabelText('Quick Play'));
     fireEvent.press(screen.getByLabelText('Continue Game'));
 
-    expect(mockPush).toHaveBeenCalledWith('/play/board');
+    expect(router.push).toHaveBeenCalledWith('/play/board');
     expect(usePlayStore.getState().session?.mode).toBe('classic');
   });
 
@@ -262,7 +152,7 @@ describe('AppHubScreen', () => {
     fireEvent.press(screen.getByLabelText('New Game'));
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/play/quick-length');
+      expect(router.push).toHaveBeenCalledWith('/play/quick-length');
       expect(usePlayStore.getState().session?.mode).toBe('quickPlay');
       expect(usePlayStore.getState().session?.step).toBe('quick-play-length');
     });
@@ -278,7 +168,7 @@ describe('AppHubScreen', () => {
   });
 
   it('keeps header chrome and taller aspect-ratio mode cards on compact phone landscape', () => {
-    mockUseWindowDimensions.mockReturnValue({
+    __setWindowDimensions({
       width: 874,
       height: 402,
       scale: 3,
@@ -306,7 +196,7 @@ describe('AppHubScreen', () => {
 
   it('matches Android mode description size on compact iOS landscape without clipping long blurbs', () => {
     // iPhone landscape short side is compact (< 560); Android 720-tall landscape is not.
-    mockUseWindowDimensions.mockReturnValue({
+    __setWindowDimensions({
       width: 874,
       height: 402,
       scale: 3,
@@ -322,7 +212,7 @@ describe('AppHubScreen', () => {
         lineHeight: 15,
         minHeight: 45,
       });
-      // 3 lines: room for Rumble’s long EN blurb on ~155pt card width.
+      // 3 lines: room for Rumble's long EN blurb on ~155pt card width.
       expect(copy.props.numberOfLines).toBe(3);
     }
   });
@@ -412,7 +302,7 @@ describe('AppHubScreen', () => {
   });
 
   it('does not show public auth entry in the home header when signed out', () => {
-    mockUseAuth.mockReturnValue({ isLoaded: true, isSignedIn: false });
+    __setClerkAuth({ isLoaded: true, isSignedIn: false });
 
     render(<AppHubScreen />);
 
@@ -420,22 +310,22 @@ describe('AppHubScreen', () => {
   });
 
   it('shows sign in on mode cards and routes to auth when signed out', () => {
-    mockUseAuth.mockReturnValue({ isLoaded: true, isSignedIn: false });
+    __setClerkAuth({ isLoaded: true, isSignedIn: false });
 
     render(<AppHubScreen />);
 
     expect(screen.getAllByText('SIGN IN')).toHaveLength(4);
-    expect(screen.getByLabelText('Quick Play. SIGN IN')).toHaveAccessibilityState({ disabled: false });
+    expect(screen.getByLabelText('Quick Play. SIGN IN').props.accessibilityState?.disabled).toBe(false);
 
     fireEvent.press(screen.getByLabelText('Quick Play. SIGN IN'));
 
     expect(usePlayStore.getState().session).toBeNull();
-    expect(mockPush).toHaveBeenCalledWith('/(auth)/sign-in');
+    expect(router.push).toHaveBeenCalledWith('/(auth)/sign-in');
   });
 
   it('lets signed-out players start a game when auth is disabled', async () => {
-    mockUseAuth.mockReturnValue({ isLoaded: true, isSignedIn: false });
-    mockIsAuthDisabled.mockReturnValue(true);
+    __setClerkAuth({ isLoaded: true, isSignedIn: false });
+    __setAuthDisabled(true);
 
     render(<AppHubScreen />);
 
@@ -444,7 +334,7 @@ describe('AppHubScreen', () => {
     await waitFor(() => {
       expect(usePlayStore.getState().session?.mode).toBe('quickPlay');
       expect(usePlayStore.getState().session?.step).toBe('quick-play-length');
-      expect(mockPush).toHaveBeenCalledWith('/play/quick-length');
+      expect(router.push).toHaveBeenCalledWith('/play/quick-length');
     });
   });
 });

@@ -6,18 +6,18 @@ import { create } from 'zustand';
 export type PlayDisplayMode = 'tv' | 'mobile';
 
 const DISPLAY_MODE_STORAGE_KEY = 'backfire-play-display-mode';
-export const PLAY_TEXT_SCALE: Record<PlayDisplayMode, number> = { tv: 0.75, mobile: 1 };
+export const PLAY_TEXT_SCALE = { tv: 0.75, mobile: 1 } as const satisfies Record<PlayDisplayMode, number>;
 
 async function getStoredMode(): Promise<string | null> {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    return window.localStorage.getItem(DISPLAY_MODE_STORAGE_KEY);
+  if (Platform.OS === 'web' && globalThis.localStorage) {
+    return globalThis.localStorage.getItem(DISPLAY_MODE_STORAGE_KEY);
   }
   return SecureStore.getItemAsync(DISPLAY_MODE_STORAGE_KEY);
 }
 
 async function setStoredMode(mode: PlayDisplayMode): Promise<void> {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    window.localStorage.setItem(DISPLAY_MODE_STORAGE_KEY, mode);
+  if (Platform.OS === 'web' && globalThis.localStorage) {
+    globalThis.localStorage.setItem(DISPLAY_MODE_STORAGE_KEY, mode);
     return;
   }
   await SecureStore.setItemAsync(DISPLAY_MODE_STORAGE_KEY, mode);

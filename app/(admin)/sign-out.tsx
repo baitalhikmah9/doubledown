@@ -87,7 +87,13 @@ export default function AdminSignOutScreen() {
             )}
           </Pressable>
 
-          <Link href={adminHref('/admin') as any} asChild>
+          <Link
+            href={
+              // SAFETY: adminHref returns a path string accepted by Expo Router Link href.
+              adminHref('/admin') as any
+            }
+            asChild
+          >
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Back to admin overview"

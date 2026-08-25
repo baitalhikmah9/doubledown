@@ -242,7 +242,7 @@ export default function StoreScreen() {
     authDisabled,
     isSignedIn,
     storedTokens:
-      balanceData && typeof balanceData.balance === 'number'
+      balanceData && balanceData.balance != null
         ? balanceData.balance
         : localTokens,
   });
@@ -354,7 +354,7 @@ export default function StoreScreen() {
           setCouponSuccess('That code has already been redeemed.');
         } else {
           const granted =
-            typeof result.tokensGranted === 'number' && result.tokensGranted > 0
+            result.tokensGranted != null && result.tokensGranted > 0
               ? result.tokensGranted
               : null;
           setCouponSuccess(

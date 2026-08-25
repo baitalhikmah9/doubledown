@@ -1,15 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-
-const mockAuthDisabled = jest.fn(() => false);
-
-jest.mock('@/lib/authMode', () => ({
-  isAuthDisabled: () => mockAuthDisabled(),
-}));
-
-jest.mock('@/lib/deviceInstallation', () => ({
-  getOrCreateInstallationId: jest.fn(async () => 'device_test_1'),
-}));
-
+import { __setAuthDisabled, __resetAuthModeDouble } from '../doubles/authMode';
+import {
+  __setInstallationId,
+  __resetDeviceInstallationDouble,
+} from '../doubles/deviceInstallation';
 import {
   abandonGameEntry,
   adjustGameEntryReservation,
@@ -20,14 +14,17 @@ import {
 
 describe('gameEntry wallet helpers', () => {
   beforeEach(() => {
-    mockAuthDisabled.mockReturnValue(false);
-    jest.clearAllMocks();
+    __resetAuthModeDouble();
+    __resetDeviceInstallationDouble();
+    __setInstallationId('device_test_1');
+    __setAuthDisabled(false);
   });
 
   it('returns a local dummy reservation when auth is disabled', async () => {
-    mockAuthDisabled.mockReturnValue(true);
+    __setAuthDisabled(true);
     const mutation = jest.fn();
 
+    // SAFETY: Test supplies a spy mutation with the reserve signature.
     const result = await reserveGameEntry(mutation as never, {
       mode: 'classic',
       clientSessionId: 'play_123',
@@ -45,6 +42,7 @@ describe('gameEntry wallet helpers', () => {
       balance: 90,
     }));
 
+    // SAFETY: Test supplies a spy mutation with the reserve signature.
     const result = await reserveGameEntry(mutation as never, {
       mode: 'quickPlay',
       clientSessionId: 'play_123',
@@ -63,11 +61,12 @@ describe('gameEntry wallet helpers', () => {
   });
 
   it('no-ops consume and refund when auth is disabled', async () => {
-    mockAuthDisabled.mockReturnValue(true);
+    __setAuthDisabled(true);
     const consumeMutation = jest.fn();
     const refundMutation = jest.fn();
 
     await expect(
+      // SAFETY: Test supplies a spy mutation with the consume signature.
       consumeGameEntry(consumeMutation as never, {
         reservationId: 'local_play_123',
         completedSessionId: 'session-1',
@@ -75,6 +74,7 @@ describe('gameEntry wallet helpers', () => {
     ).resolves.toEqual({ ok: true });
 
     await expect(
+      // SAFETY: Test supplies a spy mutation with the refund signature.
       refundGameEntry(refundMutation as never, {
         reservationId: 'local_play_123',
         reason: 'user_abandoned',
@@ -86,10 +86,11 @@ describe('gameEntry wallet helpers', () => {
   });
 
   it('skips adjust when auth is disabled or delta is zero', async () => {
-    mockAuthDisabled.mockReturnValue(true);
+    __setAuthDisabled(true);
     const mutation = jest.fn();
 
     await expect(
+      // SAFETY: Test supplies a spy mutation with the adjust signature.
       adjustGameEntryReservation(mutation as never, {
         reservationId: 'user:play_123',
         additionalCost: 3,
@@ -97,8 +98,9 @@ describe('gameEntry wallet helpers', () => {
     ).resolves.toEqual({ ok: true });
     expect(mutation).not.toHaveBeenCalled();
 
-    mockAuthDisabled.mockReturnValue(false);
+    __setAuthDisabled(false);
     await expect(
+      // SAFETY: Test supplies a spy mutation with the adjust signature.
       adjustGameEntryReservation(mutation as never, {
         reservationId: 'user:play_123',
         additionalCost: 0,
@@ -110,6 +112,7 @@ describe('gameEntry wallet helpers', () => {
   it('forwards adjust mutations when auth is enabled', async () => {
     const mutation = jest.fn(async () => ({ ok: true, balance: 82 }));
 
+    // SAFETY: Test supplies a spy mutation with the adjust signature.
     const result = await adjustGameEntryReservation(mutation as never, {
       reservationId: 'user:play_123',
       additionalCost: 3,
@@ -126,6 +129,7 @@ describe('gameEntry wallet helpers', () => {
     const refundMutation = jest.fn(async () => ({ ok: true, balance: 100 }));
     const resetSession = jest.fn();
 
+    // SAFETY: Test supplies a spy mutation with the refund signature.
     await abandonGameEntry(refundMutation as never, {
       reservationId: 'user:play_123',
       reason: 'user_abandoned',
@@ -143,6 +147,7 @@ describe('gameEntry wallet helpers', () => {
     const refundMutation = jest.fn();
     const resetSession = jest.fn();
 
+    // SAFETY: Test supplies a spy mutation with the refund signature.
     await abandonGameEntry(refundMutation as never, {
       reservationId: null,
       reason: 'user_abandoned',

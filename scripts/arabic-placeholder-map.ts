@@ -2,7 +2,7 @@
  * Restore Arabic script where the QF CSV export saved literal "?" placeholders.
  * The source file has no Arabic codepoints — only transliteration + question marks.
  */
-export const ARABIC_PLACEHOLDER_REPLACEMENTS: ReadonlyArray<readonly [string, string]> = [
+export const ARABIC_PLACEHOLDER_REPLACEMENTS: readonly (readonly [string, string])[] = [
   ['(Al-Masjid al-Aqsa, ?????? ??????)', '(Al-Masjid al-Aqsa, المسجد الأقصى)'],
   ["(Al-Bayt al-Ma'mur, ????? ???????)", "(Al-Bayt al-Ma'mur, البيت المعمور)"],
   ['(Ashab al-Ukhdud, ????? ???????)', '(Ashab al-Ukhdud, أصحاب الأخدود)'],
@@ -28,7 +28,7 @@ export const ARABIC_PLACEHOLDER_REPLACEMENTS: ReadonlyArray<readonly [string, st
 ] as const;
 
 /** Normalize already-patched strings to consistent (English, Arabic) parentheses. */
-const ARABIC_FORMAT_NORMALIZATIONS: ReadonlyArray<readonly [string, string]> = [
+const ARABIC_FORMAT_NORMALIZATIONS: readonly (readonly [string, string])[] = [
   ['Mount Judi (الجودي)', 'Mount Judi (Judi, الجودي)'],
   ['Azar (آزر)', '(Azar, آزر)'],
   [

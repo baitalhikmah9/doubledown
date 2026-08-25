@@ -13,14 +13,14 @@ describe('getPlaySurfaceColors', () => {
     // Default soft-ui palette is light (cream canvas).
     expect(colors.isDark).toBe(false);
     expect(colors.topicImageMatte).toBeDefined();
-    expect(typeof colors.topicImageMatte).toBe('string');
+    expect(colors.topicImageMatte).toEqual(expect.any(String));
     expect(colors.topicImageMatte).not.toBe(colors.surface);
     expect(colors.topicImageMatte).not.toBe(colors.canvas);
     // Must be darker than pure white so MISSING frames read as cards, not voids.
     expect(relativeLuminance(colors.topicImageMatte!)).toBeLessThan(0.85);
     // Readable label color for the matte.
     expect(colors.missingPictureLabelColor).toBeDefined();
-    expect(typeof colors.missingPictureLabelColor).toBe('string');
+    expect(colors.missingPictureLabelColor).toEqual(expect.any(String));
   });
 
   it('uses distinct navy canvas and surface colors in dark mode', () => {
@@ -36,6 +36,7 @@ describe('getPlaySurfaceColors', () => {
     expect(PALETTES.dark.border).not.toBe(colors.surface);
   });
 
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('keeps light-mode topic labels as white bars with dark type', () => {
     const colors = getPlaySurfaceColors();
 

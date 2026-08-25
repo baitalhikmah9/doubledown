@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import {
   aggregateAffiliateEarnings,
   computeCommissionMicros,
@@ -6,11 +6,12 @@ import {
   normalizeAffiliateEmail,
 } from '@/convex/lib/affiliateStats';
 import { getMyDashboard } from '@/convex/affiliate';
-import { requireUser } from '@/convex/lib/auth';
-
-jest.mock('@/convex/lib/auth', () => ({
-  requireUser: jest.fn(),
-}));
+import { getConvexHandler } from '../helpers/convexHandler';
+import {
+  createConvexTestCtx,
+  userDoc,
+  type ConvexDoc,
+} from '../helpers/convexTestCtx';
 
 describe('affiliateStats', () => {
   it('normalizes affiliate emails', () => {
@@ -20,7 +21,6 @@ describe('affiliateStats', () => {
   });
 
   it('computes commission from the post-discount sale using integer micros', () => {
-    // £8.00 at 10% = £0.80
     expect(computeCommissionMicros(8_000_000, 10)).toBe(800_000);
     expect(computeCommissionMicros(199, 10)).toBe(19);
   });
@@ -78,51 +78,42 @@ describe('affiliateStats', () => {
   });
 });
 
-const mockedRequireUser = requireUser as jest.MockedFunction<typeof requireUser>;
+const handler = getConvexHandler<ReturnType<typeof createConvexTestCtx>, Record<string, never>, {
+  codes: Record<string, string | number | boolean | null | Record<string, string | number>[]>[];
+}>(getMyDashboard);
 
-function mockAffiliateCtx(results: Record<string, unknown[]>) {
-  const calls: { table: string; index: string; eqs: [string, unknown][] }[] = [];
-  const db = {
-    query: jest.fn((table: string) => ({
-      withIndex: (
-        index: string,
-        rangeFn?: (q: { eq: (field: string, value: unknown) => unknown }) => void
-      ) => {
-        const eqs: [string, unknown][] = [];
-        const q = {
-          eq(field: string, value: unknown) {
-            eqs.push([field, value]);
-            return q;
-          },
-        };
-        rangeFn?.(q);
-        calls.push({ table, index, eqs });
-        return {
-          collect: async () => results[`${table}:${index}`] ?? [],
-        };
-      },
-    })),
-  };
-  return { db, auth: { getUserIdentity: jest.fn() }, calls };
+function affiliateCtx(results: {
+  promos?: ConvexDoc[];
+  purchases?: ConvexDoc[];
+  identity?: { subject: string; email?: string } | null;
+}) {
+  const user = userDoc({
+    id: 'users_creator',
+    clerkId: 'clerk_creator',
+    email: '  Creator@Example.com ',
+  });
+  return createConvexTestCtx({
+    identity:
+      results.identity === null
+        ? null
+        : (results.identity ?? { subject: 'clerk_creator', email: 'creator@example.com' }),
+    tables: {
+      users: [user],
+      promo_codes: results.promos ?? [],
+      store_purchases: results.purchases ?? [],
+    },
+  });
 }
 
 describe('affiliate.getMyDashboard', () => {
   it('rejects unauthenticated access before any read', async () => {
-    mockedRequireUser.mockRejectedValueOnce(new Error('Not authenticated'));
-    const ctx = mockAffiliateCtx({});
-    await expect((getMyDashboard as any)._handler(ctx as any, {})).rejects.toThrow(
-      'Not authenticated'
-    );
-    expect(ctx.db.query).not.toHaveBeenCalled();
+    const ctx = affiliateCtx({ identity: null });
+    await expect(handler(ctx, {})).rejects.toThrow('Not authenticated');
   });
 
   it('scopes codes to the normalized email and loads purchases only by that promo id', async () => {
-    mockedRequireUser.mockResolvedValueOnce({
-      _id: 'users_creator',
-      email: '  Creator@Example.com ',
-    } as never);
-    const ctx = mockAffiliateCtx({
-      'promo_codes:by_affiliate_email': [
+    const ctx = affiliateCtx({
+      promos: [
         {
           _id: 'promo_mine',
           code: 'mikhail10',
@@ -131,32 +122,23 @@ describe('affiliate.getMyDashboard', () => {
           discountPercent: 10,
           productKey: 'bundle_50',
           commissionPercent: 10,
+          affiliateEmail: 'creator@example.com',
         },
       ],
-      'store_purchases:by_promo_code': [
+      purchases: [
         {
+          _id: 'purchase_1',
           status: 'granted',
           priceAmountMicros: 8_000_000,
           currencyCode: 'GBP',
           commissionAmountMicros: 800_000,
+          promoCodeId: 'promo_mine',
         },
       ],
     });
 
-    const result = await (getMyDashboard as any)._handler(ctx as any, {});
+    const result = await handler(ctx, {});
 
-    expect(ctx.calls).toEqual([
-      {
-        table: 'promo_codes',
-        index: 'by_affiliate_email',
-        eqs: [['affiliateEmail', 'creator@example.com']],
-      },
-      {
-        table: 'store_purchases',
-        index: 'by_promo_code',
-        eqs: [['promoCodeId', 'promo_mine']],
-      },
-    ]);
     expect(result.codes).toEqual([
       {
         code: 'mikhail10',

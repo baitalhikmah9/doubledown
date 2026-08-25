@@ -1,39 +1,102 @@
-/* global jest */
 require('@testing-library/jest-native/extend-expect');
 
-const mockConvexMutation = jest.fn(async (args) => {
-  if (args && 'clientSessionId' in args) {
-    return { ok: true, reservationId: 'test_reservation' };
+// Reset shared doubles between tests so file order does not leak state.
+const { beforeEach } = require('@jest/globals');
+
+beforeEach(() => {
+  try {
+    require('./__tests__/doubles/authMode').__resetAuthModeDouble();
+  } catch {
+    /* optional */
   }
-  if (args && 'reservationId' in args && 'completedSessionId' in args) {
-    return { ok: true };
+  try {
+    require('./__tests__/doubles/deviceInstallation').__resetDeviceInstallationDouble();
+  } catch {
+    /* optional */
   }
-  if (args && 'reservationId' in args && 'reason' in args) {
-    return { ok: true };
+  try {
+    require('./__tests__/doubles/expoRouter').__resetExpoRouterDouble();
+  } catch {
+    /* optional */
   }
-  if (args && 'reservationId' in args && 'additionalCost' in args) {
-    return { ok: true };
+  try {
+    require('./__tests__/doubles/useI18n').__resetUseI18nDouble();
+  } catch {
+    /* optional */
   }
-  return { ok: true };
+  try {
+    require('./__tests__/doubles/clerkExpo').__resetClerkExpoDouble();
+  } catch {
+    /* optional */
+  }
+  try {
+    require('./__tests__/doubles/convexReact').__resetConvexReactDouble();
+  } catch {
+    /* optional */
+  }
+  try {
+    require('./__tests__/doubles/asyncStorage').__resetAsyncStorageDouble();
+  } catch {
+    /* optional */
+  }
+  try {
+    require('./__tests__/doubles/safeArea').__resetSafeAreaDouble();
+  } catch {
+    /* optional */
+  }
+  try {
+    require('./__tests__/doubles/expoHaptics').__resetExpoHapticsDouble();
+  } catch {
+    /* optional */
+  }
+  try {
+    require('./__tests__/doubles/expoSecureStore').__resetSecureStoreDouble();
+  } catch {
+    /* optional */
+  }
+  try {
+    require('./__tests__/doubles/windowDimensions').__resetWindowDimensionsDouble();
+  } catch {
+    /* optional */
+  }
+  try {
+    require('./__tests__/doubles/featureFlags').__resetFeatureFlagsDouble();
+  } catch {
+    /* optional */
+  }
+  try {
+    require('./__tests__/doubles/expoConstants').__resetExpoConstantsDouble();
+  } catch {
+    /* optional */
+  }
+  try {
+    require('./__tests__/doubles/expoAuthSession').__resetExpoAuthSessionDouble();
+  } catch {
+    /* optional */
+  }
+  try {
+    require('./__tests__/doubles/expoModule').__resetExpoModuleDouble();
+  } catch {
+    /* optional */
+  }
+  try {
+    require('./__tests__/doubles/haptics').__resetHapticsDouble?.();
+  } catch {
+    /* optional */
+  }
+  try {
+    require('./__tests__/doubles/themedAlert').__resetThemedAlertDouble();
+  } catch {
+    /* optional */
+  }
+  try {
+    require('./__tests__/doubles/appleSignIn').__resetAppleSignInDouble();
+  } catch {
+    /* optional */
+  }
+  try {
+    require('./__tests__/doubles/useTheme').__resetUseThemeDouble();
+  } catch {
+    /* optional */
+  }
 });
-
-const mockConvexAction = jest.fn(async () => ({ ok: true }));
-
-jest.mock('convex/react', () => ({
-  useQuery: jest.fn(() => undefined),
-  useMutation: jest.fn(() => mockConvexMutation),
-  useAction: jest.fn(() => mockConvexAction),
-  useConvexAuth: jest.fn(() => ({ isAuthenticated: true, isLoading: false })),
-}));
-
-jest.mock('@/lib/deviceInstallation', () => ({
-  getOrCreateInstallationId: jest.fn(async () => 'device_test_1'),
-}));
-
-jest.mock('expo-haptics', () => ({
-  impactAsync: jest.fn(() => Promise.resolve()),
-  notificationAsync: jest.fn(() => Promise.resolve()),
-  selectionAsync: jest.fn(() => Promise.resolve()),
-  ImpactFeedbackStyle: { Light: 'Light', Medium: 'Medium', Heavy: 'Heavy', Rigid: 'Rigid', Soft: 'Soft' },
-  NotificationFeedbackType: { Success: 'Success', Warning: 'Warning', Error: 'Error' },
-}));

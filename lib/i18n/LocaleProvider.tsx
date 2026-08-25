@@ -24,7 +24,7 @@ import {
   installLocaleFontRemap,
   setActiveUiFontLocale,
 } from './fonts';
-import en, { type Messages, type TranslationKey } from './messages/en';
+import enMessages, { type Messages, type TranslationKey } from './messages/en';
 import ar from './messages/ar';
 import es from './messages/es';
 import fr from './messages/fr';
@@ -40,8 +40,8 @@ import { useLocaleHydration, useLocaleStore } from '@/store/locale';
 // Remap brand Latin faces → Noto Sans Arabic while UI locale is ar/ur.
 installLocaleFontRemap();
 
-const MESSAGE_MAP: Record<SupportedLocale, Messages> = {
-  en,
+const MESSAGE_MAP = {
+  en: enMessages,
   ar,
   es,
   fr,
@@ -52,7 +52,7 @@ const MESSAGE_MAP: Record<SupportedLocale, Messages> = {
   ru,
   id,
   bn,
-};
+} as const satisfies Record<SupportedLocale, Messages>;
 
 type TranslationParams = Record<string, string | number | undefined | null>;
 
@@ -102,7 +102,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<I18nContextValue>(() => {
     const direction = getDirection(uiLocale);
-    const messages = MESSAGE_MAP[uiLocale] ?? en;
+    const messages = MESSAGE_MAP[uiLocale] ?? enMessages;
 
     return {
       uiLocale,
@@ -111,7 +111,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       direction,
       isRTL: direction === 'rtl',
       t: (key, params) => {
-        const localized = messages[key] ?? en[key];
+        const localized = messages[key] ?? enMessages[key];
 
         if (!localized) {
           if (__DEV__) {

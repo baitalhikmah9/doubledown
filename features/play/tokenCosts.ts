@@ -13,14 +13,15 @@ export const QUICK_PLAY_TOKEN_COST_BY_TOPIC_COUNT = {
 export type QuickPlayTopicCount = keyof typeof QUICK_PLAY_TOKEN_COST_BY_TOPIC_COUNT;
 
 /** Topic-count choices in ascending order (1 → 5 left to right). */
-export const QUICK_PLAY_TOPIC_OPTIONS = (
-  Object.entries(QUICK_PLAY_TOKEN_COST_BY_TOPIC_COUNT) as [string, number][]
-)
-  .map(([topicCount, tokenCost]) => ({
-    topicCount: Number(topicCount) as QuickPlayTopicCount,
-    tokenCost,
-  }))
-  .sort((a, b) => a.topicCount - b.topicCount);
+export const QUICK_PLAY_TOPIC_OPTIONS: {
+  topicCount: QuickPlayTopicCount;
+  tokenCost: number;
+}[] = (
+  [1, 2, 3, 4, 5] as const satisfies readonly QuickPlayTopicCount[]
+).map((topicCount) => ({
+  topicCount,
+  tokenCost: QUICK_PLAY_TOKEN_COST_BY_TOPIC_COUNT[topicCount],
+}));
 
 export const QUICK_PLAY_TOKEN_COST_RANGE_LABEL = '2-8';
 

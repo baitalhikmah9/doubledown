@@ -220,12 +220,15 @@ export const consumeEntry = mutation({
     if (!wallet || wallet.purchaserAccountId !== purchaserAccount?.appUserId) {
       return { ok: false as const, error: 'forbidden' };
     }
+    // SAFETY: reservation rows only use the ReservationStatus enum values.
     if (!canConsumeReservation(tx.status as 'reserved' | 'consumed' | 'refunded' | undefined)) {
       return { ok: false as const, error: 'invalid_reservation_state' };
     }
 
-    const metadata = typeof tx.metadata === 'object' && tx.metadata !== null ? tx.metadata : {};
-    if ((metadata as Record<string, unknown>).chargeTiming === 'on_board') {
+    type ReservationMetadata = { chargeTiming?: string; [key: string]: string | number | boolean | null | undefined };
+    // SAFETY: wallet_transactions.metadata is a small JSON object we write ourselves.
+    const metadata = (tx.metadata ?? {}) as ReservationMetadata;
+    if (metadata.chargeTiming === 'on_board') {
       const charge = tryReserveFromBalance(wallet.balance, -tx.amount);
       if (!charge.ok) {
         return { ok: false as const, error: charge.reason };
@@ -288,6 +291,7 @@ export const adjustEntryReservation = mutation({
     if (!wallet || wallet.purchaserAccountId !== purchaserAccount.appUserId) {
       return { ok: false as const, error: 'forbidden' };
     }
+    // SAFETY: reservation rows only use the ReservationStatus enum values.
     if (!canRefundReservation(tx.status as 'reserved' | 'consumed' | 'refunded' | undefined)) {
       return { ok: false as const, error: 'invalid_reservation_state' };
     }
@@ -348,6 +352,7 @@ export const refundEntry = mutation({
       .unique();
 
     if (!tx) return { ok: false as const, error: 'reservation_not_found' };
+    // SAFETY: reservation rows only use the ReservationStatus enum values.
     if (!canRefundReservation(tx.status as 'reserved' | 'consumed' | 'refunded' | undefined)) {
       return { ok: false as const, error: 'invalid_reservation_state' };
     }
@@ -357,9 +362,11 @@ export const refundEntry = mutation({
       return { ok: false as const, error: 'forbidden' };
     }
 
-    const metadata = typeof tx.metadata === 'object' && tx.metadata !== null ? tx.metadata : {};
+    type ReservationMetadata = { chargeTiming?: string; [key: string]: string | number | boolean | null | undefined };
+    // SAFETY: wallet_transactions.metadata is a small JSON object we write ourselves.
+    const metadata = (tx.metadata ?? {}) as ReservationMetadata;
     const nextBalance =
-      (metadata as Record<string, unknown>).chargeTiming === 'on_board'
+      metadata.chargeTiming === 'on_board'
         ? wallet.balance
         : applyRefundToBalance(wallet.balance, -tx.amount);
 

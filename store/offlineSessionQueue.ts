@@ -20,6 +20,23 @@ export interface PersistedOfflineQueueItem {
   lastError?: string;
 }
 
+function isOfflineQueueItem(value: unknown): value is PersistedOfflineQueueItem {
+  if (!value || typeof value !== 'object') return false;
+  const row = value as Record<string, unknown>;
+  if (typeof row.id !== 'string' || row.id.length === 0) return false;
+  if (typeof row.createdAt !== 'number' || typeof row.flushAttempts !== 'number') return false;
+  if (row.lastError !== undefined && typeof row.lastError !== 'string') return false;
+  if (!row.payload || typeof row.payload !== 'object') return false;
+  const payload = row.payload as Record<string, unknown>;
+  if (typeof payload.clientSessionId !== 'string' || payload.clientSessionId.length === 0) {
+    return false;
+  }
+  if (typeof payload.deviceId !== 'string' || payload.deviceId.length === 0) return false;
+  if (!('session' in payload)) return false;
+  if (!Array.isArray(payload.scoreEvents)) return false;
+  return true;
+}
+
 async function readRaw(): Promise<string | null> {
   try {
     return await AsyncStorage.getItem(STORAGE_KEY);
@@ -32,18 +49,10 @@ export async function loadOfflineSessionQueue(): Promise<PersistedOfflineQueueIt
   const raw = await readRaw();
   if (!raw) return [];
   try {
-    const parsed = JSON.parse(raw) as unknown;
+    const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (row): row is PersistedOfflineQueueItem =>
-        typeof row === 'object' &&
-        row !== null &&
-        typeof (row as PersistedOfflineQueueItem).id === 'string' &&
-        typeof (row as PersistedOfflineQueueItem).createdAt === 'number' &&
-        typeof (row as PersistedOfflineQueueItem).flushAttempts === 'number' &&
-        typeof (row as PersistedOfflineQueueItem).payload === 'object' &&
-        (row as PersistedOfflineQueueItem).payload !== null
-    );
+    // Validate rows independently so one corrupt sibling does not discard the rest.
+    return parsed.filter(isOfflineQueueItem);
   } catch {
     return [];
   }

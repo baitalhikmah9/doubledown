@@ -3,116 +3,17 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Modal, Platform, StyleSheet } from 'react-native';
 
-/** Controllable viewport so wide-web (`Platform.OS === 'web' && isWide`) can be exercised. */
-const mockUseWindowDimensions = jest.fn(() => ({
-  width: 390,
-  height: 844,
-  scale: 2,
-  fontScale: 1,
-}));
-
-jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
-  __esModule: true,
-  default: () => mockUseWindowDimensions(),
-}));
-
 import TeamSetupScreen from '@/app/(app)/play/team-setup';
 import { COLORS } from '@/constants';
 import { usePlayStore } from '@/store/play';
 import { useThemeStore } from '@/store/theme';
 import { HOME_SOFT_UI } from '@/themes';
-
-const mockBack = jest.fn();
-const mockCanGoBack = jest.fn(() => false);
-const mockPush = jest.fn();
-const mockReplace = jest.fn();
-
-jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    back: mockBack,
-    canGoBack: mockCanGoBack,
-    push: mockPush,
-    replace: mockReplace,
-  }),
-}));
-
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  __esModule: true,
-  getItem: jest.fn(async () => null),
-  setItem: jest.fn(async () => {}),
-  removeItem: jest.fn(async () => {}),
-  default: {
-    getItem: jest.fn(async () => null),
-    setItem: jest.fn(async () => {}),
-    removeItem: jest.fn(async () => {}),
-  },
-}));
-
-jest.mock('react-native-safe-area-context', () => ({
-  SafeAreaView: 'SafeAreaView',
-  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
-}));
-
-jest.mock('@/lib/i18n/useI18n', () => ({
-  useI18n: () => ({
-    direction: 'ltr',
-    getTextStyle: () => ({}),
-    uiLocale: 'en',
-    t: (key: string, values?: Record<string, string | number>) => {
-      const messages: Record<string, string> = {
-        'common.back': 'Back',
-        'common.close': 'Close',
-        'common.continue': 'Continue',
-        'common.loading': 'Loading',
-        'common.tokens': 'Tokens',
-        'play.addPlayerLink': 'Add Player',
-        'play.addTeamMemberA11y': 'Add a team member',
-        'play.hotSeatInfoBody':
-          'One player from each team answers solo in the Hot Seat round.',
-        'play.hotSeatInfoLink': 'What is Hot Seat?',
-        'play.hotSeatInfoTitle': 'Hot Seat',
-        'play.hotSeatTitle': 'Hot Seat',
-        'play.playerPlaceholder': `Player ${values?.count ?? ''}`,
-        'play.removeLastPlayerLink': 'Remove last player',
-        'play.removeTeamMemberA11y': 'Remove a team member',
-        'play.rumblePartyCountTitle': 'Number of teams',
-        'play.teamsLabel': 'Teams',
-        'play.setupIncompleteHint': 'Enter all names to continue',
-        'play.teamNamePlaceholder': 'Team name',
-        'play.teamSetupTitle': 'Team Setup',
-        'play.wagerCardTitle': 'Wager',
-        'play.wagerHelpLink': 'What is Wager?',
-        'play.wagerInfoColCorrect': 'If correct',
-        'play.wagerInfoColMultiplier': 'Multiplier',
-        'play.wagerInfoColWrong': 'If wrong',
-        'play.wagerInfoDone': 'Done',
-        'play.wagerInfoParagraph1':
-          'Wagers are a risky way to try and sabotage the other team!',
-        'play.wagerInfoParagraph2': 'A random remaining question is chosen.',
-        'play.wagerInfoTitle': 'What is a Wager?',
-        'play.wagerInfoWarning': 'Plan carefully!',
-      };
-      return messages[key] ?? key;
-    },
-  }),
-}));
-
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
-jest.mock('@clerk/clerk-expo', () => ({
-  useAuth: jest.fn(() => ({ isLoaded: true, isSignedIn: true })),
-}));
+import { router } from '../doubles/expoRouter';
+import { __setWindowDimensions } from '../doubles/windowDimensions';
 
 describe('TeamSetupScreen', () => {
   beforeEach(async () => {
-    mockBack.mockClear();
-    mockCanGoBack.mockReset();
-    mockCanGoBack.mockReturnValue(false);
-    mockPush.mockClear();
-    mockReplace.mockClear();
-    mockUseWindowDimensions.mockReturnValue({
+    __setWindowDimensions({
       width: 390,
       height: 844,
       scale: 2,
@@ -179,7 +80,7 @@ describe('TeamSetupScreen', () => {
     // Classic wide-web embeds Continue in the 3-column row; rumble must still show a CTA.
     const originalOS = Platform.OS;
     Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true });
-    mockUseWindowDimensions.mockReturnValue({
+    __setWindowDimensions({
       width: 1280,
       height: 800,
       scale: 1,
@@ -230,7 +131,7 @@ describe('TeamSetupScreen', () => {
     const addControl = screen.getAllByLabelText('Add a team member')[0];
     const styleProp = addControl.props.style;
     const resolved =
-      typeof styleProp === 'function' ? styleProp({ pressed: false }) : styleProp;
+      (styleProp instanceof Function) ? styleProp({ pressed: false }) : styleProp;
     const flat = StyleSheet.flatten(resolved);
 
     // Light mode: light surface control with dark label (adapts with theme).
@@ -250,7 +151,7 @@ describe('TeamSetupScreen', () => {
     const addControl = screen.getAllByLabelText('Add a team member')[0];
     const styleProp = addControl.props.style;
     const resolved =
-      typeof styleProp === 'function' ? styleProp({ pressed: false }) : styleProp;
+      (styleProp instanceof Function) ? styleProp({ pressed: false }) : styleProp;
     const flat = StyleSheet.flatten(resolved);
 
     // Dark mode: dark surface fill with light label (not always-navy).
@@ -273,7 +174,7 @@ describe('TeamSetupScreen', () => {
 
     const styleProp = back.props.style;
     const resolved =
-      typeof styleProp === 'function' ? styleProp({ pressed: false }) : styleProp;
+      (styleProp instanceof Function) ? styleProp({ pressed: false }) : styleProp;
     const flat = StyleSheet.flatten(resolved);
 
     expect(flat.width).toBe(44);
@@ -284,7 +185,7 @@ describe('TeamSetupScreen', () => {
   it('keeps a small dead zone under the phone continue strip above the bezel', () => {
     // SafeAreaView still clears the home indicator; strip adds modest pad so Continue
     // is not flush to the edge on zero-inset / landscape devices.
-    mockUseWindowDimensions.mockReturnValue({
+    __setWindowDimensions({
       width: 874,
       height: 402,
       scale: 3,
@@ -306,9 +207,9 @@ describe('TeamSetupScreen', () => {
     render(<TeamSetupScreen />);
     fireEvent.press(screen.getByLabelText('Back'));
 
-    expect(mockReplace).toHaveBeenCalledWith('/play/quick-length');
-    expect(mockReplace).not.toHaveBeenCalledWith('/(app)/');
-    expect(mockBack).not.toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledWith('/play/quick-length');
+    expect(router.replace).not.toHaveBeenCalledWith('/(app)/');
+    expect(router.back).not.toHaveBeenCalled();
   });
 
   it('returns home when going back during classic setup', () => {
@@ -317,8 +218,8 @@ describe('TeamSetupScreen', () => {
     render(<TeamSetupScreen />);
     fireEvent.press(screen.getByLabelText('Back'));
 
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/');
-    expect(mockReplace).not.toHaveBeenCalledWith('/play/quick-length');
+    expect(router.replace).toHaveBeenCalledWith('/(app)/');
+    expect(router.replace).not.toHaveBeenCalledWith('/play/quick-length');
   });
 
   it('returns home when going back during rumble setup instead of topics', () => {
@@ -327,20 +228,20 @@ describe('TeamSetupScreen', () => {
     render(<TeamSetupScreen />);
     fireEvent.press(screen.getByLabelText('Back'));
 
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/');
-    expect(mockReplace).not.toHaveBeenCalledWith('/play/categories');
-    expect(mockPush).not.toHaveBeenCalledWith('/play/categories');
+    expect(router.replace).toHaveBeenCalledWith('/(app)/');
+    expect(router.replace).not.toHaveBeenCalledWith('/play/categories');
+    expect(router.push).not.toHaveBeenCalledWith('/play/categories');
   });
 
   it('uses stack back to topic length when quick play has history', () => {
-    mockCanGoBack.mockReturnValue(true);
+    router.canGoBack.mockReturnValue(true);
     usePlayStore.getState().setMode('quickPlay');
     usePlayStore.getState().setQuickPlayTopicCount(3);
 
     render(<TeamSetupScreen />);
     fireEvent.press(screen.getByLabelText('Back'));
 
-    expect(mockBack).toHaveBeenCalledTimes(1);
-    expect(mockReplace).not.toHaveBeenCalled();
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(router.replace).not.toHaveBeenCalled();
   });
 });

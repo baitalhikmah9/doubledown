@@ -218,24 +218,22 @@ export function PlayScaffold({
    * `contentSafeAreaHorizontal={false}` and pads itself.
    */
   const applyHorizontalGutter = !bodyEdgeToEdge || contentSafeAreaHorizontal;
-  const paddedColumnStyles = [
-    ...(bodyEdgeToEdge
-      ? [
-          styles.sharedEdgeColumn,
-          {
-            paddingTop: chromeTopPad,
-            paddingBottom: SPACING.xs,
-            ...(applyHorizontalGutter ? { paddingLeft: padLeft, paddingRight: padRight } : null),
-          },
-        ]
-      : [
-          ...contentStyles,
-          {
-            paddingLeft: padLeft,
-            paddingRight: padRight,
-          },
-        ]),
-  ];
+  const paddedColumnStyles = bodyEdgeToEdge
+    ? [
+        styles.sharedEdgeColumn,
+        {
+          paddingTop: chromeTopPad,
+          paddingBottom: SPACING.xs,
+          ...(applyHorizontalGutter ? { paddingLeft: padLeft, paddingRight: padRight } : null),
+        },
+      ]
+    : [
+        ...contentStyles,
+        {
+          paddingLeft: padLeft,
+          paddingRight: padRight,
+        },
+      ];
 
   const footerPlacementAbove = Boolean(footer && bodyEdgeToEdge && footerAboveBody);
 

@@ -53,7 +53,7 @@ export async function findActivePendingClaimForPurchase(
   let latest: Doc<'promo_discount_claims'> | null = null;
 
   for (const row of rows) {
-    if (typeof row.expiresAt === 'number' && row.expiresAt <= now) {
+    if (row.expiresAt != null && row.expiresAt <= now) {
       await ctx.db.patch(row._id, {
         status: DISCOUNT_CLAIM_STATUS_EXPIRED,
       });
@@ -142,7 +142,7 @@ export function discountEvidenceMatches(args: {
   if (!args.appliedDiscountIdentifier || args.appliedDiscountIdentifier !== configuredIdentifier) {
     return false;
   }
-  if (typeof args.promo.discountPercent === 'number' && typeof args.appliedPercentage === 'number') {
+  if (args.promo.discountPercent != null && args.appliedPercentage != null) {
     const normalizedApplied = normalizeDiscountPercentage(args.appliedPercentage);
     if (normalizedApplied === undefined || normalizedApplied !== args.promo.discountPercent) {
       return false;
@@ -199,6 +199,7 @@ export async function consumeDiscountClaimForPurchase(
     return;
   }
 
+  // SAFETY: promoCodeId indexes promo_codes; null means the promo row was deleted.
   const promo = (await ctx.db.get(claim.promoCodeId)) as Doc<'promo_codes'> | null;
   if (!promo) {
     await ctx.db.patch(claim._id, {
@@ -216,14 +217,14 @@ export async function consumeDiscountClaimForPurchase(
     });
     return;
   }
-  if (typeof promo.activeFrom === 'number' && args.now < promo.activeFrom) {
+  if (promo.activeFrom != null && args.now < promo.activeFrom) {
     await ctx.db.patch(claim._id, {
       status: DISCOUNT_CLAIM_STATUS_REJECTED,
       consumedAt: args.now,
     });
     return;
   }
-  if (typeof promo.activeTo === 'number' && args.now > promo.activeTo) {
+  if (promo.activeTo != null && args.now > promo.activeTo) {
     await ctx.db.patch(claim._id, {
       status: DISCOUNT_CLAIM_STATUS_EXPIRED,
       consumedAt: args.now,
@@ -330,8 +331,7 @@ export async function consumeDiscountClaimForPurchase(
 
   await ctx.db.patch(args.purchaseId, {
     promoCodeId: promo._id,
-    priceAmountMicros:
-      typeof args.priceAmountMicros === 'number' ? args.priceAmountMicros : undefined,
+    priceAmountMicros: args.priceAmountMicros ?? undefined,
     currencyCode: args.currencyCode,
     commissionAmountMicros: commissionMicros,
   });

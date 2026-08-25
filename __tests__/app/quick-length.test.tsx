@@ -1,80 +1,15 @@
 import React from 'react';
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import QuickLengthScreen from '@/app/(app)/play/quick-length';
 import { usePlayStore } from '@/store/play';
 import { useThemeStore } from '@/store/theme';
-
-const mockPush = jest.fn();
-const mockReplace = jest.fn();
-
-jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    back: jest.fn(),
-    canGoBack: () => false,
-    push: mockPush,
-    replace: mockReplace,
-  }),
-}));
-
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  __esModule: true,
-  getItem: jest.fn(async () => null),
-  setItem: jest.fn(async () => {}),
-  removeItem: jest.fn(async () => {}),
-  default: {
-    getItem: jest.fn(async () => null),
-    setItem: jest.fn(async () => {}),
-    removeItem: jest.fn(async () => {}),
-  },
-}));
-
-jest.mock('react-native-safe-area-context', () => ({
-  SafeAreaView: 'SafeAreaView',
-  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
-}));
-
-jest.mock('@/lib/i18n/useI18n', () => ({
-  useI18n: () => ({
-    direction: 'ltr',
-    getTextStyle: () => ({}),
-    uiLocale: 'en',
-    t: (key: string) => {
-      const messages: Record<string, string> = {
-        'common.back': 'Back',
-        'common.tokens': 'Tokens',
-        'play.quickLengthTitle': 'Set Quick Play Length',
-        'play.quickLengthSubtitle': 'Choose how many topics Quick Play should use before team setup.',
-        'play.quickLength.option1': '1 Topic',
-        'play.quickLength.option1Copy': 'Shortest match — one topic board.',
-        'play.quickLength.option2': '2 Topics',
-        'play.quickLength.option2Copy': 'Very short setup and board.',
-        'play.quickLength.option3': '3 Topics',
-        'play.quickLength.option3Copy': 'Balanced quick-play experience.',
-        'play.quickLength.option4': '4 Topics',
-        'play.quickLength.option4Copy': 'Longer quick play while staying lightweight.',
-        'play.quickLength.option5': '5 Topics',
-        'play.quickLength.option5Copy': 'Almost the full board with one fewer topic.',
-      };
-      return messages[key] ?? key;
-    },
-  }),
-}));
-
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
-jest.mock('@clerk/clerk-expo', () => ({
-  useAuth: jest.fn(() => ({ isLoaded: true, isSignedIn: true })),
-}));
+import { router } from '../doubles/expoRouter';
 
 describe('QuickLengthScreen', () => {
   beforeEach(() => {
-    mockPush.mockClear();
-    mockReplace.mockClear();
     usePlayStore.setState({ session: null, tokens: 20, rapidFire: null });
     usePlayStore.getState().setMode('quickPlay');
     useThemeStore.setState({ paletteId: 'default' });
@@ -102,7 +37,7 @@ describe('QuickLengthScreen', () => {
     const option = screen.getByLabelText('3 Topics, 5 tokens');
     const styleProp = option.props.style;
     const resolved =
-      typeof styleProp === 'function' ? styleProp({ pressed: false }) : styleProp;
+      (styleProp instanceof Function) ? styleProp({ pressed: false }) : styleProp;
     const flat = StyleSheet.flatten(resolved);
 
     expect(flat.borderTopWidth).toBe(0);
@@ -116,7 +51,7 @@ describe('QuickLengthScreen', () => {
     const option = screen.getByLabelText('3 Topics, 5 tokens');
     const styleProp = option.props.style;
     const resolved =
-      typeof styleProp === 'function' ? styleProp({ pressed: false }) : styleProp;
+      (styleProp instanceof Function) ? styleProp({ pressed: false }) : styleProp;
     const flat = StyleSheet.flatten(resolved);
 
     expect(flat.backgroundColor).toBe('#111E2E');
@@ -132,7 +67,7 @@ describe('QuickLengthScreen', () => {
     expect(usePlayStore.getState().session?.mode).toBe('quickPlay');
     expect(usePlayStore.getState().session?.step).toBe('team-setup');
     expect(usePlayStore.getState().session?.config.quickPlayTopicCount).toBe(4);
-    expect(mockPush).toHaveBeenCalledWith('/play/team-setup');
+    expect(router.push).toHaveBeenCalledWith('/play/team-setup');
   });
 
   it('redirects back into the active match instead of allowing topic switches mid-game', () => {
@@ -155,8 +90,8 @@ describe('QuickLengthScreen', () => {
 
     render(<QuickLengthScreen />);
 
-    expect(mockReplace).toHaveBeenCalledWith('/play/board');
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledWith('/play/board');
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it('uses settings-style icon-only back control (not labeled play pill)', () => {
@@ -168,7 +103,7 @@ describe('QuickLengthScreen', () => {
 
     const styleProp = back.props.style;
     const resolved =
-      typeof styleProp === 'function' ? styleProp({ pressed: false }) : styleProp;
+      (styleProp instanceof Function) ? styleProp({ pressed: false }) : styleProp;
     const flat = StyleSheet.flatten(resolved);
 
     expect(flat.width).toBe(44);

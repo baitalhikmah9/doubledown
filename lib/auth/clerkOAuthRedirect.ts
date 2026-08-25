@@ -51,13 +51,13 @@ export function clerkNativeSsoCallbackRedirectUrl(): string {
  * Web: same-origin path (route groups like `/(app)` break popup handshake).
  */
 export function clerkOAuthRedirectUrl(redirectPath: string): string {
-  if (Platform.OS !== 'web' || typeof window === 'undefined') {
+  if (Platform.OS !== 'web' || !globalThis.location) {
     return clerkNativeSsoCallbackRedirectUrl();
   }
   const isDefaultAppShell =
     redirectPath === '/(app)/' || redirectPath === '/(app)' || redirectPath === '/';
   const path = isDefaultAppShell ? '/' : redirectPath.startsWith('/') ? redirectPath : `/${redirectPath}`;
-  const href = new URL(path, window.location.origin).href;
+  const href = new URL(path, globalThis.location.origin).href;
   return href.replace(/\/$/, '');
 }
 

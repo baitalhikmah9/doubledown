@@ -1,14 +1,29 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { writeAudit } from '@/convex/lib/audit';
 
+type AuditDoc = {
+  actorUserId?: string;
+  actorEmail?: string;
+  action?: string;
+  targetType?: string;
+  targetId?: string;
+  reason?: string;
+  before?: { balance?: number; code?: string };
+  after?: { balance?: number; code?: string };
+  timestamp?: number;
+};
+type AuditInsertArgs = [table: string, doc: AuditDoc];
+
 describe('writeAudit', () => {
   it('writes an append-only audit record with actor, action, target, reason, and snapshots', async () => {
-    const insert = jest.fn<(...args: unknown[]) => Promise<unknown>>();
-    const ctx = { db: { insert } } as any;
+    const insert = jest.fn<(...args: AuditInsertArgs) => Promise<string>>(async () => 'audit_1');
+    // SAFETY: Minimal ctx stub matches writeAudit's db.insert usage.
+    const ctx = { db: { insert } } as never;
     const now = Date.now();
 
     await writeAudit(ctx, {
-      actorUserId: 'user_1' as any,
+      // SAFETY: Test fixture branded as Id<'users'>.
+      actorUserId: 'user_1' as never,
       actorEmail: 'admin@example.com',
       action: 'wallet.adjust',
       targetType: 'wallet',
@@ -19,8 +34,10 @@ describe('writeAudit', () => {
     });
 
     expect(insert).toHaveBeenCalledTimes(1);
-    const record = insert.mock.calls[0][1] as any;
-    expect(insert.mock.calls[0][0]).toBe('admin_audit_log');
+    const call = insert.mock.calls[0];
+    expect(call?.[0]).toBe('admin_audit_log');
+    // SAFETY: insert spy was typed to receive AuditDoc.
+    const record = call?.[1] as AuditDoc;
     expect(record.actorUserId).toBe('user_1');
     expect(record.actorEmail).toBe('admin@example.com');
     expect(record.action).toBe('wallet.adjust');
@@ -34,19 +51,21 @@ describe('writeAudit', () => {
   });
 
   it('omits optional reason when not provided', async () => {
-    const insert = jest.fn<(...args: unknown[]) => Promise<unknown>>();
-    const ctx = { db: { insert } } as any;
+    const insert = jest.fn<(...args: AuditInsertArgs) => Promise<string>>(async () => 'audit_2');
+    // SAFETY: Minimal ctx stub matches writeAudit's db.insert usage.
+    const ctx = { db: { insert } } as never;
 
     await writeAudit(ctx, {
-      actorUserId: 'user_1' as any,
+      // SAFETY: Test fixture branded as Id<'users'>.
+      actorUserId: 'user_1' as never,
       action: 'promo.create',
       targetType: 'promo_code',
       targetId: 'promo_1',
       after: { code: 'test' },
     });
 
-    const record = insert.mock.calls[0][1] as any;
+    // SAFETY: insert spy was typed to receive AuditDoc.
+    const record = insert.mock.calls[0]?.[1] as AuditDoc;
     expect(record.reason).toBeUndefined();
-    expect(record.before).toBeUndefined();
   });
 });

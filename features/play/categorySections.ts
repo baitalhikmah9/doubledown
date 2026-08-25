@@ -8,7 +8,7 @@ export interface CategorySection {
   categories: CategoryOption[];
 }
 
-const TOPICS: Record<CategorySectionId, string[]> = {
+const TOPICS = {
   general: [
     'Corporations', 'Countries and Capitals', 'Famous Firsts',
     'General Knowledge', 'Geography', 'Guess the Decade', 'In between:', 'Initials',
@@ -38,16 +38,16 @@ const TOPICS: Record<CategorySectionId, string[]> = {
     'ARK: Survival Evolved', 'Dota', 'League of Legends', 'Minecraft', 'Overwatch',
     'Red Dead Redemption', 'Super Mario Bros.', 'The Legend of Zelda',
   ],
-};
+} as const satisfies Record<CategorySectionId, readonly string[]>;
 
 const SECTION_ORDER: CategorySectionId[] = ['general', 'history', 'popCulture', 'sports', 'gaming'];
-const SECTION_TITLES: Record<CategorySectionId, string> = {
+const SECTION_TITLES = {
   general: 'General Knowledge',
   history: 'History',
   popCulture: 'Pop Culture',
   sports: 'Sports',
   gaming: 'Gaming',
-};
+} as const satisfies Record<CategorySectionId, string>;
 
 function topicKey(title: string): string {
   return title

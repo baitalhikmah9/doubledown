@@ -19,6 +19,7 @@ describe('getViewportLayout', () => {
     expect(layout.shortSide).toBe(360);
   });
 
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('treats laptop web as wide with centered main and modest scale', () => {
     const layout = getViewportLayout(1440, 900);
 
@@ -58,6 +59,7 @@ describe('getContentMaxWidth', () => {
     expect(getContentMaxWidth('setup')).toBe(LAYOUT.setupMaxWidth);
   });
 
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('keeps form width as the legacy contentMaxWidth alias', () => {
     expect(LAYOUT.formMaxWidth).toBe(LAYOUT.contentMaxWidth);
     expect(kinds).toContain('form');

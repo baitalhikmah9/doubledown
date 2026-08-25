@@ -35,10 +35,12 @@ export function evaluatePromoRedeemRateGate(
  * Record a failed (or enumeration) attempt. Does not append when already limited
  * so the window cannot be extended indefinitely.
  */
+export type AppendPromoRedeemAttemptResult = { next: number[]; recorded: boolean };
+
 export function appendPromoRedeemAttempt(
   prunedTimestamps: readonly number[],
   nowMs: number
-): { next: number[]; recorded: boolean } {
+): AppendPromoRedeemAttemptResult {
   if (prunedTimestamps.length >= PROMO_REDEEM_MAX_ATTEMPTS) {
     return {
       next: prunedTimestamps.slice(0, PROMO_REDEEM_MAX_ATTEMPTS),

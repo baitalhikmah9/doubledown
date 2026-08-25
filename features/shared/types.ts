@@ -42,8 +42,13 @@ export type LifelineId = 'callAFriend' | 'discard' | 'answerRewards' | 'rest';
 export function lifelinesToConfig(ids: LifelineId[]): LifelineConfig {
   const config: LifelineConfig = { callAFriend: 0, discard: 0, answerRewards: 0 };
   for (const id of ids) {
-    if (id === 'rest') config.rest = (config.rest ?? 0) + 1;
-    else config[id] = (config[id] as number) + 1;
+    if (id === 'rest') {
+      config.rest = (config.rest ?? 0) + 1;
+      continue;
+    }
+    if (id === 'callAFriend') config.callAFriend += 1;
+    else if (id === 'discard') config.discard += 1;
+    else if (id === 'answerRewards') config.answerRewards += 1;
   }
   return config;
 }
@@ -185,6 +190,10 @@ export type ScoreEventReason =
   | 'overtimeSurge'
   | 'manualAdjustment';
 
+/** Opaque score-event extras persisted with the session ledger. */
+export type ScoreEventMetadataValue = string | number | boolean | null;
+export type ScoreEventMetadata = Record<string, ScoreEventMetadataValue>;
+
 export interface ScoreEvent {
   teamId: string;
   points: number;
@@ -192,7 +201,7 @@ export interface ScoreEvent {
   questionId?: string;
   turnIndex: number;
   createdAt: number;
-  metadata?: Record<string, unknown>;
+  metadata?: ScoreEventMetadata;
 }
 
 export type OvertimeSurgeStatus =
@@ -313,6 +322,10 @@ export interface WalletBalance {
   purchaserAccountId: string | null;
 }
 
+/** Opaque wallet ledger metadata attached at grant/adjust boundaries. */
+export type WalletTransactionMetadataValue = string | number | boolean | null;
+export type WalletTransactionMetadata = Record<string, WalletTransactionMetadataValue>;
+
 export interface WalletTransaction {
   id: string;
   type: string;
@@ -323,7 +336,7 @@ export interface WalletTransaction {
   store?: string;
   storeTransactionId?: string;
   originalStoreTransactionId?: string;
-  metadata?: Record<string, unknown>;
+  metadata?: WalletTransactionMetadata;
 }
 
 export interface PurchaserAccount {

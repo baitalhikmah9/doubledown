@@ -40,6 +40,7 @@ function dedupeQuestionGroups(groups: SourceGroup[]) {
 }
 
 mark('play data module evaluating (questions.json already parsed)');
+// SAFETY: constants/questions.json is authored to the SourceGroup schema and validated by import tooling.
 const QUESTION_GROUPS = dedupeQuestionGroups(rawQuestions as SourceGroup[]);
 mark('questions deduped');
 const CATEGORY_TRANSLATIONS: Partial<Record<SupportedLocale, Record<string, string>>> = {};

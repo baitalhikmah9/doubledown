@@ -49,14 +49,14 @@ export function pickLocalizedFromVariants<T extends { locale: string; canonicalK
 export function buildCanonicalPool<T extends { canonicalKey: string; locale: string }>(
   rows: readonly T[],
   localeChain: LocaleChain
-): Array<T & { resolvedFromFallback: boolean }> {
+): (T & { resolvedFromFallback: boolean })[] {
   const byCanon = new Map<string, T[]>();
   for (const row of rows) {
     const list = byCanon.get(row.canonicalKey) ?? [];
     list.push(row);
     byCanon.set(row.canonicalKey, list);
   }
-  const out: Array<T & { resolvedFromFallback: boolean }> = [];
+  const out: (T & { resolvedFromFallback: boolean })[] = [];
   for (const variants of byCanon.values()) {
     const picked = pickLocalizedFromVariants(variants, localeChain);
     if (picked) out.push(picked);
@@ -71,12 +71,17 @@ export function filterExcludingCanonicalKeys<T extends { canonicalKey: string }>
   return pool.filter((q) => !askedKeys.has(q.canonicalKey));
 }
 
+export type UnaskedSelectionResult<T> = {
+  selection: T[];
+  usedFallbackToFullPool: boolean;
+};
+
 export function selectUnaskedWithFallback<T extends { canonicalKey: string }>(
   fullPool: readonly T[],
   askedCanonicalKeys: ReadonlySet<string>,
   limit: number,
   seed: string
-): { selection: T[]; usedFallbackToFullPool: boolean } {
+): UnaskedSelectionResult<T> {
   const unasked = filterExcludingCanonicalKeys(fullPool, askedCanonicalKeys);
   let candidate = unasked;
   let usedFallback = false;

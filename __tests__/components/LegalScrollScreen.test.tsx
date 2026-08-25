@@ -10,40 +10,6 @@ import { useThemeStore } from '@/store/theme';
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => true);
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    back: mockBack,
-    canGoBack: mockCanGoBack,
-    replace: jest.fn(),
-  }),
-}));
-
-jest.mock('react-native-safe-area-context', () => ({
-  SafeAreaView: ({ children, ...props }: { children?: React.ReactNode }) => {
-    const ReactLib = require('react');
-    const { View } = require('react-native');
-    return ReactLib.createElement(View, props, children);
-  },
-  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
-}));
-
-jest.mock('@/components/PublicAuthEntry', () => ({
-  PublicAuthEntry: () => null,
-}));
-
-jest.mock('@/lib/i18n/useI18n', () => ({
-  useI18n: () => ({
-    direction: 'ltr',
-    t: (key: string) => {
-      const messages: Record<string, string> = {
-        'common.back': 'Back',
-        'legal.lastUpdated': 'Last updated',
-      };
-      return messages[key] ?? key;
-    },
-  }),
-}));
-
 const SECTIONS = [
   {
     heading: 'Agreement',

@@ -36,6 +36,7 @@ describe('lib/i18n/fonts', () => {
     );
   });
 
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('treats ar and ur as Arabic-script font locales', () => {
     expect(usesArabicScriptFont('ar')).toBe(true);
     expect(usesArabicScriptFont('ur')).toBe(true);
@@ -99,6 +100,7 @@ describe('lib/i18n/fonts', () => {
     installLocaleFontRemap();
     setActiveUiFontLocale('ar');
 
+    // SAFETY: StyleSheet.flatten return is a plain style bag in this test path.
     const flat = StyleSheet.flatten({
       fontFamily: 'GeneralSans-Bold',
       fontSize: 16,
@@ -112,6 +114,7 @@ describe('lib/i18n/fonts', () => {
     installLocaleFontRemap();
     setActiveUiFontLocale('en');
 
+    // SAFETY: StyleSheet.flatten return is a plain style bag in this test path.
     const flat = StyleSheet.flatten({
       fontFamily: 'GeneralSans-Regular',
     }) as { fontFamily: string };

@@ -143,7 +143,7 @@ export function useWalletSync() {
 
   useEffect(() => {
     if (authDisabled || !isSignedIn) return;
-    if (balanceData && typeof balanceData.balance === 'number') {
+    if (balanceData && balanceData.balance != null) {
       const current = usePlayStore.getState().tokens;
       if (current !== balanceData.balance) {
         usePlayStore.getState().setTokenBalance(balanceData.balance);

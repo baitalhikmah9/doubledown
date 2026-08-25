@@ -19,21 +19,21 @@ import { PlayScaffold } from '@/features/play/components/PlayScaffold';
 import { getPlaySurfaceColors } from '@/features/play/playSurfaceColors';
 import { useThemeStore } from '@/store/theme';
 
-const QUICK_LENGTH_LABEL_KEYS: Record<QuickPlayTopicCount, string> = {
+const QUICK_LENGTH_LABEL_KEYS = {
   1: 'play.quickLength.option1',
   2: 'play.quickLength.option2',
   3: 'play.quickLength.option3',
   4: 'play.quickLength.option4',
   5: 'play.quickLength.option5',
-};
+} as const satisfies Record<QuickPlayTopicCount, string>;
 
-const QUICK_LENGTH_COPY_KEYS: Record<QuickPlayTopicCount, string> = {
+const QUICK_LENGTH_COPY_KEYS = {
   1: 'play.quickLength.option1Copy',
   2: 'play.quickLength.option2Copy',
   3: 'play.quickLength.option3Copy',
   4: 'play.quickLength.option4Copy',
   5: 'play.quickLength.option5Copy',
-};
+} as const satisfies Record<QuickPlayTopicCount, string>;
 
 /** Web-only option tile with hover tracking - extracted to keep hooks at top level. */
 function OptionTile({

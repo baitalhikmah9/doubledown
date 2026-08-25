@@ -63,7 +63,7 @@ describe('store coupon input', () => {
       /\$\{formatTokens\((?:tokens|granted)\)\} tokens added to your balance\./
     );
     expect(source).not.toMatch(/tokens have been added to your balance/);
-    expect(source).not.toMatch(/tokens added\.\`/);
+    expect(source).not.toMatch(/tokens added\.`/);
   });
 
   it('never claims a discount is applied before checkout', () => {

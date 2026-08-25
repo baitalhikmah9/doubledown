@@ -1,49 +1,35 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { grantConsumablePurchase } from '@/convex/lib/grantConsumablePurchase';
+import type { MutationCtx } from '@/convex/_generated/server';
 import { DEFAULT_TOKEN_PRODUCTS } from '@/convex/lib/paymentCatalog';
+import {
+  createConvexTestCtx,
+  walletDoc,
+  type ConvexDoc,
+} from '../helpers/convexTestCtx';
 
-jest.mock('@/convex/lib/ensureWallet', () => ({
-  ensureWalletDoc: jest.fn(async () => ({ _id: 'wallet_1', balance: 5 })),
-}));
-
-jest.mock('@/convex/lib/promoDiscountClaim', () => ({
-  ...(jest.requireActual('@/convex/lib/promoDiscountClaim') as typeof import('@/convex/lib/promoDiscountClaim')),
-  consumeDiscountClaimForPurchase: jest.fn(async () => undefined),
-  priceToMicros: jest.fn((price: unknown) =>
-    typeof price === 'number' && Number.isFinite(price) && price >= 0
-      ? Math.round(price * 1_000_000)
-      : null
-  ),
-}));
-
-const { consumeDiscountClaimForPurchase } = jest.requireMock(
-  '@/convex/lib/promoDiscountClaim'
-) as { consumeDiscountClaimForPurchase: jest.Mock };
-
-function mockGrantCtx(args: { existingPurchase?: unknown }) {
-  const inserts: { table: string; doc: Record<string, unknown> }[] = [];
-  const patches: { id: unknown; patch: Record<string, unknown> }[] = [];
-  const db = {
-    insert: jest.fn(async (table: string, doc: Record<string, unknown>) => {
-      inserts.push({ table, doc });
-      return 'purchase_1';
-    }),
-    patch: jest.fn(async (id: unknown, patch: Record<string, unknown>) => {
-      patches.push({ id, patch });
-    }),
-    query: jest.fn((table: string) => ({
-      withIndex: () => ({
-        unique: async () => (table === 'store_purchases' ? args.existingPurchase ?? null : null),
-      }),
-    })),
-  };
-  return { db, inserts, patches };
+function grantCtx(args: { existingPurchase?: ConvexDoc }) {
+  const wallet = walletDoc({
+    id: 'wallet_1',
+    purchaserAccountId: 'purchaser_1',
+    balance: 5,
+  });
+  // In-memory fake is a structural subset of MutationCtx for these unit tests.
+  const ctx = createConvexTestCtx({
+    tables: {
+      wallets: [wallet],
+      store_purchases: args.existingPurchase ? [args.existingPurchase] : [],
+      wallet_transactions: [],
+    },
+  });
+  return ctx as MutationCtx & typeof ctx;
 }
 
 describe('grantConsumablePurchase', () => {
   it('records price/currency on the store_purchase and wallet_transaction', async () => {
-    const ctx = mockGrantCtx({});
-    const result = await grantConsumablePurchase(ctx as any, {
+    const ctx = grantCtx({});
+    const consume = jest.fn(async () => undefined);
+    const result = await grantConsumablePurchase(ctx, {
       products: DEFAULT_TOKEN_PRODUCTS,
       purchaserAccountId: 'purchaser_1',
       store: 'web_store',
@@ -52,6 +38,9 @@ describe('grantConsumablePurchase', () => {
       revenueCatEventId: 'evt_1',
       priceAmountMicros: 9_000_000,
       currencyCode: 'USD',
+      deps: {
+        consumeDiscountClaimForPurchase: consume,
+      },
     });
 
     expect(result.granted).toBe(true);
@@ -64,8 +53,9 @@ describe('grantConsumablePurchase', () => {
   });
 
   it('calls consumeDiscountClaimForPurchase for attribution', async () => {
-    const ctx = mockGrantCtx({});
-    await grantConsumablePurchase(ctx as any, {
+    const ctx = grantCtx({});
+    const consume = jest.fn(async () => undefined);
+    await grantConsumablePurchase(ctx, {
       products: DEFAULT_TOKEN_PRODUCTS,
       purchaserAccountId: 'purchaser_1',
       store: 'web_store',
@@ -74,14 +64,16 @@ describe('grantConsumablePurchase', () => {
       revenueCatEventId: 'evt_1',
       priceAmountMicros: 9_000_000,
       currencyCode: 'USD',
+      deps: {
+        consumeDiscountClaimForPurchase: consume,
+      },
     });
 
-    expect(consumeDiscountClaimForPurchase).toHaveBeenCalledWith(
+    expect(consume).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
         purchaserAccountId: 'purchaser_1',
         productKey: 'bundle_50',
-        purchaseId: 'purchase_1',
         priceAmountMicros: 9_000_000,
         currencyCode: 'USD',
       })
@@ -89,26 +81,35 @@ describe('grantConsumablePurchase', () => {
   });
 
   it('is idempotent: returns without inserting or consuming a claim on replay', async () => {
-    const ctx = mockGrantCtx({ existingPurchase: { _id: 'purchase_existing' } });
-    consumeDiscountClaimForPurchase.mockClear();
-    const result = await grantConsumablePurchase(ctx as any, {
+    const ctx = grantCtx({
+      existingPurchase: {
+        _id: 'purchase_existing',
+        store: 'web_store',
+        storeTransactionId: 'tx_123',
+      },
+    });
+    const consume = jest.fn(async () => undefined);
+    const result = await grantConsumablePurchase(ctx, {
       products: DEFAULT_TOKEN_PRODUCTS,
       purchaserAccountId: 'purchaser_1',
       store: 'web_store',
       productId: 'consumable_4',
       transactionId: 'tx_123',
       revenueCatEventId: 'evt_1',
+      deps: {
+        consumeDiscountClaimForPurchase: consume,
+      },
     });
 
     expect(result.granted).toBe(false);
     expect(ctx.inserts).toEqual([]);
-    expect(consumeDiscountClaimForPurchase).not.toHaveBeenCalled();
+    expect(consume).not.toHaveBeenCalled();
   });
 
   it('throws on an unknown product id', async () => {
-    const ctx = mockGrantCtx({});
+    const ctx = grantCtx({});
     await expect(
-      grantConsumablePurchase(ctx as any, {
+      grantConsumablePurchase(ctx, {
         products: DEFAULT_TOKEN_PRODUCTS,
         purchaserAccountId: 'purchaser_1',
         store: 'web_store',

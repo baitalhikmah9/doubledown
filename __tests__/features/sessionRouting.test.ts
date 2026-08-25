@@ -7,6 +7,7 @@ import {
 } from '@/features/play/sessionRouting';
 
 describe('sessionRouting', () => {
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('treats board, question, and answer as active match steps', () => {
     expect(isActiveMatchStep('board')).toBe(true);
     expect(isActiveMatchStep('question')).toBe(true);
@@ -18,6 +19,7 @@ describe('sessionRouting', () => {
     expect(isActiveMatchStep(null)).toBe(false);
   });
 
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('marks only locked-in match steps as resumable; setup is free to abandon', () => {
     expect(isResumableSessionStep('board')).toBe(true);
     expect(isResumableSessionStep('question')).toBe(true);

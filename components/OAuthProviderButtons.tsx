@@ -11,14 +11,16 @@ const GOOGLE_G_LOGO = require('@/assets/brand/google-g.png');
 
 const T = HOME_SOFT_UI;
 
-/** Flat control face — no gray strip under OAuth buttons. */
-function neumorphicLift3D(_shadowColor: string): {
+type NeumorphicLiftStyle = {
   shadowColor: string;
   shadowOffset: { width: number; height: number };
   shadowOpacity: number;
   shadowRadius: number;
   elevation: number;
-} {
+};
+
+/** Flat control face - no gray strip under OAuth buttons. */
+function neumorphicLift3D(_shadowColor: string): NeumorphicLiftStyle {
   return {
     shadowColor: 'transparent',
     shadowOffset: { width: 0, height: 0 },
@@ -46,7 +48,7 @@ const BUTTON_HEIGHT = 48;
 const ICON_RADIUS = 14;
 
 function accessibilityHint(primary?: string, secondary?: string): string {
-  const parts = [primary, secondary].filter(Boolean) as string[];
+  const parts = [primary, secondary].filter((part): part is string => Boolean(part));
   return parts.join('. ');
 }
 
@@ -114,7 +116,7 @@ export function OAuthProviderButtons({
   const textPrimary = T.colors.textPrimary;
   const shadowHex = T.colors.shadowStrong;
   const darkModeFlatTop = useDarkModeFlatTop();
-  const showApple = supportsAppleSignIn() && typeof onApplePress === 'function';
+  const showApple = supportsAppleSignIn() && onApplePress != null;
   /** Solo Google (Android): one full-width control. Dual: each takes half the row. */
   const splitHalf = showApple;
   const outlineStyle = {

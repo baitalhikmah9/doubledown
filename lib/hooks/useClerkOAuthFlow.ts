@@ -6,14 +6,31 @@ import { prefersNativeAppleSignIn, supportsAppleSignIn } from '@/lib/auth/appleS
 import { clerkOAuthRedirectUrl } from '@/lib/auth/clerkOAuthRedirect';
 import { showThemedAlert } from '@/store/themedAlert';
 
-function isAppleCancelError(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false;
-  const code = 'code' in error ? String((error as { code?: unknown }).code) : '';
-  const message = error instanceof Error ? error.message : '';
+/** True when the user dismissed native/Apple auth (Error or structured Clerk/native errors). */
+export function isAppleCancelError(error: unknown): boolean {
+  if (error == null) return false;
+
+  let code = '';
+  let message = '';
+
+  if (typeof error === 'string') {
+    message = error;
+  } else if (typeof error === 'object') {
+    if ('code' in error && error.code != null) {
+      code = String(error.code);
+    }
+    if (error instanceof Error) {
+      message = error.message;
+    } else if ('message' in error && error.message != null) {
+      message = String(error.message);
+    }
+  }
+
   return (
     code === 'ERR_REQUEST_CANCELED' ||
     code === 'ERR_CANCELED' ||
-    message.includes('ERR_REQUEST_CANCELED')
+    message.includes('ERR_REQUEST_CANCELED') ||
+    message.includes('ERR_CANCELED')
   );
 }
 

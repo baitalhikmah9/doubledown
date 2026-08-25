@@ -62,6 +62,7 @@ const styles = StyleSheet.create({
   webOverlayRoot: {
     // `fixed` escapes nested RN-web layouts (SafeAreaView, padded scaffolds).
     // Pin all edges + 100% so scrim children cover the whole viewport, not just content box.
+    // SAFETY: RN-web accepts CSS `fixed`; typed styles only list RN `absolute`/`relative`.
     position: 'fixed' as 'absolute',
     top: 0,
     left: 0,

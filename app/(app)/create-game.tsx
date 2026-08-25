@@ -59,7 +59,6 @@ export default function CreateGameScreen() {
   const surface = T.colors.surface;
   const textPrimary = T.colors.textPrimary;
   const textMuted = T.colors.textMuted;
-  const shadowHex = T.colors.shadowStrong;
   const backIcon = direction === 'rtl' ? 'chevron-forward' : 'chevron-back';
 
   const handleBack = () => {
@@ -76,15 +75,19 @@ export default function CreateGameScreen() {
           id: c._id,
           slug: c.slug,
           title: c.title,
-          illustration: (c as any).illustration,
-          flag: (c as any).flag,
+          // SAFETY: optional art fields may be present on seeded category docs.
+          illustration: (c as { illustration?: string; flag?: string }).illustration,
+          // SAFETY: optional art fields may be present on seeded category docs.
+          flag: (c as { illustration?: string; flag?: string }).flag,
         }))
       : FALLBACK_CATEGORIES.map((c) => ({
           id: c.id,
           slug: c.slug,
           title: c.title,
-          illustration: (c as any).illustration,
-          flag: (c as any).flag,
+          // SAFETY: fallback catalog entries may carry optional art fields.
+          illustration: (c as { illustration?: string; flag?: string }).illustration,
+          // SAFETY: fallback catalog entries may carry optional art fields.
+          flag: (c as { illustration?: string; flag?: string }).flag,
         }));
 
   useEffect(() => {

@@ -17,13 +17,16 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "eas-build-post-install": "node scripts/patch-standalone-debug-bundle.mjs",
-    "lint": "eslint .",
+    "lint": "eslint . && oxlint -c oxlint.config.mjs .",
     "seed:import": "tsx scripts/import-questions-from-csv.ts && tsx scripts/normalize-questions.ts",
     "seed:normalize": "tsx scripts/normalize-questions.ts",
     "seed:push": "tsx scripts/push-seed-to-convex.ts",
     "seed:push:prod": "tsx scripts/push-seed-to-convex.ts --prod",
     "topics:transparent": "python3 scripts/transparency-topic-images.py",
-    "topics:optimize": "python3 scripts/optimize-topic-images.py"
+    "topics:optimize": "python3 scripts/optimize-topic-images.py",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck:app": "tsc --noEmit -p tsconfig.json",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json"
   },
   "keywords": [
     "expo",
@@ -81,13 +84,16 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
+    "@oxlint/plugins": "1.79.0",
     "@testing-library/jest-native": "^5.4.3",
     "@testing-library/react-native": "^13.0.0",
+    "@types/jest": "29.5.14",
     "@types/node": "^22.0.0",
     "@types/react": "~19.2.0",
     "babel-plugin-module-resolver": "^5.0.2",
     "jest": "^29.7.0",
     "jest-expo": "~55.0.17",
+    "oxlint": "1.79.0",
     "react-test-renderer": "19.2.0",
     "tsx": "^4.19.0",
     "typescript": "~5.9.3"

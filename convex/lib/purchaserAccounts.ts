@@ -16,7 +16,7 @@ export function isPureGuestPurchaserAccount(account: {
   linkedUserId?: Id<'users'>;
   state?: string;
 }): boolean {
-  if (account.state && !isPurchaserAccountUsable(account as { state: string })) {
+  if (account.state && !isPurchaserAccountUsable({ state: account.state })) {
     return false;
   }
   return account.kind === 'guest' && !account.linkedUserId;
@@ -54,7 +54,7 @@ export function isMergeableGuestPurchaserAccount(
   },
   currentUserId: Id<'users'>
 ): boolean {
-  if (source.state && !isPurchaserAccountReclaimable(source as { state: string })) {
+  if (source.state && !isPurchaserAccountReclaimable({ state: source.state })) {
     return false;
   }
   if (source.kind !== 'guest') {

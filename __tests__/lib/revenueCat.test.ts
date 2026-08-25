@@ -39,6 +39,7 @@ function setRevenueCatEnv(values: Partial<Record<(typeof ENV_KEYS)[number], stri
 
 describe('revenueCat helpers', () => {
   const originalEnv: Record<string, string | undefined> = {};
+  // SAFETY: Controlled test fixture boundary cast.
   const originalDev = (globalThis as { __DEV__?: boolean }).__DEV__;
   const originalDebugMode = Constants.debugMode;
   const originalPlatform = Platform.OS;
@@ -55,16 +56,19 @@ describe('revenueCat helpers', () => {
       if (prev === undefined) delete process.env[key];
       else process.env[key] = prev;
     }
+    // SAFETY: Controlled test fixture boundary cast.
     (globalThis as { __DEV__?: boolean }).__DEV__ = originalDev;
     Object.defineProperty(Constants, 'debugMode', {
       configurable: true,
       value: originalDebugMode,
     });
+    // SAFETY: Controlled test fixture boundary cast.
     (Platform as { OS: string }).OS = originalPlatform;
   });
 
   it('fails clearly when the native purchases module is unavailable', async () => {
-    const nativeModules = NativeModules as Record<string, unknown>;
+    // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
+    const nativeModules = NativeModules as { RNPurchases?: object | null };
     const original = nativeModules.RNPurchases;
     nativeModules.RNPurchases = undefined;
 
@@ -126,12 +130,14 @@ describe('revenueCat helpers', () => {
     expect(snapshot.activeEntitlementIds).toContain('premium');
   });
 
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('treats missing entitlements as inactive', () => {
     const snapshot = normalizeCustomerInfo({ entitlements: { active: {}, all: {} } });
     expect(hasActiveEntitlement(snapshot, 'premium')).toBe(false);
   });
 
   it('uses production store keys when appl_/goog_ keys are baked into a release build', () => {
+    // SAFETY: Controlled test fixture boundary cast.
     (globalThis as { __DEV__?: boolean }).__DEV__ = false;
     Object.defineProperty(Constants, 'debugMode', { configurable: true, value: false });
     setRevenueCatEnv({
@@ -154,6 +160,7 @@ describe('revenueCat helpers', () => {
   });
 
   it('defaults to the RevenueCat Test Store key when only test keys are present', () => {
+    // SAFETY: Controlled test fixture boundary cast.
     (globalThis as { __DEV__?: boolean }).__DEV__ = false;
     Object.defineProperty(Constants, 'debugMode', { configurable: true, value: false });
     setRevenueCatEnv({
@@ -169,6 +176,7 @@ describe('revenueCat helpers', () => {
   });
 
   it('uses platform production keys only when production store is opted in', () => {
+    // SAFETY: Controlled test fixture boundary cast.
     (globalThis as { __DEV__?: boolean }).__DEV__ = false;
     Object.defineProperty(Constants, 'debugMode', { configurable: true, value: false });
     setRevenueCatEnv({
@@ -191,6 +199,7 @@ describe('revenueCat helpers', () => {
   });
 
   it('forces the Test Store key under __DEV__ even if production store is opted in', () => {
+    // SAFETY: Controlled test fixture boundary cast.
     (globalThis as { __DEV__?: boolean }).__DEV__ = true;
     Object.defineProperty(Constants, 'debugMode', { configurable: true, value: false });
     setRevenueCatEnv({
@@ -206,8 +215,10 @@ describe('revenueCat helpers', () => {
 
   it('uses the Web Billing key and web_store on web when an rcb_ key is configured', () => {
     // Force web platform so this runs under jest-expo (which defaults to ios).
+    // SAFETY: Controlled test fixture boundary cast.
     (Platform as { OS: string }).OS = 'web';
 
+    // SAFETY: Controlled test fixture boundary cast.
     (globalThis as { __DEV__?: boolean }).__DEV__ = false;
     Object.defineProperty(Constants, 'debugMode', { configurable: true, value: false });
     setRevenueCatEnv({
@@ -235,7 +246,8 @@ describe('revenueCat helpers', () => {
   });
 
   it('logOutRevenueCat clears session state even when Purchases is unavailable', async () => {
-    const nativeModules = NativeModules as Record<string, unknown>;
+    // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
+    const nativeModules = NativeModules as { RNPurchases?: object | null };
     const originalNative = nativeModules.RNPurchases;
     nativeModules.RNPurchases = undefined;
 

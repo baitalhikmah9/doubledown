@@ -33,7 +33,7 @@ const T = HOME_SOFT_UI.colors;
 /** Deeper drop shadow - reads as a raised plastic tile (tier scales with control size). */
 function neumorphicLift(
   shadowColor: string,
-  tier: 'hero' | 'header' | 'pill' | 'card'
+  _tier: 'hero' | 'header' | 'pill' | 'card'
 ): ViewStyle {
   return {
     ...softSurfaceLift(),

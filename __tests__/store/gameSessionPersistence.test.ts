@@ -131,6 +131,7 @@ function createSession(): GameSessionState {
 }
 
 describe('gameSessionPersistence', () => {
+  // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
   it('serializes and restores question ids as a set', () => {
     const session = createSession();
 
@@ -198,10 +199,14 @@ describe('gameSessionPersistence', () => {
   });
 
   it('defaults scoreEvents when legacy persisted session omits them', () => {
-    const serialized = JSON.parse(JSON.stringify(serializeGameSession(createSession()))) as Record<
-      string,
-      unknown
-    >;
+    // SAFETY: JSON round-trip yields a mutable bag; drop scoreEvents to simulate legacy payloads.
+    const serialized = JSON.parse(JSON.stringify(serializeGameSession(createSession()))) as {
+      scoreEvents?: { id: string }[];
+      sessionId?: string;
+      mode?: string;
+      step?: string;
+      config?: { entryTokenCharge?: number };
+    };
     delete serialized.scoreEvents;
     const restored = deserializeGameSession(serialized);
     expect(restored?.scoreEvents).toEqual([]);

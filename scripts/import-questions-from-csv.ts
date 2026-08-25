@@ -33,11 +33,11 @@ interface SourceGroup {
   points: number;
 }
 
-const DIFFICULTY_POINTS: Record<CsvRow['difficulty'], number> = {
+const DIFFICULTY_POINTS = {
   Easy: 100,
   Medium: 200,
   Hard: 300,
-};
+} as const satisfies Record<CsvRow['difficulty'], number>;
 
 const DEFAULT_CSV = path.join(
   os.homedir(),
@@ -109,6 +109,7 @@ function loadCategoryMaps(questionsPath: string) {
     return { categoryIdByTopic, groupIdByTopicPoints, nextGroupNum: 1 };
   }
 
+  // SAFETY: questions.json is the SourceGroup[] catalog this script rewrites.
   const existing = JSON.parse(fs.readFileSync(questionsPath, 'utf-8')) as SourceGroup[];
   let maxGroupNum = 0;
 
@@ -240,7 +241,9 @@ function main() {
     }
 
     const repairedTopic = repairTopicName(topic);
-    const diff = difficulty?.trim() as CsvRow['difficulty'];
+    const diffRaw = difficulty?.trim();
+    // SAFETY: DIFFICULTY_POINTS keys are the closed CsvRow difficulty set.
+    const diff = diffRaw as CsvRow['difficulty'];
     if (!(diff in DIFFICULTY_POINTS)) {
       console.warn(`Skipping row ${userId}: unknown difficulty ${difficulty}`);
       continue;
