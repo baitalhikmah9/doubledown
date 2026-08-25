@@ -1,32 +1,65 @@
 import React from 'react';
 import { Platform } from 'react-native';
 import { render, screen } from '@testing-library/react-native';
-import {
-  WebLandscapeGate,
-  isWebPlayLandscapePath,
-} from '@/components/WebLandscapeGate';
+import { WebLandscapeGate, isMobileWebClient } from '@/components/WebLandscapeGate';
 import { __setWindowDimensions } from '../doubles/windowDimensions';
 import { __setPathname } from '../doubles/expoRouter';
 
-describe('isWebPlayLandscapePath', () => {
-  it('matches play and game surfaces only', () => {
-    expect(isWebPlayLandscapePath('/play')).toBe(true);
-    expect(isWebPlayLandscapePath('/play/board')).toBe(true);
-    expect(isWebPlayLandscapePath('/(app)/play/question')).toBe(true);
-    expect(isWebPlayLandscapePath('/game')).toBe(true);
-    expect(isWebPlayLandscapePath('/(app)/game')).toBe(true);
-    expect(isWebPlayLandscapePath('/game/recap')).toBe(true);
+type MediaQueryListStub = {
+  matches: boolean;
+  media: string;
+  onchange: null;
+  addListener: () => void;
+  removeListener: () => void;
+  addEventListener: () => void;
+  removeEventListener: () => void;
+  dispatchEvent: () => boolean;
+};
 
-    expect(isWebPlayLandscapePath('/')).toBe(false);
-    expect(isWebPlayLandscapePath('/(app)')).toBe(false);
-    expect(isWebPlayLandscapePath('/create-game')).toBe(false);
-    expect(isWebPlayLandscapePath('/(app)/create-game')).toBe(false);
-    expect(isWebPlayLandscapePath('/login')).toBe(false);
-    expect(isWebPlayLandscapePath('/admin')).toBe(false);
-    expect(isWebPlayLandscapePath('/privacy')).toBe(false);
-    expect(isWebPlayLandscapePath('/settings')).toBe(false);
-    expect(isWebPlayLandscapePath('/delete-account')).toBe(false);
-    expect(isWebPlayLandscapePath('/terms')).toBe(false);
+function mediaStub(matches: boolean, media: string): MediaQueryListStub {
+  return {
+    matches,
+    media,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  };
+}
+
+/** Configure pointer/touch signals for mobile vs desktop web. */
+function setWebInputProfile(profile: 'mobile' | 'desktop') {
+  const mobile = profile === 'mobile';
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: (query: string) => {
+      const q = query.replace(/\s+/g, ' ').trim();
+      if (q.includes('pointer: coarse')) return mediaStub(mobile, query);
+      if (q.includes('pointer: fine')) return mediaStub(!mobile, query);
+      if (q.includes('hover: none')) return mediaStub(mobile, query);
+      if (q.includes('hover: hover')) return mediaStub(!mobile, query);
+      return mediaStub(false, query);
+    },
+  });
+  Object.defineProperty(window.navigator, 'maxTouchPoints', {
+    configurable: true,
+    writable: true,
+    value: mobile ? 5 : 0,
+  });
+}
+
+describe('isMobileWebClient', () => {
+  it('detects coarse-pointer mobile web', () => {
+    setWebInputProfile('mobile');
+    expect(isMobileWebClient()).toBe(true);
+  });
+
+  it('detects fine-pointer desktop web', () => {
+    setWebInputProfile('desktop');
+    expect(isMobileWebClient()).toBe(false);
   });
 });
 
@@ -35,55 +68,76 @@ describe('WebLandscapeGate', () => {
 
   afterEach(() => {
     Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOS });
+    setWebInputProfile('desktop');
   });
 
-  it('is a no-op on native', () => {
+  it('is a no-op on native even in portrait', () => {
     Object.defineProperty(Platform, 'OS', { configurable: true, value: 'ios' });
+    setWebInputProfile('mobile');
     __setWindowDimensions({ width: 390, height: 844 });
-    __setPathname('/play/board');
+    __setPathname('/');
 
     const { toJSON } = render(<WebLandscapeGate />);
     expect(toJSON()).toBeNull();
   });
 
-  it('blocks portrait web play routes', () => {
+  it('blocks mobile web portrait on the home route', () => {
     Object.defineProperty(Platform, 'OS', { configurable: true, value: 'web' });
+    setWebInputProfile('mobile');
     __setWindowDimensions({ width: 390, height: 844 });
-    __setPathname('/play/board');
+    __setPathname('/');
 
-    render(<WebLandscapeGate />);
+    const { toJSON } = render(<WebLandscapeGate />);
     expect(screen.getByText('Rotate your device')).toBeTruthy();
     expect(screen.getByText('Backfire plays in landscape only.')).toBeTruthy();
+    // Walk the tree JSON for a11y props (parent links are unreliable across RNTL versions).
+    const tree = JSON.stringify(toJSON());
+    expect(tree).toContain('"accessibilityRole":"alert"');
+    expect(tree).toContain('"accessibilityLiveRegion":"polite"');
   });
 
-  it('blocks portrait web game routes', () => {
+  it('blocks mobile web portrait on auth, admin, and legal routes', () => {
     Object.defineProperty(Platform, 'OS', { configurable: true, value: 'web' });
-    __setWindowDimensions({ width: 390, height: 844 });
-    __setPathname('/(app)/game');
-
-    render(<WebLandscapeGate />);
-    expect(screen.getByText('Rotate your device')).toBeTruthy();
-  });
-
-  it('does not block portrait web non-play routes (create-game / auth / legal / home)', () => {
-    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'web' });
+    setWebInputProfile('mobile');
     __setWindowDimensions({ width: 390, height: 844 });
 
-    for (const path of ['/login', '/create-game', '/(app)/create-game', '/settings', '/']) {
+    for (const path of ['/login', '/admin', '/privacy', '/terms', '/delete-account', '/settings']) {
       __setPathname(path);
-      const { toJSON, unmount } = render(<WebLandscapeGate />);
-      expect(toJSON()).toBeNull();
-      expect(screen.queryByText('Rotate your device')).toBeNull();
+      const { unmount } = render(<WebLandscapeGate />);
+      expect(screen.getByText('Rotate your device')).toBeTruthy();
       unmount();
     }
   });
 
-  it('hides itself in landscape web gameplay viewports', () => {
+  it('allows mobile web landscape', () => {
     Object.defineProperty(Platform, 'OS', { configurable: true, value: 'web' });
+    setWebInputProfile('mobile');
     __setWindowDimensions({ width: 844, height: 390 });
-    __setPathname('/play/board');
+    __setPathname('/');
 
     const { toJSON } = render(<WebLandscapeGate />);
     expect(toJSON()).toBeNull();
+    expect(screen.queryByText('Rotate your device')).toBeNull();
+  });
+
+  it('allows desktop web portrait (narrow window)', () => {
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'web' });
+    setWebInputProfile('desktop');
+    __setWindowDimensions({ width: 800, height: 1200 });
+    __setPathname('/');
+
+    const { toJSON } = render(<WebLandscapeGate />);
+    expect(toJSON()).toBeNull();
+    expect(screen.queryByText('Rotate your device')).toBeNull();
+  });
+
+  it('blocks mobile web portrait play routes', () => {
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'web' });
+    setWebInputProfile('mobile');
+    __setWindowDimensions({ width: 390, height: 844 });
+    __setPathname('/play/board');
+
+    render(<WebLandscapeGate />);
+    expect(screen.getByText('Rotate your device')).toBeTruthy();
   });
 });

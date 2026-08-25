@@ -1,44 +1,104 @@
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { usePathname } from 'expo-router';
 import { FONTS } from '@/constants/theme';
 import { HOME_SOFT_UI } from '@/themes';
 
+type MediaQueryListLike = {
+  matches: boolean;
+  addEventListener?: (type: 'change', listener: () => void) => void;
+  removeEventListener?: (type: 'change', listener: () => void) => void;
+  addListener?: (listener: () => void) => void;
+  removeListener?: (listener: () => void) => void;
+};
+
 /**
- * Landscape-only gate for web gameplay surfaces.
- * Web cannot hard-lock orientation outside fullscreen; on portrait play routes
- * we ask the user to rotate. Non-play routes (auth, admin, legal, home, etc.) stay usable.
- *
- * Covered surfaces:
- * - `/play/*` (and grouped `/(app)/play/*`)
- * - `/game` (and grouped `/(app)/game`): active create-game lobby/board
- *
- * Not covered: `/create-game`, auth, admin, legal, home, settings.
+ * Mobile-web signal: primary coarse pointer and/or no-hover touch profile.
+ * Not user-agent based. Desktop (fine pointer + hover) stays false even when
+ * the window is tall/narrow. SSR has no pointer API; returns false so static
+ * desktop HTML is not gated (mobile hydrates and re-evaluates).
  */
-export function isWebPlayLandscapePath(pathname: string | null | undefined): boolean {
-  if (!pathname) return false;
-  // Expo Router pathnames may include groups: "/(app)/play/board" or "/(app)/game".
-  const normalized = pathname.replace(/\/\([^/]+\)/g, '');
-  if (normalized === '/play' || normalized.startsWith('/play/')) return true;
-  if (normalized === '/game' || normalized.startsWith('/game/')) return true;
-  return false;
+export function isMobileWebClient(): boolean {
+  if (typeof window === 'undefined') {
+    // SSR fallback: no matchMedia/touch. Do not gate until client evaluation.
+    return false;
+  }
+
+  try {
+    if (typeof window.matchMedia === 'function') {
+      if (window.matchMedia('(pointer: coarse)').matches) return true;
+      // Phones/tablets typically lack hover and are not fine-pointer primary.
+      if (
+        window.matchMedia('(hover: none)').matches &&
+        !window.matchMedia('(pointer: fine)').matches
+      ) {
+        return true;
+      }
+      // matchMedia available and not mobile.
+      return false;
+    }
+  } catch {
+    /* matchMedia can throw in odd test hosts; fall through to touch */
+  }
+
+  // Conservative touch fallback when matchMedia is missing (including some SSR-adjacent hosts).
+  return (window.navigator?.maxTouchPoints ?? 0) > 0;
 }
 
+function subscribeMobileWeb(onStoreChange: () => void): () => void {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return () => {};
+  }
+
+  const queries = ['(pointer: coarse)', '(pointer: fine)', '(hover: none)'];
+  const lists: MediaQueryListLike[] = [];
+
+  for (const query of queries) {
+    try {
+      lists.push(window.matchMedia(query));
+    } catch {
+      /* skip broken query */
+    }
+  }
+
+  for (const list of lists) {
+    if (typeof list.addEventListener === 'function') {
+      list.addEventListener('change', onStoreChange);
+    } else if (typeof list.addListener === 'function') {
+      list.addListener(onStoreChange);
+    }
+  }
+
+  return () => {
+    for (const list of lists) {
+      if (typeof list.removeEventListener === 'function') {
+        list.removeEventListener('change', onStoreChange);
+      } else if (typeof list.removeListener === 'function') {
+        list.removeListener(onStoreChange);
+      }
+    }
+  };
+}
+
+function useIsMobileWebClient(): boolean {
+  return useSyncExternalStore(subscribeMobileWeb, isMobileWebClient, () => false);
+}
+
+/**
+ * Full-screen rotate gate for mobile web in portrait.
+ * Native is unchanged. Desktop web stays usable in portrait.
+ * Mobile Safari cannot lock orientation; this blocks interaction until rotation.
+ */
 export function WebLandscapeGate() {
   if (Platform.OS !== 'web') return null;
   return <WebLandscapeGateInner />;
 }
 
 function WebLandscapeGateInner() {
-  const pathname = usePathname();
   const { width, height } = useWindowDimensions();
-  const [portrait, setPortrait] = useState(height > width);
+  const mobileWeb = useIsMobileWebClient();
+  const portrait = height > width;
 
-  useEffect(() => {
-    setPortrait(height > width);
-  }, [height, width]);
-
-  if (!isWebPlayLandscapePath(pathname) || !portrait) return null;
+  if (!mobileWeb || !portrait) return null;
 
   return (
     <View
