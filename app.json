@@ -3,7 +3,7 @@
     "name": "BackFire",
     "slug": "backfire",
     "scheme": "backfire",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "landscape",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -29,7 +29,7 @@
       "hidden": true
     },
     "android": {
-      "versionCode": 21,
+      "versionCode": 22,
       "package": "com.playbackfire.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
