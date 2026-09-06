@@ -418,8 +418,7 @@ export default function TeamSetupScreen() {
     if (!session || !rumbleMode) return null;
 
     const d = rumbleDensity;
-    /** Guide: 2-3 teams use a single column; 4+ use a 2-column grid (e.g. 2x2 for 4, 3x2 for 6). */
-    const stackNamesVertically = session.teams.length <= 3;
+    const namesGridMinHeight = d.nameMinH * 3 + d.gridRowGap * 2;
 
     return (
       <View
@@ -479,10 +478,14 @@ export default function TeamSetupScreen() {
         </View>
 
         <View
+          testID="rumble-names-grid"
           style={[
             styles.rumbleNamesGrid,
-            { rowGap: d.gridRowGap, columnGap: d.gridColGap },
-            stackNamesVertically && styles.rumbleNamesGridStacked,
+            {
+              rowGap: d.gridRowGap,
+              columnGap: d.gridColGap,
+              minHeight: namesGridMinHeight,
+            },
           ]}
         >
           {session.teams.map((team) => (
@@ -491,7 +494,6 @@ export default function TeamSetupScreen() {
               style={[
                 styles.rumbleNameRow,
                 { minHeight: d.nameMinH },
-                stackNamesVertically && styles.rumbleNameRowFull,
               ]}
             >
               <View style={styles.editableInputWrap}>
@@ -1069,16 +1071,10 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     flexWrap: 'wrap',
-  },
-  rumbleNamesGridStacked: {
-    flexDirection: 'column',
-    flexWrap: 'nowrap',
+    alignContent: 'flex-start',
   },
   rumbleNameRow: {
     width: '48.8%',
-  },
-  rumbleNameRowFull: {
-    width: '100%',
   },
   rumbleNameInput: {
     width: '100%',

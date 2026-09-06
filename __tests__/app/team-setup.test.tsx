@@ -99,6 +99,27 @@ describe('TeamSetupScreen', () => {
     expect(screen.getByLabelText('4 teams').props.accessibilityState).toMatchObject({ disabled: true });
   });
 
+  it('keeps the rumble names grid height stable when topic tabs snap the team count', () => {
+    usePlayStore.getState().setMode('rumble');
+
+    render(<TeamSetupScreen />);
+    const gridMinHeight = () =>
+      StyleSheet.flatten(screen.getByTestId('rumble-names-grid').props.style).minHeight;
+
+    const sixTopicsHeight = gridMinHeight();
+    expect(sixTopicsHeight).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('Team name')).toHaveLength(2);
+
+    fireEvent.press(screen.getByLabelText('Four topics'));
+    expect(gridMinHeight()).toBe(sixTopicsHeight);
+    expect(screen.getAllByLabelText('Team name')).toHaveLength(2);
+
+    fireEvent.press(screen.getByLabelText('Three topics'));
+    expect(usePlayStore.getState().session?.teams).toHaveLength(3);
+    expect(gridMinHeight()).toBe(sixTopicsHeight);
+    expect(screen.getAllByLabelText('Team name')).toHaveLength(3);
+  });
+
   it('opens randomizer quick play from random team setup', () => {
     usePlayStore.getState().setMode('random');
 
