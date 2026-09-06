@@ -23,6 +23,7 @@ import {
   getRumblePartySlots,
 } from '@/features/play/rumble';
 import { PlayAnswerPanel } from '@/features/play/components/PlayAnswerPanel';
+import { QuestionReportControl } from '@/features/play/components/QuestionReportModal';
 import { WagerInfoModal } from '@/features/play/components/WagerInfoModal';
 import { getRowDirection } from '@/lib/i18n/direction';
 import { useI18n } from '@/lib/i18n/useI18n';
@@ -605,7 +606,7 @@ export default function PlayQuestionScreen() {
   ) : null;
 
   const promptBlock = (
-    <View style={[styles.revealPromptBlock, { width: questionContentWidth }]}>
+    <View style={styles.revealPromptBlock}>
       {q.promptImageUrl ? (
         <Image
           testID="question-prompt-image"
@@ -1042,6 +1043,17 @@ export default function PlayQuestionScreen() {
         </>
       )}
 
+      {isAnswerPhase ? (
+        <QuestionReportControl
+          question={q}
+          sessionId={session.id}
+          offsetRight={Math.max(insets.right, SPACING.sm)}
+          offsetBottom={
+            Math.max(insets.bottom, SPACING.sm) +
+            (showAnswerPhaseNextTurnDock ? Math.round(70 * questionViewportScale) : 0)
+          }
+        />
+      ) : null}
       <WagerInfoModal visible={wagerInfoOpen} onClose={() => setWagerInfoOpen(false)} />
     </View>
   );
@@ -1353,8 +1365,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   revealPromptBlock: {
+    width: '100%',
     alignItems: 'center',
-    alignSelf: 'center',
+    alignSelf: 'stretch',
     gap: SPACING.md,
     marginBottom: SPACING.lg,
   },

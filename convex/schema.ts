@@ -321,6 +321,29 @@ export default defineSchema({
     .index('by_purchaser_product_status', ['purchaserAccountId', 'productKey', 'status'])
     .index('by_promo_status', ['promoCodeId', 'status']),
 
+  question_reports: defineTable({
+    userId: v.id('users'),
+    questionId: v.string(),
+    canonicalKey: v.string(),
+    categoryId: v.optional(v.string()),
+    categoryName: v.optional(v.string()),
+    locale: v.optional(v.string()),
+    prompt: v.string(),
+    answer: v.string(),
+    reasons: v.array(v.string()),
+    problemLocation: v.union(
+      v.literal('question'),
+      v.literal('answer'),
+      v.literal('both')
+    ),
+    otherText: v.optional(v.string()),
+    sessionId: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index('by_user_and_created', ['userId', 'createdAt'])
+    .index('by_canonical', ['canonicalKey'])
+    .index('by_created', ['createdAt']),
+
   feature_flags: defineTable({
     key: v.string(),
     enabled: v.boolean(),

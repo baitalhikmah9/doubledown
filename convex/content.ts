@@ -207,3 +207,77 @@ export const recordAskedQuestions = mutation({
     }
   },
 });
+
+const REPORT_REASONS = new Set([
+  'factually_incorrect',
+  'ambiguous',
+  'unclear',
+  'unfair',
+  'mismatch',
+  'outdated',
+  'broken',
+  'inappropriate',
+  'other',
+]);
+
+const REPORT_WINDOW_MS = 10 * 60 * 1000;
+const REPORT_MAX_IN_WINDOW = 8;
+
+export const submitQuestionReport = mutation({
+  args: {
+    questionId: v.string(),
+    canonicalKey: v.string(),
+    categoryId: v.optional(v.string()),
+    categoryName: v.optional(v.string()),
+    locale: v.optional(v.string()),
+    prompt: v.string(),
+    answer: v.string(),
+    reasons: v.array(v.string()),
+    problemLocation: v.union(
+      v.literal('question'),
+      v.literal('answer'),
+      v.literal('both')
+    ),
+    otherText: v.optional(v.string()),
+    sessionId: v.optional(v.string()),
+  },
+  returns: v.id('question_reports'),
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const reasons = [...new Set(args.reasons)].filter((reason) => REPORT_REASONS.has(reason));
+    if (reasons.length === 0) {
+      throw new Error('Select at least one issue');
+    }
+    const otherText = args.otherText?.trim();
+    if (reasons.includes('other') && !otherText) {
+      throw new Error('Describe the issue');
+    }
+
+    const now = Date.now();
+    const recent = await ctx.db
+      .query('question_reports')
+      .withIndex('by_user_and_created', (q) =>
+        q.eq('userId', user._id).gte('createdAt', now - REPORT_WINDOW_MS)
+      )
+      .take(REPORT_MAX_IN_WINDOW);
+    if (recent.length >= REPORT_MAX_IN_WINDOW) {
+      throw new Error('Too many reports. Try again later.');
+    }
+
+    return await ctx.db.insert('question_reports', {
+      userId: user._id,
+      questionId: args.questionId.slice(0, 200),
+      canonicalKey: args.canonicalKey.slice(0, 200),
+      categoryId: args.categoryId?.slice(0, 200),
+      categoryName: args.categoryName?.slice(0, 200),
+      locale: args.locale?.slice(0, 32),
+      prompt: args.prompt.slice(0, 4000),
+      answer: args.answer.slice(0, 4000),
+      reasons,
+      problemLocation: args.problemLocation,
+      otherText: reasons.includes('other') ? otherText?.slice(0, 500) : undefined,
+      sessionId: args.sessionId?.slice(0, 200),
+      createdAt: now,
+    });
+  },
+});

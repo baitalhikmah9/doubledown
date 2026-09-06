@@ -540,4 +540,46 @@ describe('PlayQuestionScreen', () => {
       screen.getByText('Wager x1.5 (Correct: 1.5x gain, incorrect: 1x loss)')
     ).toBeTruthy();
   });
+
+  it('hides the report control until the answer is revealed', () => {
+    const question = createQuestion({
+      id: 'q-report-hidden',
+      canonicalKey: 'science:200:report-hidden',
+    });
+
+    usePlayStore.setState({
+      session: createSession({
+        currentQuestion: question,
+        board: [question],
+      }),
+    });
+
+    render(<PlayQuestionScreen />);
+    expect(screen.queryByTestId('question-report-button')).toBeNull();
+  });
+
+  it('opens the report modal from the post-reveal control', () => {
+    const question = createQuestion({
+      id: 'q-report-open',
+      canonicalKey: 'science:200:report-open',
+      prompt: 'Which tragic hero is known for thee of jealousy?',
+      answer: 'Othello',
+    });
+
+    usePlayStore.setState({
+      session: createSession({
+        step: 'answer',
+        phase: 'scoring',
+        currentQuestion: question,
+        board: [question],
+      }),
+    });
+
+    render(<PlayQuestionScreen />);
+    expect(screen.getByTestId('question-report-button')).toBeTruthy();
+    expect(screen.queryByTestId('question-report-modal')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('question-report-button'));
+    expect(screen.getByTestId('question-report-modal')).toBeTruthy();
+  });
 });

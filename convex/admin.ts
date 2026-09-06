@@ -1005,6 +1005,32 @@ export const listAuditLog = query({
   },
 });
 
+export const listQuestionReports = query({
+  args: {
+    cursor: v.optional(v.number()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const limit = Math.min(args.limit ?? 50, 100);
+    const rows = await ctx.db
+      .query('question_reports')
+      .withIndex('by_created', (range) => {
+        if (args.cursor !== undefined) return range.lt('createdAt', args.cursor);
+        return range;
+      })
+      .order('desc')
+      .take(limit + 1);
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+    const last = items[items.length - 1];
+    return {
+      items,
+      nextCursor: hasMore && last ? last.createdAt : undefined,
+    };
+  },
+});
+
 // ───────────────────────────────────────────────
 // Admin Dashboard Stats
 // ───────────────────────────────────────────────
