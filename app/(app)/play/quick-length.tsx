@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Platform, type TextStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Pressable } from '@/components/ui/Pressable';
 import { useRouter } from 'expo-router';
-import { BORDER_RADIUS, SPACING, LAYOUT, FONTS } from '@/constants';
+import { FONTS } from '@/constants';
 import { SOFT_SURFACE_STYLES } from '@/features/play/styles/softSurface';
 import { isActiveMatchStep, routeForPlayStep } from '@/features/play/sessionRouting';
 import {
@@ -14,6 +15,7 @@ import {
 import { useI18n } from '@/lib/i18n/useI18n';
 import { useDarkModeFlatTop } from '@/lib/hooks/useTheme';
 import { useViewportLayout } from '@/lib/hooks/useViewportLayout';
+import { getQuickLengthOptionLayout, type QuickLengthOptionLayout } from '@/lib/layout/quickLengthLayout';
 import { usePlayStore } from '@/store/play';
 import { goBackOrReplace } from '@/lib/navigation/goBackOrReplace';
 import type { SupportedLocale } from '@/lib/i18n/config';
@@ -41,7 +43,7 @@ const QUICK_LENGTH_COPY_KEYS = {
 function OptionTile({
   option,
   isWeb,
-  compact,
+  layout,
   tokenLabel,
   tokensText,
   getTextStyle,
@@ -49,7 +51,7 @@ function OptionTile({
 }: {
   option: { count: number; tokenCost: number; label: string; copy: string };
   isWeb: boolean;
-  compact: boolean;
+  layout: QuickLengthOptionLayout;
   tokenLabel: string;
   tokensText: string;
   getTextStyle: (
@@ -71,11 +73,17 @@ function OptionTile({
       onPointerLeave={isWeb ? () => setHovered(false) : undefined}
       style={({ pressed }) => [
         styles.optionCard,
-        isWeb ? styles.optionCardWeb : compact ? styles.optionCardCompact : styles.optionCardNative,
         SOFT_SURFACE_STYLES.face,
         darkModeFlatTop,
         SOFT_SURFACE_STYLES.raised,
-        { backgroundColor: surfaceColors.controlBackground },
+        {
+          width: layout.cardW,
+          height: layout.cardH,
+          borderRadius: layout.radius,
+          paddingHorizontal: layout.padH,
+          paddingVertical: layout.padV,
+          backgroundColor: surfaceColors.controlBackground,
+        },
         isWeb && hovered && { backgroundColor: surfaceColors.hoverSurface },
         pressed && styles.optionCardPressed,
       ]}
@@ -87,12 +95,12 @@ function OptionTile({
       <Text
         style={[
           styles.optionTitle,
-          isWeb
-            ? styles.optionTitleWeb
-            : compact
-              ? styles.optionTitleCompact
-              : styles.optionTitleNative,
-          { color: surfaceColors.textPrimary },
+          {
+            color: surfaceColors.textPrimary,
+            fontSize: layout.titleSize,
+            lineHeight: layout.titleLine,
+            marginBottom: layout.titleMargin,
+          },
           getTextStyle(undefined, 'displayBold', 'center'),
         ]}
         numberOfLines={2}
@@ -101,22 +109,21 @@ function OptionTile({
       >
         {option.label}
       </Text>
-      <View style={[styles.tokenCostRow, isWeb && styles.tokenCostRowWeb]}>
+      <View style={[styles.tokenCostRow, { gap: Math.max(3, Math.round(layout.iconSize * 0.4)) }]}>
         <Ionicons
           name="diamond"
-          size={isWeb ? 13 : compact ? 10 : 12}
+          size={layout.iconSize}
           color={surfaceColors.textPrimary}
         />
         <Text
           testID={`quick-length-token-cost-${option.count}`}
           style={[
             styles.tokenCostText,
-            isWeb
-              ? styles.tokenCostTextWeb
-              : compact
-                ? styles.tokenCostTextCompact
-                : styles.tokenCostTextNative,
-            { color: surfaceColors.textPrimary },
+            {
+              color: surfaceColors.textPrimary,
+              fontSize: layout.tokenSize,
+              lineHeight: layout.tokenLine,
+            },
             getTextStyle(undefined, 'bodyBold', 'center'),
           ]}
           numberOfLines={1}
@@ -133,14 +140,23 @@ function OptionTile({
 export default function QuickLengthScreen() {
   const router = useRouter();
   const viewport = useViewportLayout();
+  const insets = useSafeAreaInsets();
   const { t, getTextStyle } = useI18n();
   const sessionStep = usePlayStore((state) => state.session?.step);
   const sessionMode = usePlayStore((state) => state.session?.mode);
   const setQuickPlayTopicCount = usePlayStore((state) => state.setQuickPlayTopicCount);
   const setTopicCount = usePlayStore((state) => state.setTopicCount);
   const isWeb = Platform.OS === 'web';
-  const compact = viewport.height < 720;
-  const setupMaxWidth = viewport.contentMaxWidth('setup');
+  const layout = useMemo(
+    () =>
+      getQuickLengthOptionLayout({
+        width: viewport.width,
+        height: viewport.height,
+        insets,
+        isWeb,
+      }),
+    [insets, isWeb, viewport.height, viewport.width]
+  );
   const tokensText = t('common.tokens');
   const tokenLabel = tokensText.toUpperCase();
   const isRandomizerQp = sessionMode === 'random';
@@ -196,7 +212,6 @@ export default function QuickLengthScreen() {
       backVariant="icon"
       bodyFrame={false}
       bodyScrollEnabled={false}
-      contentMaxWidth={isWeb ? setupMaxWidth : undefined}
     >
       <View
         style={[
@@ -208,8 +223,11 @@ export default function QuickLengthScreen() {
         <View
           style={[
             styles.list,
-            isWeb ? styles.listWeb : styles.listNative,
-            isWeb && { maxWidth: setupMaxWidth },
+            {
+              width: layout.rowWidth,
+              maxWidth: layout.rowWidth,
+              gap: layout.gap,
+            },
           ]}
         >
           {options.map((option) => (
@@ -217,7 +235,7 @@ export default function QuickLengthScreen() {
               key={option.count}
               option={option}
               isWeb={isWeb}
-              compact={compact}
+              layout={layout}
               tokenLabel={tokenLabel}
               tokensText={tokensText}
               getTextStyle={getTextStyle}
@@ -231,7 +249,6 @@ export default function QuickLengthScreen() {
 }
 
 const styles = StyleSheet.create({
-  /* ── List wrapper ── */
   listWrap: {
     flex: 1,
     minHeight: 0,
@@ -241,107 +258,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 0,
   },
-  /** 1 → 5 topics left to right in a single row. */
+  /** 1 to 5 topics left to right in a single row. */
   list: {
-    width: '100%',
     minWidth: 0,
     flexDirection: 'row',
     alignItems: 'stretch',
-  },
-  listNative: {
-    flex: 1,
-    minHeight: 0,
-    gap: SPACING.xs,
-    maxHeight: 220,
     alignSelf: 'center',
-  },
-  listWeb: {
-    maxWidth: LAYOUT.setupMaxWidth,
-    gap: 14,
     justifyContent: 'center',
-    paddingVertical: SPACING.xs,
-    minHeight: 160,
-    maxHeight: 200,
   },
-
-  /* ── Option card ── */
   optionCard: {
     borderWidth: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    flex: 1,
+    flexGrow: 0,
+    flexShrink: 0,
     minWidth: 0,
     minHeight: 0,
-  },
-  optionCardNative: {
-    borderRadius: BORDER_RADIUS.lg,
-    paddingHorizontal: SPACING.xs,
-    paddingVertical: SPACING.md,
-  },
-  optionCardCompact: {
-    borderRadius: BORDER_RADIUS.sm,
-    paddingHorizontal: 4,
-    paddingVertical: SPACING.sm,
-  },
-  optionCardWeb: {
-    borderRadius: 22,
-    paddingHorizontal: 10,
-    paddingVertical: 22,
-    minHeight: 140,
   },
   optionCardPressed: {
     opacity: 0.85,
     transform: [{ scale: 0.98 }],
   },
-
-  /* ── Option title ── */
   optionTitle: {
     fontFamily: FONTS.displayBold,
-    marginBottom: SPACING.xs,
     textAlign: 'center',
     width: '100%',
   },
-  optionTitleNative: {
-    fontSize: 15,
-    lineHeight: 18,
-  },
-  optionTitleCompact: {
-    fontSize: 12,
-    lineHeight: 14,
-    marginBottom: 2,
-  },
-  optionTitleWeb: {
-    fontSize: 18,
-    lineHeight: 22,
-    marginBottom: 8,
-  },
-
-  /* ── Token cost row ── */
   tokenCostRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
     flexWrap: 'wrap',
-  },
-  tokenCostRowWeb: {
-    gap: 5,
   },
   tokenCostText: {
     fontFamily: FONTS.uiBold,
     letterSpacing: 0.4,
     textAlign: 'center',
-  },
-  tokenCostTextNative: {
-    fontSize: 10,
-    lineHeight: 13,
-  },
-  tokenCostTextCompact: {
-    fontSize: 9,
-    lineHeight: 11,
-  },
-  tokenCostTextWeb: {
-    fontSize: 13,
-    lineHeight: 16,
   },
 });

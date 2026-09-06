@@ -1,21 +1,29 @@
 import React from 'react';
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 
 import QuickLengthScreen from '@/app/(app)/play/quick-length';
 import { usePlayStore } from '@/store/play';
 import { useThemeStore } from '@/store/theme';
 import { router } from '../doubles/expoRouter';
+import { __setWindowDimensions } from '../doubles/windowDimensions';
+import { getQuickLengthOptionLayout } from '@/lib/layout/quickLengthLayout';
 
 describe('QuickLengthScreen', () => {
   beforeEach(() => {
+    __setWindowDimensions({
+      width: 800,
+      height: 700,
+      scale: 2,
+      fontScale: 1,
+    });
     usePlayStore.setState({ session: null, tokens: 20, rapidFire: null });
     usePlayStore.getState().setMode('quickPlay');
     useThemeStore.setState({ paletteId: 'default' });
   });
 
-  it('shows quick play topic choices 1–5 left to right with their token costs', () => {
+  it('shows quick play topic choices 1 to 5 left to right with their token costs', () => {
     render(<QuickLengthScreen />);
 
     expect(screen.getByText('1 Topic')).toBeTruthy();
@@ -28,6 +36,26 @@ describe('QuickLengthScreen', () => {
     expect(screen.getByTestId('quick-length-token-cost-4')).toHaveTextContent('7 TOKENS');
     expect(screen.getByText('5 Topics')).toBeTruthy();
     expect(screen.getByTestId('quick-length-token-cost-5')).toHaveTextContent('8 TOKENS');
+  });
+
+  it('sizes topic cards from the shared topic-row viewport layout', () => {
+    const expected = getQuickLengthOptionLayout({
+      width: 800,
+      height: 700,
+      insets: { left: 0, right: 0 },
+      isWeb: Platform.OS === 'web',
+    });
+    render(<QuickLengthScreen />);
+
+    const option = screen.getByLabelText('3 Topics, 5 tokens');
+    const styleProp = option.props.style;
+    const resolved =
+      (styleProp instanceof Function) ? styleProp({ pressed: false }) : styleProp;
+    const flat = StyleSheet.flatten(resolved);
+
+    expect(flat.width).toBe(expected.cardW);
+    expect(flat.height).toBe(expected.cardH);
+    expect(flat.height).toBeGreaterThan(56);
   });
 
   it('removes the white raised-surface strip from dark-mode choices', () => {
