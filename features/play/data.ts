@@ -1,8 +1,9 @@
 import { mark } from '@/lib/startupTiming';
 import rawQuestions from '@/constants/questions.json';
-import { groupRumbleQuestionsByValueBucket } from '@/features/play/rumble';
-import type { CategoryOption, QuestionCard } from '@/features/shared';
+import { groupRumbleQuestionsByValueBucket, normalizeRumbleTopicCount } from '@/features/play/rumble';
+import type { CategoryOption, GameMode, QuestionCard } from '@/features/shared';
 import type { SupportedLocale } from '@/lib/i18n/config';
+import { normalizeQuickPlayTopicCount } from '@/features/play/tokenCosts';
 
 interface SourceQA {
   text: string;
@@ -285,11 +286,21 @@ export function getBonusQuestion(
   return candidates.length ? pickRandom(candidates) : null;
 }
 
-export function getModeCategoryCount(
-  mode: 'classic' | 'quickPlay' | 'random' | 'rumble' | 'rapidFire',
-  quickPlayTopicCount: number
-): number {
-  if (mode === 'quickPlay') return quickPlayTopicCount;
+export function defaultTopicCountForMode(mode: GameMode): number {
+  if (mode === 'quickPlay') return 3;
+  if (mode === 'rapidFire') return 5;
+  return 6;
+}
+
+export function getModeCategoryCount(mode: GameMode, topicCount?: number): number {
+  if (mode === 'quickPlay') return normalizeQuickPlayTopicCount(topicCount);
+  if (mode === 'random') {
+    if (topicCount === 1 || topicCount === 2 || topicCount === 3 || topicCount === 4 || topicCount === 5) {
+      return topicCount;
+    }
+    return 6;
+  }
+  if (mode === 'rumble') return normalizeRumbleTopicCount(topicCount);
   if (mode === 'rapidFire') return 5;
   return 6;
 }

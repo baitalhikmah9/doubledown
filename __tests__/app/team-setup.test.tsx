@@ -1,6 +1,6 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { Modal, Platform, StyleSheet } from 'react-native';
 
 import TeamSetupScreen from '@/app/(app)/play/team-setup';
@@ -74,6 +74,47 @@ describe('TeamSetupScreen', () => {
     expect(usePlayStore.getState().session?.teams).toHaveLength(6);
     expect(screen.getByLabelText('6 teams').props.accessibilityState).toMatchObject({ selected: true });
     expect(screen.getByLabelText('2 teams').props.accessibilityState).toMatchObject({ selected: false });
+  });
+
+  it('greys rumble team counts that cannot split the selected topic count', () => {
+    usePlayStore.getState().setMode('rumble');
+
+    render(<TeamSetupScreen />);
+
+    expect(screen.getByLabelText('Six topics').props.accessibilityState).toMatchObject({ selected: true });
+    fireEvent.press(screen.getByLabelText('Four topics'));
+
+    expect(usePlayStore.getState().session?.config.quickPlayTopicCount).toBe(4);
+    expect(screen.getByLabelText('2 teams').props.accessibilityState).toMatchObject({ disabled: false });
+    expect(screen.getByLabelText('4 teams').props.accessibilityState).toMatchObject({ disabled: false });
+    expect(screen.getByLabelText('3 teams').props.accessibilityState).toMatchObject({ disabled: true });
+    expect(screen.getByLabelText('6 teams').props.accessibilityState).toMatchObject({ disabled: true });
+
+    fireEvent.press(screen.getByLabelText('Three topics'));
+
+    expect(usePlayStore.getState().session?.config.quickPlayTopicCount).toBe(3);
+    expect(screen.getByLabelText('3 teams').props.accessibilityState).toMatchObject({ disabled: false });
+    expect(screen.getByLabelText('6 teams').props.accessibilityState).toMatchObject({ disabled: false });
+    expect(screen.getByLabelText('2 teams').props.accessibilityState).toMatchObject({ disabled: true });
+    expect(screen.getByLabelText('4 teams').props.accessibilityState).toMatchObject({ disabled: true });
+  });
+
+  it('opens randomizer quick play from random team setup', () => {
+    usePlayStore.getState().setMode('random');
+
+    render(<TeamSetupScreen />);
+
+    const header = screen.getByTestId('play-scaffold-header');
+    const qp = within(header).getByLabelText('Randomizer Quick Play');
+    const styleProp = qp.props.style;
+    const resolved =
+      (styleProp instanceof Function) ? styleProp({ pressed: false }) : styleProp;
+    const flat = StyleSheet.flatten(resolved);
+    expect(flat.height).toBe(44);
+    expect(flat.borderRadius).toBe(14);
+    fireEvent.press(qp);
+
+    expect(router.push).toHaveBeenCalledWith('/play/quick-length');
   });
 
   it('shows Continue for rumble setup on wide web (floating CTA is not classic-only)', () => {
@@ -182,9 +223,10 @@ describe('TeamSetupScreen', () => {
     expect(flat.borderRadius).toBe(14);
   });
 
-  it('keeps a small dead zone under the phone continue strip above the bezel', () => {
+  it('keeps a small dead zone under the rumble continue strip above the bezel', () => {
     // SafeAreaView still clears the home indicator; strip adds modest pad so Continue
     // is not flush to the edge on zero-inset / landscape devices.
+    usePlayStore.getState().setMode('rumble');
     __setWindowDimensions({
       width: 874,
       height: 402,
@@ -198,6 +240,20 @@ describe('TeamSetupScreen', () => {
     const flat = StyleSheet.flatten(strip.props.style);
     expect(flat.paddingBottom).toBeGreaterThanOrEqual(8);
     expect(flat.paddingBottom).toBeLessThanOrEqual(16);
+  });
+
+  it('pins classic landscape Continue to the team-card baseline instead of a lower strip', () => {
+    __setWindowDimensions({
+      width: 874,
+      height: 402,
+      scale: 3,
+      fontScale: 1,
+    });
+
+    render(<TeamSetupScreen />);
+
+    expect(screen.getByText('CONTINUE')).toBeTruthy();
+    expect(screen.queryByTestId('team-setup-continue-strip')).toBeNull();
   });
 
   it('returns to quick-play topic length when going back during quick play', () => {

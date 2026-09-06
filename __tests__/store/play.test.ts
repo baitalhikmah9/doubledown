@@ -338,7 +338,32 @@ describe('usePlayStore', () => {
 
     usePlayStore.getState().setTeamCount(1);
     session = usePlayStore.getState().session;
-    expect(session?.teams).toHaveLength(2);
+    expect(session?.teams).toHaveLength(6);
+  });
+
+  it('defaults rumble and random to six topics', () => {
+    usePlayStore.getState().setMode('rumble');
+    expect(usePlayStore.getState().session?.config.quickPlayTopicCount).toBe(6);
+
+    usePlayStore.getState().setMode('random');
+    expect(usePlayStore.getState().session?.config.quickPlayTopicCount).toBe(6);
+    expect(usePlayStore.getState().session?.step).toBe('team-setup');
+  });
+
+  it('snaps rumble teams when the topic count makes the current count invalid', () => {
+    usePlayStore.getState().setMode('rumble');
+    usePlayStore.getState().setTeamCount(3);
+    usePlayStore.getState().setTopicCount(4);
+
+    expect(usePlayStore.getState().session?.config.quickPlayTopicCount).toBe(4);
+    expect(usePlayStore.getState().session?.teams).toHaveLength(4);
+
+    usePlayStore.getState().setTeamCount(3);
+    expect(usePlayStore.getState().session?.teams).toHaveLength(4);
+
+    usePlayStore.getState().setTopicCount(3);
+    expect(usePlayStore.getState().session?.config.quickPlayTopicCount).toBe(3);
+    expect(usePlayStore.getState().session?.teams).toHaveLength(3);
   });
 
   it('assigns rumble questions evenly by team, answer order, and difficulty', () => {
@@ -430,6 +455,20 @@ describe('usePlayStore', () => {
       }, {});
       expect(ownerCounts).toEqual({ team_1: 6, team_2: 6 });
     }
+  });
+
+  it('starts randomizer quick play with the chosen topic count', () => {
+    usePlayStore.setState({ session: null, tokens: 20, rapidFire: null });
+    usePlayStore.getState().setMode('random');
+    usePlayStore.getState().setTopicCount(3);
+
+    const categories = usePlayStore.getState().session?.availableCategories.slice(0, 3) ?? [];
+    usePlayStore.getState().setCategories(categories.map((category) => category.slug));
+
+    const result = usePlayStore.getState().startBoard();
+    expect(result).toMatchObject({ ok: true });
+    expect(usePlayStore.getState().session?.selectedCategoryIds).toHaveLength(3);
+    expect(usePlayStore.getState().session?.board).toHaveLength(18);
   });
 
   it('assigns rumble questions evenly across 100, 200, and 300 value buckets', () => {
@@ -663,6 +702,29 @@ describe('usePlayStore', () => {
 
     expect(board).toHaveLength(36);
     expect(byPointValue).toEqual({ 100: 12, 200: 12, 300: 12 });
+  });
+
+  it('starts rumble with four topics and two teams', () => {
+    usePlayStore.setState({ session: null, tokens: 20, rapidFire: null });
+    const store = usePlayStore.getState();
+    store.setMode('rumble');
+    usePlayStore.getState().setTopicCount(4);
+    usePlayStore.getState().setTeamCount(2);
+
+    const categories = usePlayStore.getState().session?.availableCategories.slice(0, 4) ?? [];
+    usePlayStore.getState().setCategories(categories.map((category) => category.slug));
+
+    const result = usePlayStore.getState().startBoard();
+    expect(result).toMatchObject({ ok: true });
+
+    const board = usePlayStore.getState().session?.board ?? [];
+    const byPointValue = board.reduce<Record<number, number>>((counts, question) => {
+      counts[question.pointValue] = (counts[question.pointValue] ?? 0) + 1;
+      return counts;
+    }, {});
+
+    expect(board).toHaveLength(24);
+    expect(byPointValue).toEqual({ 100: 8, 200: 8, 300: 8 });
   });
 
   it('hydrates token balance from storage', async () => {

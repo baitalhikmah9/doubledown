@@ -7,6 +7,10 @@ import {
   getNextRumbleCheckpointSeconds,
   getRumblePartyPhase,
   getRumblePartySlots,
+  isRumbleTeamCountAllowed,
+  rumbleQuestionsPerDifficulty,
+  rumbleTeamCountsForTopics,
+  snapRumbleTeamCount,
 } from '@/features/play/rumble';
 
 describe('getRumblePartyPhase / getRumblePartySlots', () => {
@@ -67,5 +71,30 @@ describe('getNextRumbleCheckpointSeconds', () => {
   it('returns null once the round has ended', () => {
     expect(getNextRumbleCheckpointSeconds(90)).toBeNull();
     expect(getNextRumbleCheckpointSeconds(120)).toBeNull();
+  });
+});
+
+describe('rumble topic / team pairing', () => {
+  it('keeps 2, 3, 4, and 6 teams on six topics', () => {
+    expect(rumbleTeamCountsForTopics(6)).toEqual([2, 3, 4, 6]);
+    expect(rumbleQuestionsPerDifficulty(6)).toBe(12);
+  });
+
+  it('allows only 2 and 4 teams on four topics', () => {
+    expect(rumbleTeamCountsForTopics(4)).toEqual([2, 4]);
+    expect(isRumbleTeamCountAllowed(4, 3)).toBe(false);
+    expect(isRumbleTeamCountAllowed(4, 6)).toBe(false);
+    expect(snapRumbleTeamCount(4, 3)).toBe(4);
+    expect(snapRumbleTeamCount(4, 6)).toBe(4);
+    expect(rumbleQuestionsPerDifficulty(4)).toBe(8);
+  });
+
+  it('allows only 3 and 6 teams on three topics', () => {
+    expect(rumbleTeamCountsForTopics(3)).toEqual([3, 6]);
+    expect(isRumbleTeamCountAllowed(3, 2)).toBe(false);
+    expect(isRumbleTeamCountAllowed(3, 4)).toBe(false);
+    expect(snapRumbleTeamCount(3, 2)).toBe(3);
+    expect(snapRumbleTeamCount(3, 4)).toBe(3);
+    expect(rumbleQuestionsPerDifficulty(3)).toBe(6);
   });
 });

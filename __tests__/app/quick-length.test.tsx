@@ -70,6 +70,19 @@ describe('QuickLengthScreen', () => {
     expect(router.push).toHaveBeenCalledWith('/play/team-setup');
   });
 
+  it('keeps random mode when choosing a randomizer quick-play length', () => {
+    usePlayStore.getState().setMode('random');
+    render(<QuickLengthScreen />);
+
+    expect(screen.getByText('Choose from one to five topics')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('2 Topics, 10 tokens'));
+
+    expect(usePlayStore.getState().session?.mode).toBe('random');
+    expect(usePlayStore.getState().session?.config.quickPlayTopicCount).toBe(2);
+    expect(router.replace).toHaveBeenCalledWith('/play/team-setup');
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
   it('redirects back into the active match instead of allowing topic switches mid-game', () => {
     const current = usePlayStore.getState().session;
     usePlayStore.setState({

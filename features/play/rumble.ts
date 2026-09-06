@@ -16,6 +16,47 @@ export const RUMBLE_SKIP_CHECKPOINTS = [
 export const RUMBLE_VALUE_BUCKETS = [100, 200, 300] as const;
 export type RumbleValueBucket = (typeof RUMBLE_VALUE_BUCKETS)[number];
 
+export const RUMBLE_TOPIC_COUNT_OPTIONS = [3, 4, 6] as const;
+export type RumbleTopicCount = (typeof RUMBLE_TOPIC_COUNT_OPTIONS)[number];
+export const DEFAULT_RUMBLE_TOPIC_COUNT = 6;
+export const RUMBLE_TEAM_COUNT_OPTIONS = [2, 3, 4, 6] as const;
+export type RumbleTeamCount = (typeof RUMBLE_TEAM_COUNT_OPTIONS)[number];
+
+/** Left+right tiles per topic in each 100/200/300 bucket. */
+export function rumbleQuestionsPerDifficulty(topicCount: number | undefined): number {
+  return normalizeRumbleTopicCount(topicCount) * 2;
+}
+
+export function normalizeRumbleTopicCount(count: number | undefined): RumbleTopicCount {
+  if (count === 3 || count === 4) return count;
+  return DEFAULT_RUMBLE_TOPIC_COUNT;
+}
+
+/** Team counts that can split each value bucket evenly for the chosen topic count. */
+export function rumbleTeamCountsForTopics(topicCount: number | undefined): readonly RumbleTeamCount[] {
+  switch (normalizeRumbleTopicCount(topicCount)) {
+    case 3:
+      return [3, 6];
+    case 4:
+      return [2, 4];
+    case 6:
+      return RUMBLE_TEAM_COUNT_OPTIONS;
+  }
+}
+
+export function isRumbleTeamCountAllowed(topicCount: number | undefined, teamCount: number): boolean {
+  return rumbleTeamCountsForTopics(topicCount).includes(teamCount as RumbleTeamCount);
+}
+
+export function snapRumbleTeamCount(topicCount: number | undefined, teamCount: number): RumbleTeamCount {
+  const allowed = rumbleTeamCountsForTopics(topicCount);
+  return allowed.reduce((nearest, option) => {
+    const nearestDistance = Math.abs(nearest - teamCount);
+    const optionDistance = Math.abs(option - teamCount);
+    return optionDistance <= nearestDistance ? option : nearest;
+  });
+}
+
 export type RumbleRevealResult =
   | { ok: true }
   | { ok: false; error: string };

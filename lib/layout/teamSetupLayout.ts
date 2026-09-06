@@ -35,7 +35,7 @@ export type TeamSetupClassicBodyLayout = {
      * `space-between` + flex side panels - not `center`, which inset cards from the frame.
      */
     justifyContent: 'space-between';
-    alignItems: 'center';
+    alignItems: 'stretch';
   };
 };
 
@@ -66,7 +66,7 @@ export function getTeamSetupClassicBodyLayout(options: {
       maxWidth: options.setupRowMaxWidth,
       alignSelf: 'center',
       justifyContent: 'space-between',
-      alignItems: 'center',
+      alignItems: 'stretch',
     },
   };
 }

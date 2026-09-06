@@ -8,12 +8,14 @@ import { SOFT_SURFACE_STYLES } from '@/features/play/styles/softSurface';
 import { isActiveMatchStep, routeForPlayStep } from '@/features/play/sessionRouting';
 import {
   QUICK_PLAY_TOPIC_OPTIONS,
+  getGameTokenCost,
   type QuickPlayTopicCount,
 } from '@/features/play/tokenCosts';
 import { useI18n } from '@/lib/i18n/useI18n';
 import { useDarkModeFlatTop } from '@/lib/hooks/useTheme';
 import { useViewportLayout } from '@/lib/hooks/useViewportLayout';
 import { usePlayStore } from '@/store/play';
+import { goBackOrReplace } from '@/lib/navigation/goBackOrReplace';
 import type { SupportedLocale } from '@/lib/i18n/config';
 import { PlayScaffold } from '@/features/play/components/PlayScaffold';
 import { getPlaySurfaceColors } from '@/features/play/playSurfaceColors';
@@ -133,15 +135,18 @@ export default function QuickLengthScreen() {
   const viewport = useViewportLayout();
   const { t, getTextStyle } = useI18n();
   const sessionStep = usePlayStore((state) => state.session?.step);
+  const sessionMode = usePlayStore((state) => state.session?.mode);
   const setQuickPlayTopicCount = usePlayStore((state) => state.setQuickPlayTopicCount);
+  const setTopicCount = usePlayStore((state) => state.setTopicCount);
   const isWeb = Platform.OS === 'web';
   const compact = viewport.height < 720;
   const setupMaxWidth = viewport.contentMaxWidth('setup');
   const tokensText = t('common.tokens');
   const tokenLabel = tokensText.toUpperCase();
+  const isRandomizerQp = sessionMode === 'random';
   const options = QUICK_PLAY_TOPIC_OPTIONS.map(({ topicCount, tokenCost }) => ({
     count: topicCount,
-    tokenCost,
+    tokenCost: isRandomizerQp ? getGameTokenCost('random', topicCount) : tokenCost,
     label: t(QUICK_LENGTH_LABEL_KEYS[topicCount]),
     copy: t(QUICK_LENGTH_COPY_KEYS[topicCount]),
   }));
@@ -156,28 +161,37 @@ export default function QuickLengthScreen() {
   }, [router, sessionStep]);
 
   const handleBack = useCallback(() => {
+    if (sessionMode === 'random') {
+      goBackOrReplace(router, '/play/team-setup');
+      return;
+    }
     if (router.canGoBack()) {
       router.back();
     } else {
       router.replace('/(app)/');
     }
-  }, [router]);
+  }, [router, sessionMode]);
 
   const handleSelect = useCallback(
     (count: number) => {
       if (isActiveMatchStep(sessionStep)) {
         return;
       }
+      if (sessionMode === 'random') {
+        setTopicCount(count);
+        goBackOrReplace(router, '/play/team-setup');
+        return;
+      }
       setQuickPlayTopicCount(count);
       router.push('/play/team-setup');
     },
-    [router, sessionStep, setQuickPlayTopicCount]
+    [router, sessionMode, sessionStep, setQuickPlayTopicCount, setTopicCount]
   );
 
   return (
     <PlayScaffold
-      title={t('play.quickLengthTitle')}
-      subtitle={t('play.quickLengthSubtitle')}
+      title={t(isRandomizerQp ? 'play.randomizerQuickPlayChoose' : 'play.quickLengthTitle')}
+      subtitle={isRandomizerQp ? undefined : t('play.quickLengthSubtitle')}
       onBack={handleBack}
       backVariant="icon"
       bodyFrame={false}

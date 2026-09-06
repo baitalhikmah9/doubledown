@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, type ReactNode } from 'react';
 import { Platform, View, StyleSheet, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { GameHeader, type GameHeaderTopPad } from '@/components/GameHeader';
@@ -23,6 +23,8 @@ export type PlayStackHeaderProps = {
   onBackPress?: () => void;
   /** Defaults to labeled play pill; use `icon` for settings/store squircle. */
   backVariant?: HeaderBackButtonVariant;
+  /** Extra control after the back button (e.g. Randomizer Quick Play). */
+  leadingExtra?: ReactNode;
   /**
    * Web: constrain header bar max-width so back / token chip edges align with
    * centered content cards (same value as the content row max-width).
@@ -45,6 +47,7 @@ export function PlayStackHeader({
   title,
   onBackPress,
   backVariant = 'labeled',
+  leadingExtra,
   barMaxWidth,
   topPad = 'standard',
 }: PlayStackHeaderProps) {
@@ -77,13 +80,16 @@ export function PlayStackHeader({
         topPad={topPad}
         barMaxWidthOverride={barMaxWidth}
         leftSlot={
-          <HeaderBackButton
-            onPress={handleBack}
-            direction={direction}
-            rowDirection={rowDir}
-            label={t('common.back')}
-            variant={backVariant}
-          />
+          <View style={[styles.leftCluster, { flexDirection: rowDir }]}>
+            <HeaderBackButton
+              onPress={handleBack}
+              direction={direction}
+              rowDirection={rowDir}
+              label={t('common.back')}
+              variant={backVariant}
+            />
+            {leadingExtra}
+          </View>
         }
         rightSlot={
           <HubTokenChip
@@ -104,5 +110,10 @@ export function PlayStackHeader({
 const styles = StyleSheet.create({
   wrapper: {
     marginBottom: SPACING.md,
+  },
+  leftCluster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
   },
 });

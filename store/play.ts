@@ -5,6 +5,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import {
   assignRandomQuestionOwners,
   buildBoard,
+  defaultTopicCountForMode,
   getBonusQuestion,
   getModeCategoryCount,
   getPlayableCategories,
@@ -20,6 +21,9 @@ import {
   getNextRumbleCheckpointSeconds,
   getRumbleElapsedSeconds,
   groupRumbleQuestionsByValueBucket,
+  isRumbleTeamCountAllowed,
+  rumbleQuestionsPerDifficulty,
+  snapRumbleTeamCount,
 } from '@/features/play/rumble';
 import type {
   AnswerReviewState,
@@ -61,25 +65,10 @@ const DEFAULT_BONUS: BonusChallengeState = {
   multiplier: 2,
 };
 
-const SUPPORTED_RUMBLE_TEAM_COUNTS = [2, 3, 4, 6] as const;
-const DEFAULT_RUMBLE_TEAM_COUNT = 2;
 const MAX_HOT_SEAT_ROUNDS = 5;
-const RUMBLE_QUESTIONS_PER_DIFFICULTY = 12;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
-}
-
-function isSupportedRumbleTeamCount(count: number): count is typeof SUPPORTED_RUMBLE_TEAM_COUNTS[number] {
-  return SUPPORTED_RUMBLE_TEAM_COUNTS.includes(count as typeof SUPPORTED_RUMBLE_TEAM_COUNTS[number]);
-}
-
-function getNearestSupportedRumbleTeamCount(count: number): number {
-  return SUPPORTED_RUMBLE_TEAM_COUNTS.reduce((nearest, option) => {
-    const nearestDistance = Math.abs(nearest - count);
-    const optionDistance = Math.abs(option - count);
-    return optionDistance <= nearestDistance ? option : nearest;
-  }, DEFAULT_RUMBLE_TEAM_COUNT);
 }
 
 function createDefaultTeam(index: number): TeamState {
@@ -102,13 +91,13 @@ function cloneTeam(team: TeamState, index: number): TeamState {
   };
 }
 
-function normalizeTeamsForMode(mode: GameMode, teams: TeamState[]): TeamState[] {
+function normalizeTeamsForMode(
+  mode: GameMode,
+  teams: TeamState[],
+  topicCount?: number
+): TeamState[] {
   const desiredCount =
-    mode === 'rumble'
-      ? isSupportedRumbleTeamCount(teams.length)
-        ? teams.length
-        : DEFAULT_RUMBLE_TEAM_COUNT
-      : 2;
+    mode === 'rumble' ? snapRumbleTeamCount(topicCount, teams.length) : 2;
   const normalized = (teams.length ? teams : DEFAULT_TEAMS)
     .slice(0, desiredCount)
     .map(cloneTeam);
@@ -141,7 +130,8 @@ function getDefaultConfig(
   teams: TeamState[] = DEFAULT_TEAMS,
   contentLocaleChain: SupportedLocale[] = ['en']
 ): GameConfig {
-  const normalizedTeams = normalizeTeamsForMode(mode, teams);
+  const topicCount = defaultTopicCountForMode(mode);
+  const normalizedTeams = normalizeTeamsForMode(mode, teams, topicCount);
   const teamConfigs: TeamConfig[] = normalizedTeams.map(({ id, name, playerNames }) => ({
     id,
     name,
@@ -153,7 +143,7 @@ function getDefaultConfig(
     teams: teamConfigs,
     categories: [],
     contentLocaleChain,
-    quickPlayTopicCount: normalizeQuickPlayTopicCount(3),
+    quickPlayTopicCount: defaultTopicCountForMode(mode),
     hotSeatEnabled: false,
     hotSeatRounds: 0,
     wagerEnabled: isWagerAvailable(mode),
@@ -273,7 +263,7 @@ function syncConfig(session: GameSessionState): GameConfig {
     teams: session.teams.map(({ id, name, playerNames }) => ({ id, name, playerNames })),
     categories: session.selectedCategoryIds,
     contentLocaleChain: session.contentLocaleChain,
-    quickPlayTopicCount: normalizeQuickPlayTopicCount(session.config.quickPlayTopicCount),
+    quickPlayTopicCount: getModeCategoryCount(session.mode, session.config.quickPlayTopicCount),
     wagerEnabled: isWagerAvailable(session.mode),
     wagersPerTeam: session.wagersPerTeam,
     entryTokenCharge: cfg.entryTokenCharge ?? 0,
@@ -399,21 +389,23 @@ function buildBalancedTeamSequence(teamIds: string[], repeats: number): string[]
   return shuffleItems(sequence);
 }
 
-function getRumbleValidationError(board: QuestionCard[], teamCount: number): string | null {
-  if (!isSupportedRumbleTeamCount(teamCount)) {
+function getRumbleValidationError(
+  board: QuestionCard[],
+  teamCount: number,
+  topicCount: number
+): string | null {
+  if (!isRumbleTeamCountAllowed(topicCount, teamCount)) {
     return 'Rumble supports 2, 3, 4, or 6 teams.';
   }
 
+  const expectedPerBucket = rumbleQuestionsPerDifficulty(topicCount);
   const byValueBucket = groupRumbleQuestionsByValueBucket(board);
   if (!byValueBucket) {
-    return 'Rumble requires exactly 12 questions in each 100, 200, and 300 value bucket.';
+    return `Rumble requires exactly ${expectedPerBucket} questions in each 100, 200, and 300 value bucket.`;
   }
 
   for (const questions of byValueBucket.values()) {
-    if (
-      questions.length !== RUMBLE_QUESTIONS_PER_DIFFICULTY ||
-      questions.length % teamCount !== 0
-    ) {
+    if (questions.length !== expectedPerBucket || questions.length % teamCount !== 0) {
       return 'Rumble questions cannot be balanced for this team count.';
     }
   }
@@ -423,9 +415,10 @@ function getRumbleValidationError(board: QuestionCard[], teamCount: number): str
 
 function assignRumbleQuestionParties(
   board: QuestionCard[],
-  teams: TeamState[]
+  teams: TeamState[],
+  topicCount: number
 ): { ok: true; board: QuestionCard[] } | { ok: false; error: string } {
-  const validationError = getRumbleValidationError(board, teams.length);
+  const validationError = getRumbleValidationError(board, teams.length, topicCount);
   if (validationError) return { ok: false, error: validationError };
 
   const teamIds = teams.map((team) => team.id);
@@ -433,7 +426,7 @@ function assignRumbleQuestionParties(
   if (!byValueBucket) {
     return {
       ok: false,
-      error: 'Rumble requires exactly 12 questions in each 100, 200, and 300 value bucket.',
+      error: `Rumble requires exactly ${rumbleQuestionsPerDifficulty(topicCount)} questions in each 100, 200, and 300 value bucket.`,
     };
   }
 
@@ -592,6 +585,7 @@ interface PlayStore {
   setMode: (mode: GameMode) => void;
   setTeamCount: (count: number) => void;
   setQuickPlayTopicCount: (count: number) => void;
+  setTopicCount: (count: number) => void;
   updateTeamName: (teamId: string, name: string) => void;
   addTeamMember: (teamId: string) => void;
   removeTeamMember: (teamId: string) => void;
@@ -735,7 +729,8 @@ function createPlayStore() {
         }
         set((current) => {
           const session = withFreshAvailableCategories(current.session ?? createDraftSession());
-          const teams = normalizeTeamsForMode(mode, session.teams);
+          const topicCount = defaultTopicCountForMode(mode);
+          const teams = normalizeTeamsForMode(mode, session.teams, topicCount);
           const nextStep = mode === 'quickPlay' ? 'quick-play-length' : 'team-setup';
           const nextSession: GameSessionState = {
             ...session,
@@ -755,6 +750,7 @@ function createPlayStore() {
               wagerEnabled: isWagerAvailable(mode),
               // Charge only when the board starts (topics chosen).
               entryTokenCharge: 0,
+              quickPlayTopicCount: topicCount,
             },
           });
           return { session: nextSession, entryReservationId: null };
@@ -765,7 +761,8 @@ function createPlayStore() {
       setMode: (mode) =>
         set((state) => {
           const session = withFreshAvailableCategories(state.session ?? createDraftSession());
-          const teams = normalizeTeamsForMode(mode, session.teams);
+          const topicCount = defaultTopicCountForMode(mode);
+          const teams = normalizeTeamsForMode(mode, session.teams, topicCount);
           const nextStep = mode === 'quickPlay' ? 'quick-play-length' : 'team-setup';
           const nextSession: GameSessionState = {
             ...session,
@@ -784,6 +781,7 @@ function createPlayStore() {
               mode,
               wagerEnabled: isWagerAvailable(mode),
               entryTokenCharge: 0,
+              quickPlayTopicCount: topicCount,
             },
           });
           return { session: nextSession };
@@ -793,8 +791,15 @@ function createPlayStore() {
         set((state) => {
           if (!state.session) return state;
 
-          const desiredCount =
-            state.session.mode === 'rumble' ? getNearestSupportedRumbleTeamCount(count) : 2;
+          if (state.session.mode === 'rumble') {
+            const topicCount = getModeCategoryCount(
+              'rumble',
+              state.session.config.quickPlayTopicCount
+            );
+            if (!isRumbleTeamCountAllowed(topicCount, count)) return state;
+          }
+
+          const desiredCount = state.session.mode === 'rumble' ? count : 2;
           const teams = state.session.teams.slice(0, desiredCount).map(cloneTeam);
 
           while (teams.length < desiredCount) {
@@ -814,7 +819,7 @@ function createPlayStore() {
         set((state) => {
           const base = withFreshAvailableCategories(state.session ?? createDraftSession());
           const quickPlayTopicCount = normalizeQuickPlayTopicCount(count);
-          const teams = normalizeTeamsForMode('quickPlay', base.teams);
+          const teams = normalizeTeamsForMode('quickPlay', base.teams, quickPlayTopicCount);
           const session: GameSessionState = {
             ...base,
             id: `play_${Date.now()}`,
@@ -831,6 +836,28 @@ function createPlayStore() {
           };
           session.config = syncConfig(session);
           return { session };
+        }),
+
+      setTopicCount: (count) =>
+        set((state) => {
+          const session = state.session;
+          if (!session || (session.mode !== 'random' && session.mode !== 'rumble')) {
+            return state;
+          }
+          const topicCount = getModeCategoryCount(session.mode, count);
+          const teams = normalizeTeamsForMode(session.mode, session.teams, topicCount);
+          const nextSession: GameSessionState = {
+            ...session,
+            selectedCategoryIds: [],
+            ...withScores(teams),
+            hotSeat: undefined,
+            config: {
+              ...session.config,
+              quickPlayTopicCount: topicCount,
+            },
+          };
+          nextSession.config = syncConfig(nextSession);
+          return { session: nextSession };
         }),
 
       updateTeamName: (teamId, name) =>
@@ -933,7 +960,7 @@ function createPlayStore() {
           if (!state.session) return state;
           const max = getModeCategoryCount(
             state.session.mode,
-            normalizeQuickPlayTopicCount(state.session.config.quickPlayTopicCount)
+            state.session.config.quickPlayTopicCount
           );
           const isSelected = state.session.selectedCategoryIds.includes(slug);
           const selectedCategoryIds = isSelected
@@ -966,27 +993,21 @@ function createPlayStore() {
         const state = get();
         const session = state.session;
         if (!session) return { ok: false, error: 'No session found.' };
-        const quickPlayTopicCount = normalizeQuickPlayTopicCount(
-          session.config.quickPlayTopicCount
-        );
-        const required = getModeCategoryCount(
-          session.mode,
-          quickPlayTopicCount
-        );
-        if (session.selectedCategoryIds.length !== required) {
-          return { ok: false, error: `Select ${required} topics to continue.` };
+        const topicCount = getModeCategoryCount(session.mode, session.config.quickPlayTopicCount);
+        if (session.selectedCategoryIds.length !== topicCount) {
+          return { ok: false, error: `Select ${topicCount} topics to continue.` };
         }
-        const tokenCost = getGameTokenCost(session.mode, quickPlayTopicCount);
+        const tokenCost = getGameTokenCost(session.mode, session.config.quickPlayTopicCount);
         const entryTokenCharge = session.config.entryTokenCharge ?? 0;
         const remainingTokenCost = Math.max(0, tokenCost - entryTokenCharge);
         const requiredBalance = isAuthDisabled() ? tokenCost : remainingTokenCost;
         if (state.tokens < requiredBalance) {
           return { ok: false, error: 'You need more tokens to start a new game.' };
         }
-        if (session.mode === 'rumble' && !isSupportedRumbleTeamCount(session.teams.length)) {
+        if (session.mode === 'rumble' && !isRumbleTeamCountAllowed(topicCount, session.teams.length)) {
           return { ok: false, error: 'Rumble supports 2, 3, 4, or 6 teams.' };
         }
-        const teams = normalizeTeamsForMode(session.mode, session.teams).map((team) => ({
+        const teams = normalizeTeamsForMode(session.mode, session.teams, topicCount).map((team) => ({
           ...team,
           score: 0,
           wagersUsed: 0,
@@ -997,7 +1018,9 @@ function createPlayStore() {
           new Set(state.askedCanonicalKeys)
         );
         const rumbleAssignment =
-          session.mode === 'rumble' ? assignRumbleQuestionParties(rawBoard, teams) : null;
+          session.mode === 'rumble'
+            ? assignRumbleQuestionParties(rawBoard, teams, topicCount)
+            : null;
         if (rumbleAssignment && !rumbleAssignment.ok) {
           return { ok: false, error: rumbleAssignment.error };
         }

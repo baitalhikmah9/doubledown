@@ -37,6 +37,7 @@ describe('getTeamSetupClassicBodyLayout', () => {
     expect(layout.webLandscapeRow.alignSelf).toBe('center');
     // Side cards pin to frame edges (align with header back / token chip).
     expect(layout.webLandscapeRow.justifyContent).toBe('space-between');
+    expect(layout.webLandscapeRow.alignItems).toBe('stretch');
   });
 
   it('keeps phone classic layout top-aligned and stretch', () => {

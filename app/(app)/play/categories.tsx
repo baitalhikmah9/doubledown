@@ -343,7 +343,7 @@ export default function CategorySelectionScreen() {
     // SAFETY: session.mode is always a GameMode from the play store.
     return getModeCategoryCount(
       session.mode as GameMode,
-      session.config.quickPlayTopicCount ?? 3
+      session.config.quickPlayTopicCount
     );
   }, [session]);
 

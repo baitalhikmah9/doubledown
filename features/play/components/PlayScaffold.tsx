@@ -39,6 +39,8 @@ interface PlayScaffoldProps {
   onBack?: () => void;
   /** Defaults to labeled play pill; use `icon` for settings/store squircle. */
   backVariant?: HeaderBackButtonVariant;
+  /** Extra control after the back button (e.g. Randomizer Quick Play). */
+  headerLeading?: ReactNode;
   showHud?: boolean;
   /** Tighter score strip (e.g. question board). */
   scoreHudDense?: boolean;
@@ -98,6 +100,7 @@ export function PlayScaffold({
   customHeader,
   onBack,
   backVariant,
+  headerLeading,
   showHud = false,
   scoreHudDense = false,
   session,
@@ -167,6 +170,7 @@ export function PlayScaffold({
           title={title}
           onBackPress={onBack}
           backVariant={backVariant}
+          leadingExtra={headerLeading}
           topPad={bodyEdgeToEdge ? 'none' : 'standard'}
         />
       )}

@@ -12,6 +12,7 @@ type PlayScaffoldProps = {
   customHeader?: React.ReactNode;
   onBack?: () => void;
   backVariant?: string;
+  headerLeading?: React.ReactNode;
   footer?: React.ReactNode;
   footerAboveBody?: boolean;
   testID?: string;
@@ -31,13 +32,14 @@ export function PlayScaffold({
   title,
   customHeader,
   onBack,
+  headerLeading,
   footer,
   footerAboveBody,
   testID,
 }: PlayScaffoldProps) {
   const header =
     customHeader ??
-    (onBack || title
+    (onBack || title || headerLeading
       ? React.createElement(
           View,
           { testID: 'play-scaffold-header' },
@@ -53,6 +55,7 @@ export function PlayScaffold({
                 React.createElement(Text, null, '←')
               )
             : null,
+          headerLeading,
           title
             ? React.createElement(Text, { accessibilityRole: 'header' }, title)
             : null

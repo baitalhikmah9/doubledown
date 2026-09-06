@@ -19,14 +19,24 @@ import { SHOW_HOT_SEAT_UI } from '@/constants/featureFlags';
 import { PlayScaffold } from '@/features/play/components/PlayScaffold';
 import { WagerInfoModal } from '@/features/play/components/WagerInfoModal';
 import { isActiveMatchStep, routeForPlayStep } from '@/features/play/sessionRouting';
+import {
+  RUMBLE_TEAM_COUNT_OPTIONS,
+  RUMBLE_TOPIC_COUNT_OPTIONS,
+  isRumbleTeamCountAllowed,
+  normalizeRumbleTopicCount,
+  type RumbleTopicCount,
+} from '@/features/play/rumble';
+import { getModeCategoryCount } from '@/features/play/data';
 import { SOFT_SURFACE_FACE, softSurfaceLift } from '@/features/play/styles/softSurface';
 import { useI18n } from '@/lib/i18n/useI18n';
+import { useDarkModeFlatTop } from '@/lib/hooks/useTheme';
 import { useViewportLayout } from '@/lib/hooks/useViewportLayout';
 import {
   getTeamSetupClassicBodyLayout,
   getWebTeamCardMinHeight,
 } from '@/lib/layout/teamSetupLayout';
 import { goBackOrReplace } from '@/lib/navigation/goBackOrReplace';
+import { getWebViewportScale } from '@/lib/layout/webViewportScale';
 import { usePlayStore } from '@/store/play';
 import { useThemeStore } from '@/store/theme';
 import type { GameSessionState } from '@/features/shared';
@@ -49,7 +59,11 @@ function neumorphicLift(
 const PLASTIC_FACE: ViewStyle = {
   ...SOFT_SURFACE_FACE,
 };
-const RUMBLE_TEAM_COUNT_OPTIONS = [2, 3, 4, 6] as const;
+const RUMBLE_TOPIC_LABEL_KEYS = {
+  3: 'play.rumbleTopicCount.3',
+  4: 'play.rumbleTopicCount.4',
+  6: 'play.rumbleTopicCount.6',
+} as const satisfies Record<RumbleTopicCount, string>;
 const MAX_WAGERS_PER_TEAM = 9;
 const MAX_HOT_SEAT_ROUNDS = 5;
 
@@ -80,6 +94,9 @@ function getRumbleTeamSetupDensity(windowWidth: number, windowHeight: number) {
     countSize: micro ? 36 : tight ? 40 : 44,
     countGap: micro ? SPACING.xs : tight ? SPACING.sm : SPACING.md,
     countFontSize: tight ? FONT_SIZES.sm : FONT_SIZES.md,
+    topicTabMinH: micro ? 32 : tight ? 36 : 40,
+    topicTabFontSize: micro ? FONT_SIZES.xs : tight ? FONT_SIZES.sm : FONT_SIZES.md,
+    topicTabGap: micro ? 6 : tight ? SPACING.xs : SPACING.sm,
     editIcon: micro ? 12 : tight ? 13 : 15,
     /** Air between name grid and count row (guide: generous). */
     nameToCountGap: micro ? SPACING.sm : tight ? SPACING.md : SPACING.lg,
@@ -123,6 +140,7 @@ export default function TeamSetupScreen() {
   const { getTextStyle, t } = useI18n();
   const paletteId = useThemeStore((state) => state.paletteId);
   const themedStyles = useMemo(() => makeThemedStyles(paletteId), [paletteId]);
+  const darkModeFlatTop = useDarkModeFlatTop();
   const [wagerInfoOpen, setWagerInfoOpen] = useState(false);
   const [hotSeatInfoOpen, setHotSeatInfoOpen] = useState(false);
 
@@ -133,6 +151,7 @@ export default function TeamSetupScreen() {
   const removeTeamMember = usePlayStore((state) => state.removeTeamMember);
   const updateTeamMemberName = usePlayStore((state) => state.updateTeamMemberName);
   const setTeamCount = usePlayStore((state) => state.setTeamCount);
+  const setTopicCount = usePlayStore((state) => state.setTopicCount);
   const setWagersPerTeam = usePlayStore((state) => state.setWagersPerTeam);
   const setHotSeatRounds = usePlayStore((state) => state.setHotSeatRounds);
 
@@ -169,6 +188,13 @@ export default function TeamSetupScreen() {
     session && SHOW_HOT_SEAT_UI && (session.mode === 'classic' || session.mode === 'quickPlay')
   );
   const rumbleMode = session?.mode === 'rumble';
+  const randomMode = session?.mode === 'random';
+  const rumbleTopicCount = rumbleMode
+    ? normalizeRumbleTopicCount(session?.config.quickPlayTopicCount)
+    : 6;
+  const randomizerQpActive =
+    Boolean(randomMode && session) &&
+    getModeCategoryCount('random', session?.config.quickPlayTopicCount) < 6;
   const hotSeatRounds = session ? hotSeatRoundsFromConfig(session.config) : 0;
 
   useLayoutEffect(() => {
@@ -187,6 +213,65 @@ export default function TeamSetupScreen() {
     () => getRumbleTeamSetupDensity(windowWidth, windowHeight),
     [windowWidth, windowHeight]
   );
+
+  const randomizerQuickPlayButton = useMemo(() => {
+    if (!randomMode) return null;
+    const chromeScale = Platform.OS === 'web' ? getWebViewportScale(windowWidth, windowHeight) : 1;
+    const chromeSize = Math.round(44 * chromeScale);
+    return (
+      <Pressable
+        testID="randomizer-quick-play"
+        onPress={() => router.push('/play/quick-length')}
+        style={({ pressed }) => [
+          styles.randomizerQpButton,
+          SOFT_SURFACE_FACE,
+          darkModeFlatTop,
+          softSurfaceLift(),
+          {
+            height: chromeSize,
+            borderRadius: Math.round(14 * chromeScale),
+            backgroundColor: randomizerQpActive ? T.textPrimary : T.surface,
+          },
+          {
+            opacity: pressed ? 0.9 : 1,
+            transform: pressed ? [{ scale: 0.98 }] : [{ scale: 1 }],
+          },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={t('play.randomizerQuickPlay')}
+        accessibilityState={{
+          selected: randomizerQpActive,
+        }}
+      >
+        <Text
+          style={[
+            styles.randomizerQpButtonText,
+            {
+              color: randomizerQpActive ? T.surface : T.textPrimary,
+              fontSize: shortScreen ? 18 : compact ? 20 : 22,
+            },
+            getTextStyle(undefined, 'display', 'center'),
+          ]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+        >
+          {t('play.randomizerQuickPlay')}
+        </Text>
+      </Pressable>
+    );
+  }, [
+    darkModeFlatTop,
+    compact,
+    getTextStyle,
+    randomMode,
+    randomizerQpActive,
+    router,
+    shortScreen,
+    t,
+    windowHeight,
+    windowWidth,
+  ]);
 
   const renderStepper = useCallback(
     (value: number, onMinus: () => void, onPlus: () => void, minusDisabled: boolean, plusDisabled: boolean) => (
@@ -333,7 +418,7 @@ export default function TeamSetupScreen() {
     if (!session || !rumbleMode) return null;
 
     const d = rumbleDensity;
-    /** Guide: 2–3 teams use a single column; 4+ use a 2-column grid (e.g. 2×2 for 4, 3×2 for 6). */
+    /** Guide: 2-3 teams use a single column; 4+ use a 2-column grid (e.g. 2x2 for 4, 3x2 for 6). */
     const stackNamesVertically = session.teams.length <= 3;
 
     return (
@@ -351,16 +436,47 @@ export default function TeamSetupScreen() {
           },
         ]}
       >
-        <Text
-          style={[
-            styles.rumbleCardHeading,
-            themedStyles.rumbleCardHeading,
-            { fontSize: d.cardHeadingSize },
-            getTextStyle(undefined, 'displayBold', 'center'),
-          ]}
-        >
-          {t('play.rumblePartyCountTitle').toUpperCase()}
-        </Text>
+        <View style={[styles.rumbleTopicTabRow, { gap: d.topicTabGap }]}>
+          {RUMBLE_TOPIC_COUNT_OPTIONS.map((count) => {
+            const selected = rumbleTopicCount === count;
+            return (
+              <Pressable
+                key={count}
+                onPress={() => setTopicCount(count)}
+                style={({ pressed }) => [
+                  styles.rumbleTopicTab,
+                  {
+                    minHeight: d.topicTabMinH,
+                    borderRadius: 14,
+                  },
+                  themedStyles.rumbleCountButton,
+                  selected && styles.rumbleCountButtonSelected,
+                  selected && themedStyles.rumbleCountButtonSelected,
+                  pressed && styles.rumbleCountButtonPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={t(RUMBLE_TOPIC_LABEL_KEYS[count])}
+                accessibilityState={{ selected }}
+              >
+                <Text
+                  style={[
+                    styles.rumbleTopicTabText,
+                    themedStyles.rumbleCountText,
+                    { fontSize: d.topicTabFontSize },
+                    selected && styles.rumbleCountTextSelected,
+                    selected && themedStyles.rumbleCountTextSelected,
+                    getTextStyle(undefined, 'displayBold', 'center'),
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                >
+                  {t(RUMBLE_TOPIC_LABEL_KEYS[count])}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
         <View
           style={[
@@ -407,44 +523,57 @@ export default function TeamSetupScreen() {
           ))}
         </View>
 
+        <Text
+          style={[
+            styles.rumbleCardHeading,
+            themedStyles.rumbleCardHeading,
+            { fontSize: d.cardHeadingSize },
+            getTextStyle(undefined, 'displayBold', 'center'),
+          ]}
+        >
+          {t('play.rumblePartyCountTitle').toUpperCase()}
+        </Text>
+
         <View
           style={[
             styles.rumblePanelCountRow,
             {
               gap: d.countGap,
-              paddingTop: tightContinueStrip ? SPACING.xs : d.nameToCountGap,
             },
           ]}
         >
           {RUMBLE_TEAM_COUNT_OPTIONS.map((count) => {
             const selected = session.teams.length === count;
+            const allowed = isRumbleTeamCountAllowed(rumbleTopicCount, count);
             return (
               <Pressable
                 key={count}
                 onPress={() => setTeamCount(count)}
+                disabled={!allowed}
                 style={({ pressed }) => [
                   styles.rumbleCountButton,
                   {
                     width: d.countSize,
                     height: d.countSize,
                     borderRadius: 14,
+                    opacity: allowed ? 1 : 0.35,
                   },
                   themedStyles.rumbleCountButton,
-                  selected && styles.rumbleCountButtonSelected,
-                  selected && themedStyles.rumbleCountButtonSelected,
-                  pressed && styles.rumbleCountButtonPressed,
+                  selected && allowed && styles.rumbleCountButtonSelected,
+                  selected && allowed && themedStyles.rumbleCountButtonSelected,
+                  pressed && allowed && styles.rumbleCountButtonPressed,
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel={`${count} teams`}
-                accessibilityState={{ selected }}
+                accessibilityState={{ selected, disabled: !allowed }}
               >
                 <Text
                   style={[
                     styles.rumbleCountText,
                     themedStyles.rumbleCountText,
                     { fontSize: d.countFontSize },
-                    selected && styles.rumbleCountTextSelected,
-                    selected && themedStyles.rumbleCountTextSelected,
+                    selected && allowed && styles.rumbleCountTextSelected,
+                    selected && allowed && themedStyles.rumbleCountTextSelected,
                     getTextStyle(undefined, 'displayBold', 'center'),
                   ]}
                 >
@@ -456,7 +585,7 @@ export default function TeamSetupScreen() {
         </View>
       </View>
     );
-  }, [rumbleDensity, session, rumbleMode, getTextStyle, setTeamCount, t, themedStyles, tightContinueStrip, updateTeamName]);
+  }, [rumbleDensity, rumbleTopicCount, session, rumbleMode, getTextStyle, setTeamCount, setTopicCount, t, themedStyles, tightContinueStrip, updateTeamName]);
 
   const centerColumn = useMemo(() => {
     if (!session) return null;
@@ -560,6 +689,38 @@ export default function TeamSetupScreen() {
     );
   }
 
+  const continueControls = (
+    <>
+      <Button
+        title={t('common.continue').toUpperCase()}
+        onPress={() => router.push('/play/categories')}
+        disabled={!canContinue}
+        style={StyleSheet.flatten([
+          styles.continueBtn,
+          themedStyles.continueBtn,
+          isWebLayout && styles.webContinueBtn,
+          !canContinue && { opacity: 0.5 },
+        ])}
+        textStyle={StyleSheet.flatten([
+          styles.continueBtnText,
+          themedStyles.continueBtnText,
+          getTextStyle(undefined, 'displayBold', 'center'),
+        ])}
+      />
+      {!canContinue && (
+        <Text
+          style={[
+            styles.footerHint,
+            { color: T.textMuted },
+            getTextStyle(undefined, 'body', 'center'),
+          ]}
+        >
+          {t('play.setupIncompleteHint') || 'Enter all names to continue'}
+        </Text>
+      )}
+    </>
+  );
+
   const teamSetupBody = rumbleMode ? (
     <ScrollView
       style={styles.rumbleScrollOuter}
@@ -598,30 +759,7 @@ export default function TeamSetupScreen() {
             </View>
             <View style={[styles.webCenterColumn, { minHeight: webTeamCardMinHeight }]}>
               {centerColumn}
-              <View style={styles.webContinueSection}>
-                <Button
-                  title={t('common.continue').toUpperCase()}
-                  onPress={() => router.push('/play/categories')}
-                  disabled={!canContinue}
-                  style={StyleSheet.flatten([styles.continueBtn, themedStyles.continueBtn, styles.webContinueBtn, !canContinue && { opacity: 0.5 }])}
-                  textStyle={StyleSheet.flatten([
-                    styles.continueBtnText,
-                    themedStyles.continueBtnText,
-                    getTextStyle(undefined, 'bodySemibold', 'center'),
-                  ])}
-                />
-                {!canContinue && (
-                  <Text
-                    style={[
-                      styles.footerHint,
-                      { color: T.textMuted },
-                      getTextStyle(undefined, 'body', 'center'),
-                    ]}
-                  >
-                    {t('play.setupIncompleteHint') || 'Enter all names to continue'}
-                  </Text>
-                )}
-              </View>
+              <View style={styles.columnContinue}>{continueControls}</View>
             </View>
             <View style={[styles.webTeamPanel, { minHeight: webTeamCardMinHeight }]}>
               {teamCard(session.teams[1])}
@@ -638,7 +776,10 @@ export default function TeamSetupScreen() {
             ]}
           >
             <View style={styles.teamCol}>{teamCard(session.teams[0])}</View>
-            <View style={styles.centerCol}>{centerColumn}</View>
+            <View style={styles.centerCol}>
+              {centerColumn}
+              <View style={styles.columnContinue}>{continueControls}</View>
+            </View>
             <View style={styles.teamCol}>{teamCard(session.teams[1])}</View>
           </View>
         )
@@ -659,9 +800,9 @@ export default function TeamSetupScreen() {
     </ScrollView>
   );
 
-  // Classic wide-web embeds Continue in the center column. Rumble (and non-web)
-  // use the floating strip - without this, rumble on desktop web has no CTA.
-  const showFloatingContinue = !isWebLayout || rumbleMode;
+  // Classic landscape pins Continue to the center column so its bottom matches the team cards.
+  // Rumble and portrait still use the floating strip.
+  const showFloatingContinue = rumbleMode || !landscape;
 
   const mainContent = (
     <View style={styles.fixedViewportLayout}>
@@ -672,28 +813,7 @@ export default function TeamSetupScreen() {
           testID="team-setup-continue-strip"
           style={[styles.floatingButtonWrap, tightContinueStrip && styles.floatingButtonWrapTight]}
         >
-          <Button
-            title={t('common.continue').toUpperCase()}
-            onPress={() => router.push('/play/categories')}
-            disabled={!canContinue}
-            style={StyleSheet.flatten([styles.continueBtn, themedStyles.continueBtn, !canContinue && { opacity: 0.5 }])}
-            textStyle={StyleSheet.flatten([
-              styles.continueBtnText,
-              themedStyles.continueBtnText,
-              getTextStyle(undefined, 'bodySemibold', 'center'),
-            ])}
-          />
-          {!canContinue && (
-            <Text
-              style={[
-                styles.footerHint,
-                { color: T.textMuted },
-                getTextStyle(undefined, 'body', 'center'),
-              ]}
-            >
-              {t('play.setupIncompleteHint') || 'Enter all names to continue'}
-            </Text>
-          )}
+          {continueControls}
         </View>
       )}
     </View>
@@ -704,6 +824,7 @@ export default function TeamSetupScreen() {
       title={t('play.teamSetupTitle')}
       onBack={handleBack}
       backVariant="icon"
+      headerLeading={randomizerQuickPlayButton}
       bodyScrollEnabled={false}
       bodyFrame={false}
       backgroundColor={T.canvas}
@@ -855,6 +976,7 @@ const styles = StyleSheet.create({
   landscapeRow: {
     flex: 1,
     flexDirection: 'row',
+    alignItems: 'stretch',
     gap: SPACING.md,
     minHeight: 0,
     minWidth: 0,
@@ -878,6 +1000,7 @@ const styles = StyleSheet.create({
     maxWidth: '28%',
     flexShrink: 0,
     minHeight: 0,
+    justifyContent: 'flex-start',
   },
   portraitColumn: {
     flex: 1,
@@ -970,6 +1093,37 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  rumbleTopicTabRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  rumbleTopicTab: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: SPACING.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(51,51,51,0.12)',
+  },
+  rumbleTopicTabText: {
+    color: T.textPrimary,
+    textAlign: 'center',
+  },
+  randomizerQpButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+  },
+  randomizerQpButtonText: {
+    fontFamily: FONTS.displayBold,
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    color: T.textPrimary,
   },
   rumbleScrollContent: {
     gap: SPACING.md,
@@ -1308,13 +1462,12 @@ const styles = StyleSheet.create({
     gap: 32,
     paddingTop: SPACING.md,
   },
-  /** Pinned to the bottom of the center column (aligned with Add Player on team cards). */
-  webContinueSection: {
+  /** Same baseline as team cards: no extra pad under Continue. */
+  columnContinue: {
     width: '100%',
     alignItems: 'center',
     gap: 4,
     marginTop: 'auto',
-    paddingBottom: SPACING.lg,
   },
   /** Slightly wider Continue button on web, matching the center column scale. */
   webContinueBtn: {
