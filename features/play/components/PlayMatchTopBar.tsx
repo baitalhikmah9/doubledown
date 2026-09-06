@@ -326,14 +326,14 @@ export function PlayMatchTopBar({
     const highlightTeamId = isRumble ? getLeadingTeamId(session.teams) : session.currentTeamId;
     const isActive = highlightTeamId === team.id;
     const teamCount = session.teams.length;
-    /** Six equal pills leave little room — prefer score digits over name width. */
+    /** Six equal pills leave little room, so prefer score digits over name width. */
     const ultraDense = teamCount >= 6;
     // With many equal-width pills, shrink the name before ellipsizing so labels stay readable.
     const nameMinFontScale = ultraDense ? 0.5 : teamCount >= 4 ? 0.65 : 0.75;
     // Score must never clip: allow aggressive shrink for multi-digit totals on 6-team boards.
     const scoreMinFontScale = ultraDense ? 0.42 : multiTeamDensePills ? 0.55 : 0.7;
 
-    const onFace = isActive ? surfaceColors.activeTurnOnFace : surfaceColors.textPrimary;
+    const onFace = surfaceColors.textPrimary;
     const nestedFill = isActive
       ? surfaceColors.activeTurnNestedFill
       : surfaceColors.subtleFill;
@@ -342,10 +342,11 @@ export function PlayMatchTopBar({
     return (
       <View
         key={team.id}
+        testID={`logo-score-pill-${team.id}`}
         style={[
           styles.logoScorePill,
           {
-            backgroundColor: isActive ? surfaceColors.activeTurnFace : surfaceColors.controlBackground,
+            backgroundColor: surfaceColors.controlBackground,
             borderColor: isActive ? FIRE.flame : surfaceColors.hairlineBorder,
             minWidth: m.minWidth > 0 ? m.minWidth : undefined,
             maxWidth: m.maxWidth >= 9999 ? undefined : m.maxWidth,
@@ -392,13 +393,12 @@ export function PlayMatchTopBar({
             style={[
               styles.logoScoreName,
               {
-                color: isActive ? surfaceColors.activeTurnOnFace : surfaceColors.textMuted,
+                color: surfaceColors.textMuted,
                 fontSize: m.nameFont,
                 lineHeight: Math.round(m.nameFont * 1.15),
                 maxWidth: isRumble || m.nameMaxWidth == null ? '100%' : m.nameMaxWidth,
                 width: isRumble ? '100%' : undefined,
               },
-              isActive && styles.logoScoreNameActive,
             ]}
             numberOfLines={1}
             adjustsFontSizeToFit
@@ -412,12 +412,11 @@ export function PlayMatchTopBar({
             style={[
               styles.logoScoreValue,
               {
-                color: isActive ? surfaceColors.activeTurnOnFace : surfaceColors.textPrimary,
+                color: surfaceColors.textPrimary,
                 fontSize: m.scoreFont,
                 lineHeight: Math.round(m.scoreFont * 1.15),
               },
               isRumble && styles.logoScoreValueRumble,
-              isActive && styles.logoScoreValueActive,
             ]}
             numberOfLines={1}
             adjustsFontSizeToFit
@@ -576,8 +575,8 @@ const styles = StyleSheet.create({
     overflow: 'visible',
   },
   /**
-   * Board score row: slight top pad for amber turn glow; no bottom pad —
-   * the topic grid owns equal top/bottom edge cream under the pills.
+   * Board score row: slight top pad for amber turn glow and no bottom pad.
+   * The topic grid owns equal top/bottom edge cream under the pills.
    */
   logoOnlyTopBarDense: {
     gap: 6,
@@ -638,7 +637,7 @@ const styles = StyleSheet.create({
   logoScoreSideRight: {
     alignItems: 'flex-end',
   },
-  /** Structural only — sizes come from getMatchScorePillMetrics. */
+  /** Structural only. Sizes come from getMatchScorePillMetrics. */
   logoScorePill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -689,9 +688,6 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.uiBold,
     textAlign: 'center',
   },
-  logoScoreNameActive: {
-    color: '#E8420C',
-  },
   logoScoreValue: {
     fontFamily: FONTS.displayBold,
     fontVariant: ['tabular-nums'],
@@ -703,9 +699,6 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
     flexShrink: 1,
   },
-  logoScoreValueActive: {
-    color: '#E8420C',
-  },
   teamScoreHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -714,7 +707,7 @@ const styles = StyleSheet.create({
   teamScoreHeaderRight: {
     justifyContent: 'flex-end',
   },
-  /** Structural only — padding/radius from getMatchScorePillMetrics. */
+  /** Structural only. Padding/radius come from getMatchScorePillMetrics. */
   headerScoreCard: {
     flexDirection: 'row',
     alignItems: 'center',

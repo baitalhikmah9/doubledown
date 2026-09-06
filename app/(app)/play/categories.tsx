@@ -17,7 +17,7 @@ import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeaderBackButton } from '@/components/HeaderBackButton';
-import { BREAKPOINTS, SPACING, FONTS, FONT_SIZES, BORDER_RADIUS } from '@/constants';
+import { BREAKPOINTS, SPACING, FONTS, FONT_SIZES, BORDER_RADIUS, HEADER } from '@/constants';
 import {
   getCategoryPictureSource,
   MISSING_CATEGORY_PICTURE_LABEL,
@@ -48,6 +48,7 @@ import { usePlayStore } from '@/store/play';
 import { useThemeStore } from '@/store/theme';
 import { useResponsivePlayFontSizes } from '@/utils/responsiveTypography';
 import { topicCardScreenPadding } from '@/lib/layout/viewportLayout';
+import { getWebViewportScale } from '@/lib/layout/webViewportScale';
 
 // ── Grid constants ──────────────────────────────────────────────────────
 
@@ -103,8 +104,8 @@ function buildCategoryListData(
   let offset = SPACING.xs;
 
   sections.forEach((section, sectionIndex) => {
-    // Clear break between sections (General Knowledge → History, etc.) —
-    // larger than the in-section row gap so groups don't read as one list.
+    // Clear break between sections (General Knowledge → History, etc.).
+    // This is larger than the in-section row gap so groups don't read as one list.
     const marginTop = sectionIndex > 0 ? gridGap * 2 + SPACING.xxl : 0;
     const sectionCols = Math.min(cols, section.categories.length);
     const sectionWidth = cardW * sectionCols + gridGap * Math.max(0, sectionCols - 1);
@@ -212,7 +213,7 @@ const CategoryCard = memo(function CategoryCard({
           // Keep border width constant so select/deselect never reflows image bounds
           // (Android expo-image blanks when parent layout thrashing or opacity changes).
           borderColor: selected ? selectedBorder : 'transparent',
-          // Android: never set opacity on an ancestor of expo-image — it blanks the bitmap.
+          // Android: never set opacity on an ancestor of expo-image because it blanks the bitmap.
           // Use scale for press, and a dim overlay for disabled (below).
           ...(isAndroid
             ? { opacity: 1 }
@@ -361,6 +362,9 @@ export default function CategorySelectionScreen() {
   const useWebLayout = isWeb && windowWidth >= BREAKPOINTS.wide;
   const isLandscape = windowWidth > windowHeight;
   const compactHeader = !useWebLayout && isLandscape;
+  const chromeScale = isWeb ? getWebViewportScale(windowWidth, windowHeight) : 1;
+  const chromeH = Math.round(44 * chromeScale);
+  const chromeRadius = Math.round(14 * chromeScale);
 
   const topicLayout = topicCardScreenPadding(
     windowWidth,
@@ -639,7 +643,13 @@ export default function CategorySelectionScreen() {
       chromeColumnStyle={compactHeader ? styles.compactChrome : undefined}
       customHeader={
         isLoading ? null : (
-          <View style={[styles.headerWrap, compactHeader && styles.headerWrapCompact]}>
+          <View
+            style={[
+              styles.headerWrap,
+              compactHeader && styles.headerWrapCompact,
+              { paddingBottom: Math.round(HEADER.bottomGap * chromeScale) },
+            ]}
+          >
             {/* Header row: back + counter | title | random button */}
             <View style={[styles.headerRow, compactHeader && styles.headerRowCompact]}>
               <View style={styles.headerLeft}>
@@ -658,7 +668,13 @@ export default function CategorySelectionScreen() {
                     SOFT_SURFACE_STYLES.face,
                     darkModeFlatTop,
                     SOFT_SURFACE_STYLES.raised,
-                    { backgroundColor: controlBackground },
+                    {
+                      backgroundColor: controlBackground,
+                      height: chromeH,
+                      minHeight: chromeH,
+                      minWidth: chromeH,
+                      borderRadius: chromeRadius,
+                    },
                   ]}
                 >
                   <Text
@@ -740,6 +756,9 @@ export default function CategorySelectionScreen() {
                     SOFT_SURFACE_STYLES.raised,
                     {
                       backgroundColor: controlBackground,
+                      height: chromeH,
+                      minHeight: chromeH,
+                      borderRadius: chromeRadius,
                       opacity: !canChooseRandom ? 0.45 : pressed ? 0.9 : 1,
                       transform: pressed && canChooseRandom ? [{ scale: 0.98 }] : [{ scale: 1 }],
                     },
@@ -779,12 +798,16 @@ export default function CategorySelectionScreen() {
               <View
                 style={[
                   styles.selectedStripContent,
-                  compactHeader && styles.selectedStripContentCompact,
-                  { gap: selectedPillGap },
+                  {
+                    gap: selectedPillGap,
+                    width: selectedStripInnerW,
+                    height: chromeH,
+                    alignSelf: 'center',
+                  },
                 ]}
               >
                 {selectedCategories.map((category) => (
-                  // Sibling press targets (not nested) — RN Web maps Pressable → <button>,
+                  // Sibling press targets are not nested. RN Web maps Pressable to <button>,
                   // and nested buttons are invalid HTML / console errors.
                   <View
                     key={category.slug}
@@ -795,6 +818,9 @@ export default function CategorySelectionScreen() {
                       {
                         backgroundColor: controlBackground,
                         width: selectedPillWidth,
+                        maxWidth: selectedPillWidth,
+                        height: chromeH,
+                        borderRadius: chromeRadius,
                       },
                       isVeryDense && styles.selectedPillVeryDense,
                     ]}
@@ -970,7 +996,7 @@ const styles = StyleSheet.create({
   headerWrap: {
     width: '100%',
     paddingTop: 0,
-    paddingBottom: 0,
+    paddingBottom: HEADER.bottomGap,
     gap: 0,
   },
   headerWrapCompact: {
@@ -1066,6 +1092,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: SPACING.md,
     borderRadius: BORDER_RADIUS.button,
+    overflow: 'hidden',
   },
   randomBtnLabel: {
     fontFamily: FONTS.uiSemibold,
@@ -1091,10 +1118,6 @@ const styles = StyleSheet.create({
     height: 44,
     minWidth: 0,
   },
-  selectedStripContentCompact: {
-    height: 36,
-    paddingHorizontal: 0,
-  },
   selectedTopicPill: {
     borderRadius: BORDER_RADIUS.button,
     // Equal left/right inset: text starts at 12, X ends at 12 (icon-sized control).
@@ -1105,11 +1128,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
     minWidth: 0,
+    flexGrow: 0,
     flexShrink: 0,
     overflow: 'hidden',
   },
   selectedTopicPillCompact: {
-    height: 36,
     paddingHorizontal: 10,
   },
   selectedPillVeryDense: {
@@ -1250,7 +1273,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 2,
   },
-  // Android-only dim when at topic cap — avoid parent opacity blanking expo-image.
+  // Android-only dim when at topic cap avoids parent opacity blanking expo-image.
   disabledDim: {
     ...StyleSheet.absoluteFillObject,
     opacity: 0.65,

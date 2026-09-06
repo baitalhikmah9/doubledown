@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
 
 import CategorySelectionScreen from '@/app/(app)/play/categories';
-import { PALETTES } from '@/constants/theme';
+import { HEADER, PALETTES } from '@/constants/theme';
 import { usePlayStore } from '@/store/play';
 import { useThemeStore } from '@/store/theme';
 import { router } from '../doubles/expoRouter';
@@ -22,6 +22,19 @@ function hasAbsolutePositionedAncestor(node: ReturnType<typeof screen.getByText>
   }
 
   return false;
+}
+
+/** Outer custom header wrap (back / title / random) above the topic grid. */
+function findHeaderWrapStyle(titleNode: ReturnType<typeof screen.getByText>) {
+  let current: ReturnType<typeof screen.getByText> | null = titleNode.parent;
+  while (current) {
+    const style = StyleSheet.flatten(current.props.style) ?? {};
+    if (style.width === '100%' && Object.prototype.hasOwnProperty.call(style, 'paddingBottom')) {
+      return style;
+    }
+    current = current.parent;
+  }
+  throw new Error('Choose Topics header wrap not found');
 }
 
 function getResolvedStyle(node: ReturnType<typeof screen.getByLabelText> | ReturnType<typeof screen.getByText>) {
@@ -64,7 +77,7 @@ function hasMinHeightZeroInAncestorChain(node: ReturnType<typeof screen.getByTex
 
 describe('CategorySelectionScreen', () => {
   beforeEach(async () => {
-    // Portrait phone: compact landscape mode shrinks selected pills to 36pt height.
+    // Phone layout; landscape uses the same 44pt header-chip height as back/random.
     __setWindowDimensions({
       width: 390,
       height: 844,
@@ -160,6 +173,34 @@ describe('CategorySelectionScreen', () => {
     render(<CategorySelectionScreen />);
 
     expect(hasAbsolutePositionedAncestor(screen.getByText('0/6'))).toBe(false);
+  });
+
+  it('keeps HEADER.bottomGap under the custom header before the topic grid', async () => {
+    render(<CategorySelectionScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('CHOOSE THE TOPICS')).toBeTruthy();
+    });
+
+    const headerStyle = findHeaderWrapStyle(screen.getByText('CHOOSE THE TOPICS'));
+    expect(headerStyle.paddingBottom).toBe(HEADER.bottomGap);
+  });
+
+  it('keeps HEADER.bottomGap under the custom header in landscape', async () => {
+    __setWindowDimensions({
+      width: 844,
+      height: 390,
+      scale: 2,
+      fontScale: 1,
+    });
+    render(<CategorySelectionScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('CHOOSE THE TOPICS')).toBeTruthy();
+    });
+
+    const headerStyle = findHeaderWrapStyle(screen.getByText('CHOOSE THE TOPICS'));
+    expect(headerStyle.paddingBottom).toBe(HEADER.bottomGap);
   });
 
   // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
@@ -290,8 +331,44 @@ describe('CategorySelectionScreen', () => {
 
     expect(Number.isFinite(firstPillStyle.width)).toBe(true);
     expect(firstPillStyle.width).toBe(secondPillStyle.width);
+    expect(firstPillStyle.maxWidth).toBe(firstPillStyle.width);
+    expect(secondPillStyle.maxWidth).toBe(secondPillStyle.width);
+    expect(firstPillStyle.height).toBe(secondPillStyle.height);
     // SAFETY: Test fixture / double boundary cast justified by controlled test setup.
     expect(firstPillStyle.width).toBeLessThan(onePillStyle.width as number);
+  });
+
+  it('keeps selected topic header chips the same height as back and random in landscape', () => {
+    __setWindowDimensions({
+      width: 844,
+      height: 390,
+      scale: 2,
+      fontScale: 1,
+    });
+    render(<CategorySelectionScreen />);
+
+    const category = usePlayStore.getState().session?.availableCategories[0];
+    expect(category).toBeDefined();
+    fireEvent.press(screen.getByLabelText(`Select ${category!.title}`));
+
+    const resolve = (node: ReturnType<typeof screen.getByLabelText>) => {
+      const styleProp = node.props.style;
+      return StyleSheet.flatten(
+        styleProp instanceof Function
+          ? styleProp({ pressed: false, hovered: false, focused: false })
+          : styleProp
+      );
+    };
+
+    const pillStyle = getResolvedStyle(
+      findSelectedPillChrome(screen.getByLabelText(`Jump to ${category!.title}`))
+    );
+    const backStyle = resolve(screen.getByLabelText('Back to team setup'));
+    const randomStyle = resolve(screen.getByLabelText('Choose a random topic'));
+
+    expect(pillStyle.height).toBe(44);
+    expect(backStyle.height).toBe(44);
+    expect(randomStyle.height).toBe(44);
   });
 
   it('vertically centers selected topic title and remove control inside each pill', () => {

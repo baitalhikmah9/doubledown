@@ -50,6 +50,40 @@ function createRumbleSession(teamNames: string[]): GameSessionState {
 }
 
 describe('PlayMatchTopBar rumble score cards', () => {
+  it('keeps the active card face while adding the turn outline', () => {
+    const session = createRumbleSession(['Alpha', 'Beta']);
+
+    render(
+      <PlayMatchTopBar
+        session={session}
+        onLogoPress={jest.fn()}
+        showTeamScores={false}
+        scorePillsNextToLogo
+      />
+    );
+
+    const activeStyle = StyleSheet.flatten(screen.getByTestId('logo-score-pill-team_1').props.style);
+    const inactiveStyle = StyleSheet.flatten(screen.getByTestId('logo-score-pill-team_2').props.style);
+
+    expect(activeStyle.backgroundColor).toBe(inactiveStyle.backgroundColor);
+    expect(activeStyle.borderColor).not.toBe(inactiveStyle.borderColor);
+    expect(StyleSheet.flatten(screen.getByText('Alpha').props.style).color).toBe(
+      StyleSheet.flatten(screen.getByText('Beta').props.style).color
+    );
+    expect(StyleSheet.flatten(screen.getByTestId('logo-score-value-team_1').props.style).color).toBe(
+      StyleSheet.flatten(screen.getByTestId('logo-score-value-team_2').props.style).color
+    );
+
+    const minusLabels = screen.getAllByText('−');
+    const plusLabels = screen.getAllByText('+');
+    expect(StyleSheet.flatten(minusLabels[0].props.style).color).toBe(
+      StyleSheet.flatten(minusLabels[1].props.style).color
+    );
+    expect(StyleSheet.flatten(plusLabels[0].props.style).color).toBe(
+      StyleSheet.flatten(plusLabels[1].props.style).color
+    );
+  });
+
   it('shows every team name without fixed max-width clipping for six rumble teams', () => {
     const teamNames = [
       'Alpha Squad',
