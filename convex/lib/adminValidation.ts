@@ -1,5 +1,5 @@
 import { isAffiliateEmail, normalizeAffiliateEmail } from './affiliateStats';
-import { DEFAULT_TOKEN_PRODUCTS } from './paymentCatalog';
+import { WEB_TOKEN_PRODUCTS } from './paymentCatalog';
 import { isUnlimitedUsageCap, isValidDiscountCodeFormat } from './promoRules';
 
 /**
@@ -114,7 +114,10 @@ export function derivePromoCodeStatus(
   return 'active';
 }
 
-const TOKEN_PRODUCT_KEYS = new Set(DEFAULT_TOKEN_PRODUCTS.map((product) => product.productKey));
+// Discount promos apply at the web checkout only, and the web storefront now
+// sells its own token packs. Valid product keys are therefore the web catalog
+// keys, not the native ones.
+const TOKEN_PRODUCT_KEYS = new Set(WEB_TOKEN_PRODUCTS.map((product) => product.productKey));
 
 export function isKnownTokenProductKey(productKey: string): boolean {
   return TOKEN_PRODUCT_KEYS.has(productKey);

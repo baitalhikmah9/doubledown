@@ -10,7 +10,7 @@
  */
 export const REVENUECAT_TEST_STORE_API_KEY = 'test_hbpxoGCDXRBRDjhBSdRMowxgIVL';
 
-/** Token consumable store product IDs (same identifier on iOS, Android, and web when using RevenueCat Billing cross-platform products). */
+/** Token consumable store product IDs for iOS App Store and Google Play. Web now sells its own token packs via RC Billing; those identifiers live in the web catalog (convex/lib/paymentCatalog). */
 export const REVENUECAT_TOKEN_PRODUCT_IDS = {
   tokens10: 'consumable',
   tokens20: 'consumable_2',

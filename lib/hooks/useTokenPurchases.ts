@@ -29,6 +29,8 @@ export interface TokenCatalogProduct {
   tokensGranted: number;
   iosProductId: string;
   androidProductId: string;
+  /** Web (RC Billing) product identifier for the web catalog rows. */
+  webProductId?: string;
   sortOrder: number;
 }
 
@@ -133,7 +135,7 @@ export function useTokenPurchases({ catalog, enabled }: UseTokenPurchasesOptions
 
       const isWeb = isWebBillingSupported();
       const productId = isWeb
-        ? catalogProduct.androidProductId
+        ? (catalogProduct.webProductId || catalogProduct.androidProductId)
         : Platform.OS === 'ios'
           ? catalogProduct.iosProductId
           : catalogProduct.androidProductId;
@@ -163,7 +165,7 @@ export function useTokenPurchases({ catalog, enabled }: UseTokenPurchasesOptions
         if (isWeb) {
           const realTransactionId = purchaseResult.transactionId?.trim() ?? null;
           if (!realTransactionId) {
-            // No transaction id yet — grant will come from the RC webhook.
+            // No transaction id yet; the grant comes from the RC webhook.
             return {
               ...purchaseResult,
               transactionId: null,

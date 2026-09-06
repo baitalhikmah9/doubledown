@@ -14,6 +14,7 @@ import { grantConsumablePurchase } from './lib/grantConsumablePurchase';
 import {
   DEFAULT_TOKEN_PRODUCTS,
   findTokenProductByStoreProductId,
+  WEB_TOKEN_PRODUCTS,
 } from './lib/paymentCatalog';
 import { getCurrentUser, requireUser } from './lib/auth';
 import {
@@ -48,7 +49,9 @@ function asStringArray(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
 
-async function listTokenProducts(ctx: QueryCtx | MutationCtx) {
+async function listNativeTokenProducts(ctx: QueryCtx | MutationCtx) {
+  // Native catalog: stored token_products rows (native packs) win, otherwise
+  // fall back to the repo defaults.
   const stored = await ctx.db.query('token_products').withIndex('by_sort_order').collect();
   if (stored.length > 0) {
     return stored.sort((a, b) => a.sortOrder - b.sortOrder);
@@ -61,6 +64,25 @@ async function listTokenProducts(ctx: QueryCtx | MutationCtx) {
     createdAt: 0,
     updatedAt: 0,
   }));
+}
+
+async function listWebTokenProducts() {
+  // Web catalog is code-owned; web rows are never stored in token_products,
+  // so web always sees the current repo web defaults.
+  return WEB_TOKEN_PRODUCTS.map((product) => ({
+    ...product,
+    _id: undefined,
+    _creationTime: 0,
+    createdAt: 0,
+    updatedAt: 0,
+  }));
+}
+
+/** Both product lines, used for purchase/webhook lookups across stores. */
+async function listAllTokenProducts(ctx: QueryCtx | MutationCtx) {
+  const native = await listNativeTokenProducts(ctx);
+  const web = await listWebTokenProducts();
+  return [...native, ...web];
 }
 
 async function findMatchingPurchaserAccount(
@@ -232,9 +254,18 @@ export const ensurePurchaserAccount = mutation({
 });
 
 export const getCatalog = query({
-  args: {},
-  handler: async (ctx) => {
-    const products = await listTokenProducts(ctx);
+  args: {
+    // Old clients omit the platform and get the native catalog, which keeps
+    // pre-web-catalog app builds on their original packs.
+    platform: v.optional(v.union(v.literal('ios'), v.literal('android'), v.literal('web'))),
+  },
+  handler: async (ctx, args) => {
+    // Web storefront shows only the web catalog; iOS/Android (and legacy
+    // clients that send no platform) keep the native catalog.
+    const products =
+      args.platform === 'web'
+        ? await listWebTokenProducts()
+        : await listNativeTokenProducts(ctx);
     return products
       .filter((product) => product.isActive)
       .map((product) => ({
@@ -242,6 +273,7 @@ export const getCatalog = query({
         tokensGranted: product.tokensGranted,
         iosProductId: product.iosProductId,
         androidProductId: product.androidProductId,
+        webProductId: (product as { webProductId?: string }).webProductId,
         isActive: product.isActive,
         sortOrder: product.sortOrder,
       }));
@@ -307,7 +339,7 @@ export const syncConsumablePurchase = mutation({
           ? purchaserAccount.appUserId
           : (canonical?.appUserId ?? purchaserAccount.appUserId);
 
-    const products = await listTokenProducts(ctx);
+    const products = await listAllTokenProducts(ctx);
     const product = findTokenProductByStoreProductId(products, args.store, args.productId);
     if (!product) {
       throw new Error('invalid_product');
@@ -507,7 +539,7 @@ export const processRevenueCatWebhook = internalMutation({
         return await markWebhook('failed', 'missing_purchase_fields');
       }
 
-      const products = await listTokenProducts(ctx);
+      const products = await listAllTokenProducts(ctx);
       const product = findTokenProductByStoreProductId(products, store, productId);
       if (!product) {
         return await markWebhook('failed', 'invalid_product');

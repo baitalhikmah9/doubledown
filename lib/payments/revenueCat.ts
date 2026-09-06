@@ -196,17 +196,18 @@ export function getPaymentStoreForPurchase(): 'app_store' | 'play_store' | 'web_
 /**
  * Platform-specific product IDs for the given catalog product IDs.
  *
- * Web uses the SAME product identifiers as Android (`consumable`, …) under
- * RevenueCat Billing, so no separate `webProductId` is needed.
+ * Native platforms resolve their ios/android ids; web resolves the web
+ * catalog's RC Billing ids (rows that carry a webProductId). Native rows are
+ * excluded on web because their ids are empty for the web fields, and web
+ * rows are excluded on native for the same reason.
  */
 export function resolvePlatformProductIds(
-  productIds: { iosProductId: string; androidProductId: string }[]
+  productIds: { iosProductId: string; androidProductId: string; webProductId?: string }[]
 ): string[] {
   if (!isRevenueCatSupported()) return [];
   if (Platform.OS === 'ios') return productIds.map((p) => p.iosProductId).filter(Boolean) as string[];
   if (Platform.OS === 'android') return productIds.map((p) => p.androidProductId).filter(Boolean) as string[];
-  // Web uses RC Billing with the same product ids as Android.
-  if (Platform.OS === 'web') return productIds.map((p) => p.androidProductId).filter(Boolean) as string[];
+  if (Platform.OS === 'web') return productIds.map((p) => p.webProductId).filter(Boolean) as string[];
   return [];
 }
 

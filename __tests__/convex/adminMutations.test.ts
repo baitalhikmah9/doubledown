@@ -206,7 +206,7 @@ describe('createPromoCode affiliate and discount', () => {
       mode: 'public_multi_use',
       rewardType: 'discount',
       discountPercent: 10,
-      productKey: 'bundle_50',
+      productKey: 'web_bundle_100',
       affiliateEmail: '  Creator@Example.com ',
       commissionPercent: 10,
     });
@@ -218,7 +218,7 @@ describe('createPromoCode affiliate and discount', () => {
         rewardAmount: 0,
         usageCap: 0,
         discountPercent: 10,
-        productKey: 'bundle_50',
+        productKey: 'web_bundle_100',
         affiliateEmail: 'creator@example.com',
         commissionPercent: 10,
         activeTo: undefined,
@@ -236,7 +236,7 @@ describe('createPromoCode affiliate and discount', () => {
         mode: 'public_multi_use',
         rewardType: 'discount',
         discountPercent: 20,
-        productKey: 'bundle_100',
+        productKey: 'web_bundle_5',
       })
     ).rejects.toThrow('product_key_invalid');
     expect(ctx.db.insert).not.toHaveBeenCalled();

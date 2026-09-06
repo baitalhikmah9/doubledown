@@ -230,8 +230,11 @@ export default function StoreScreen() {
   // Local play store (fallback token display).
   const localTokens = usePlayStore((state) => state.tokens);
 
-  // Convex queries.
-  const catalog = useQuery(api.payments.getCatalog);
+  // Convex queries. The web storefront requests the web catalog; native
+  // requests the native one (old clients that omit the argument get native).
+  const catalog = useQuery(api.payments.getCatalog, {
+    platform: Platform.OS === 'web' ? 'web' : Platform.OS === 'ios' ? 'ios' : 'android',
+  });
   const balanceData = useQuery(api.wallet.getBalance, {});
 
   // Promo redemption + discount validation (unified single coupon box).
@@ -257,6 +260,7 @@ export default function StoreScreen() {
       tokensGranted: p.tokensGranted,
       iosProductId: p.iosProductId,
       androidProductId: p.androidProductId,
+      webProductId: p.webProductId,
       sortOrder: p.sortOrder,
     }));
   }, [catalog]);
@@ -372,11 +376,12 @@ export default function StoreScreen() {
           discountPercent: result.discountPercent,
           expiresAt: result.expiresAt,
         });
+        const discountTokens =
+          catalogProducts?.find((p) => p.productKey === result.productKey)?.tokensGranted;
+        const discountBundleLabel =
+          discountTokens != null ? `${discountTokens}-token` : result.productKey;
         setCouponSuccess(
-          `${result.discountPercent}% off ready for the ${result.productKey.replace(
-            'bundle_',
-            ''
-          )}-token bundle. Tap BUY on that bundle; the discount is applied at checkout and you will see the final price before paying.`
+          `${result.discountPercent}% off ready for the ${discountBundleLabel} bundle. Tap BUY on that bundle; the discount is applied at checkout and you will see the final price before paying.`
         );
       }
     } catch (error) {
@@ -390,7 +395,7 @@ export default function StoreScreen() {
     } finally {
       setIsApplyingCoupon(false);
     }
-  }, [couponCodeInput, isApplyingCoupon, isSignedIn, applyPromoCode, router, t]);
+  }, [couponCodeInput, isApplyingCoupon, isSignedIn, applyPromoCode, router, t, catalogProducts]);
 
   const onBuyBundle = useCallback(
     async (bundle: DisplayBundle) => {
@@ -800,7 +805,7 @@ const styles = StyleSheet.create({
     minHeight: Platform.OS === 'web' ? 64 : 56,
   },
   headerSide: {
-    // Grow with content (token chip) — fixed width was clipping larger balances.
+    // Grow with content (token chip); a fixed width was clipping larger balances.
     zIndex: 2,
     minWidth: 44,
     flexShrink: 0,
@@ -810,7 +815,7 @@ const styles = StyleSheet.create({
   headerSideRight: {
     alignItems: 'flex-end',
   },
-  // True geometric center of the frame — aligns with the middle (30) token card.
+  // True geometric center of the frame, aligning with the middle (30) token card.
   headerCenter: {
     position: 'absolute',
     left: 0,

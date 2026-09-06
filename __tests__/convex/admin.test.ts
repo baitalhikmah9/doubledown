@@ -262,7 +262,7 @@ describe('adminValidation', () => {
           usageCap: 0,
           rewardType: 'discount',
           discountPercent: 20,
-          productKey: 'bundle_50',
+          productKey: 'web_bundle_100',
         })
       ).toEqual({ ok: true });
     });
@@ -276,7 +276,7 @@ describe('adminValidation', () => {
           usageCap: 0,
           rewardType: 'discount',
           discountPercent: 20,
-          productKey: 'bundle_100',
+          productKey: 'web_bundle_5',
         })
       ).toEqual({ ok: false, reason: 'product_key_invalid' });
     });
@@ -290,7 +290,7 @@ describe('adminValidation', () => {
           usageCap: 0,
           rewardType: 'discount',
           discountPercent: 20,
-          productKey: 'bundle_50',
+          productKey: 'web_bundle_100',
         })
       ).toEqual({ ok: false, reason: 'discount_code_format_invalid' });
     });
@@ -304,7 +304,7 @@ describe('adminValidation', () => {
           usageCap: 0,
           rewardType: 'discount',
           discountPercent: 10,
-          productKey: 'bundle_50',
+          productKey: 'web_bundle_100',
           affiliateEmail: 'creator@example.com',
         })
       ).toEqual({ ok: false, reason: 'commission_percent_invalid' });
@@ -319,7 +319,7 @@ describe('adminValidation', () => {
           usageCap: 0,
           rewardType: 'discount',
           discountPercent: 10,
-          productKey: 'bundle_50',
+          productKey: 'web_bundle_100',
           affiliateEmail: '  Creator@Example.com ',
           commissionPercent: 10,
         })

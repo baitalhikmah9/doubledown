@@ -13,6 +13,7 @@ import {
   isPurchaseCancelledError,
   logOutRevenueCat,
   normalizeCustomerInfo,
+  resolvePlatformProductIds,
   shouldUseRevenueCatTestStore,
   STORE_PRODUCTS_UNAVAILABLE_ERROR,
 } from '@/lib/payments/revenueCat';
@@ -229,11 +230,47 @@ describe('revenueCat helpers', () => {
       EXPO_PUBLIC_REVENUECAT_USE_PRODUCTION_STORE: undefined,
     });
 
-    // Web bypasses native Test Store selection — the configured rcb_ key is
+    // Web bypasses native Test Store selection; the configured rcb_ key is
     // returned directly (RC Test Store keys are not valid for purchases-js).
     expect(shouldUseRevenueCatTestStore()).toBe(false);
     expect(getRevenueCatApiKey()).toBe('rcb_live_key');
     expect(getPaymentStoreForPurchase()).toBe('web_store');
+  });
+
+  it('resolves native product ids on iOS and Android only from native rows', () => {
+    const rows = [
+      { iosProductId: 'consumable', androidProductId: 'consumable', webProductId: undefined },
+      { iosProductId: '', androidProductId: '', webProductId: 'consumable_v2_10' },
+    ];
+    // SAFETY: Controlled test fixture boundary cast.
+    (Platform as { OS: string }).OS = 'ios';
+    expect(resolvePlatformProductIds(rows)).toEqual(['consumable']);
+
+    // SAFETY: Controlled test fixture boundary cast.
+    (Platform as { OS: string }).OS = 'android';
+    expect(resolvePlatformProductIds(rows)).toEqual(['consumable']);
+  });
+
+  it('resolves web RC Billing ids on web from web rows only', () => {
+    const rows = [
+      { iosProductId: 'consumable', androidProductId: 'consumable', webProductId: undefined },
+      { iosProductId: 'consumable_2', androidProductId: 'consumable_2', webProductId: undefined },
+      { iosProductId: '', androidProductId: '', webProductId: 'consumable_v2_10' },
+      { iosProductId: '', androidProductId: '', webProductId: 'consumable_v2_100' },
+    ];
+    // SAFETY: Controlled test fixture boundary cast.
+    (Platform as { OS: string }).OS = 'web';
+    setRevenueCatEnv({
+      EXPO_PUBLIC_REVENUECAT_IOS_API_KEY: undefined,
+      EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY: undefined,
+      EXPO_PUBLIC_REVENUECAT_WEB_API_KEY: 'rcb_live_key',
+      EXPO_PUBLIC_REVENUECAT_USE_TEST_STORE: undefined,
+      EXPO_PUBLIC_REVENUECAT_USE_PRODUCTION_STORE: undefined,
+    });
+    expect(resolvePlatformProductIds(rows)).toEqual([
+      'consumable_v2_10',
+      'consumable_v2_100',
+    ]);
   });
 
   it('clears local session state without requiring the native SDK', () => {

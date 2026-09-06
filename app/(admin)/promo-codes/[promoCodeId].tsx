@@ -11,6 +11,7 @@ import { AdminStatusBadge } from '@/components/admin/AdminStatusBadge';
 import { ADMIN_THEME } from '@/constants/adminTheme';
 import { FONTS } from '@/constants/theme';
 import { isUnlimitedUsageCap } from '@/convex/lib/promoRules';
+import { tokenProductKeyLabel } from '@/convex/lib/paymentCatalog';
 
 type RedemptionRow = {
   redemption: { _id: string; userId: string; redeemedAt: number };
@@ -285,7 +286,7 @@ export default function PromoCodeDetailScreen() {
             label={promoCode.rewardType === 'discount' ? 'Discount' : 'Reward Amount'}
             value={
               promoCode.rewardType === 'discount'
-                ? `${promoCode.discountPercent ?? 0}% off ${promoCode.productKey ?? 'bundle'}`
+                ? `${promoCode.discountPercent ?? 0}% off ${tokenProductKeyLabel(promoCode.productKey ?? 'bundle')}`
                 : `${promoCode.rewardAmount} tokens`
             }
           />

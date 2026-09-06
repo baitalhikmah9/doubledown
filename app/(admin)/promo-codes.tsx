@@ -20,7 +20,7 @@ import { AdminStatusBadge } from '@/components/admin/AdminStatusBadge';
 import PromoModeDropdown from '@/components/admin/PromoModeDropdown';
 import { ADMIN_THEME } from '@/constants/adminTheme';
 import { FONTS } from '@/constants/theme';
-import { DEFAULT_TOKEN_PRODUCTS } from '@/convex/lib/paymentCatalog';
+import { tokenProductKeyLabel, WEB_TOKEN_PRODUCTS } from '@/convex/lib/paymentCatalog';
 import { generatePromoCode, isUnlimitedUsageCap } from '@/convex/lib/promoRules';
 import { adminHref } from '@/lib/admin/shell';
 
@@ -68,7 +68,9 @@ const REWARD_TYPES = [
 
 type RewardType = (typeof REWARD_TYPES)[number]['value'];
 
-const BUNDLE_OPTIONS = DEFAULT_TOKEN_PRODUCTS.map((product) => ({
+// Discount promos apply at the web checkout, which now sells its own web
+// catalog. The selectable bundles are the web packs.
+const BUNDLE_OPTIONS = WEB_TOKEN_PRODUCTS.map((product) => ({
   value: product.productKey,
   label: `${product.tokensGranted}-token bundle`,
 }));
@@ -125,7 +127,7 @@ export default function PromoCodesScreen() {
   const [rewardType, setRewardType] = useState<RewardType>('tokens');
   const [rewardAmount, setRewardAmount] = useState('');
   const [discountPercent, setDiscountPercent] = useState('');
-  const [productKey, setProductKey] = useState(DEFAULT_TOKEN_PRODUCTS[0]?.productKey ?? 'bundle_10');
+  const [productKey, setProductKey] = useState(WEB_TOKEN_PRODUCTS[0]?.productKey ?? 'web_bundle_10');
   const [usageCap, setUsageCap] = useState('');
   const [unlimited, setUnlimited] = useState(false);
   const [affiliatePreset, setAffiliatePreset] = useState(false);
@@ -259,7 +261,7 @@ export default function PromoCodesScreen() {
       setRewardType('tokens');
       setRewardAmount('');
       setDiscountPercent('');
-      setProductKey(DEFAULT_TOKEN_PRODUCTS[0]?.productKey ?? 'bundle_10');
+      setProductKey(WEB_TOKEN_PRODUCTS[0]?.productKey ?? 'web_bundle_10');
       setUsageCap('');
       setUnlimited(false);
       setAffiliatePreset(false);
@@ -288,7 +290,7 @@ export default function PromoCodesScreen() {
       align: 'center',
       render: (promo) =>
         promo.rewardType === 'discount'
-          ? `${promo.discountPercent ?? 0}% off ${promo.productKey ?? 'bundle'}`
+          ? `${promo.discountPercent ?? 0}% off ${tokenProductKeyLabel(promo.productKey ?? 'bundle')}`
           : `${promo.rewardAmount} tokens`,
     },
     {

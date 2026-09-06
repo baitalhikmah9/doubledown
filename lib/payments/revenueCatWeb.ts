@@ -3,13 +3,13 @@
  *
  * Uses `@revenuecat/purchases-js` directly (named exports `Purchases` and
  * `LogLevel`). On native platforms the RN SDK (`react-native-purchases`) is
- * used instead — see `revenueCat.ts`. This module is only imported on web so
+ * used instead; see `revenueCat.ts`. This module is only imported on web so
  * the web SDK never loads in native bundles.
  *
- * Product strategy: web uses RevenueCat Billing (Stripe gateway) with the SAME
- * product identifiers as iOS/Android (`consumable`, `consumable_2`, …). RC
- * Billing supports repeated consumable purchases, unlike raw Stripe Billing.
- * No separate `webProductId` is needed.
+ * Product strategy: web uses RevenueCat Billing (Stripe gateway) with its own
+ * catalog of consumables (`consumable_v2_10`, …). RC Billing supports repeated
+ * consumable purchases, unlike raw Stripe Billing. The web product ids come
+ * from the web catalog rows' `webProductId`, not from the iOS/Android ids.
  *
  * Keys are read from `EXPO_PUBLIC_REVENUECAT_WEB_API_KEY` (env only, never
  * committed; prefix `rcb_` for live, `rcb_sb_` for sandbox). Mark the Vercel
@@ -171,7 +171,7 @@ export function normalizeWebCustomerInfo(customerInfo: unknown): CustomerInfoSna
  * (including logout → login) call `instance.changeUser(appUserId)`, the
  * documented method for switching known users (unlike the experimental
  * `identifyUser`, which aliases anonymous IDs). If the API key differs from
- * the one the singleton was built with, we throw — the SDK static singleton
+ * the one the singleton was built with, we throw; the SDK static singleton
  * cannot be safely reconfigured in-page, so a reload is required.
  */
 export async function configureWebRevenueCat(appUserId: string): Promise<WebPurchasesInstance> {
@@ -199,7 +199,7 @@ export async function configureWebRevenueCat(appUserId: string): Promise<WebPurc
     return instance;
   }
 
-  // API key differs from the configured singleton — cannot reconfigure in-page.
+  // API key differs from the configured singleton; cannot reconfigure in-page.
   if (instance && configuredApiKey !== apiKey) {
     throw new Error(
       'RevenueCat Web Billing API key changed after configuration. A page reload is required.'
@@ -237,9 +237,9 @@ export function clearWebRevenueCatConfig(): void {
 }
 
 /**
- * Fetch web store products by RC product id. Web uses the SAME product
- * identifiers as iOS/Android (`consumable`, `consumable_2`, …) under RC
- * Billing, so callers pass the native product ids directly.
+ * Fetch web store products by RC Billing product id. The web storefront has
+ * its own catalog, so callers pass the web catalog `webProductId` values
+ * (e.g. `consumable_v2_10`), which must exist in an RC Billing offering.
  */
 export async function getWebStoreProducts(
   productIds: string[]

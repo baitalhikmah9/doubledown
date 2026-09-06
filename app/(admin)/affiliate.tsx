@@ -5,6 +5,7 @@ import { AdminScreenHeader } from '@/components/admin/AdminScreenHeader';
 import { AdminCard, AdminCardTitle } from '@/components/admin/AdminCard';
 import { ADMIN_THEME } from '@/constants/adminTheme';
 import { FONTS } from '@/constants/theme';
+import { tokenProductKeyLabel } from '@/convex/lib/paymentCatalog';
 
 function formatMoney(micros: number, currencyCode: string) {
   return `${(micros / 1_000_000).toFixed(2)} ${currencyCode}`;
@@ -39,7 +40,7 @@ export default function AffiliateDashboardScreen() {
               {item.rewardType === 'discount' && item.discountPercent !== null ? (
                 <Stat
                   label="Discount"
-                  value={`${item.discountPercent}% off ${item.productKey ?? 'bundle'}`}
+                  value={`${item.discountPercent}% off ${tokenProductKeyLabel(item.productKey ?? 'bundle')}`}
                 />
               ) : (
                 <Stat label="Type" value="Free tokens" />
