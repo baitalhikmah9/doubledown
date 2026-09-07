@@ -12,7 +12,7 @@
     "build:web": "expo export --platform web",
     "vercel-build": "bun run build:web",
     "guard:clerk-sso": "jest __tests__/lib/clerkNativeSsoContract.test.ts --runInBand",
-    "build:android:prod": "bash -lc 'bun run guard:clerk-sso && set -a && source .env.production && set +a && export GRADLE_USER_HOME=\"$HOME/.gradle\" && export ANDROID_HOME=\"$HOME/Library/Android/sdk\" && export ANDROID_SDK_ROOT=\"$HOME/Library/Android/sdk\" && eas build --platform android --profile production --local'",
+    "build:android:prod": "bash -lc 'bun run guard:clerk-sso && set -a && source .env.production && set +a && export GRADLE_USER_HOME=\"$HOME/.gradle\" && export ANDROID_HOME=\"/Volumes/Mikhail Seagate 2TB SSD/AndroidDev/sdk\" && export ANDROID_SDK_ROOT=\"/Volumes/Mikhail Seagate 2TB SSD/AndroidDev/sdk\" && eas build --platform android --profile production --local'",
     "build:ios:prod": "bash -lc 'bun run guard:clerk-sso && bash scripts/build-ios-prod.sh'",
     "test": "jest",
     "test:watch": "jest --watch",
