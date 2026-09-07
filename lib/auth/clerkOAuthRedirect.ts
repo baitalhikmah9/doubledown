@@ -30,10 +30,12 @@ function authSessionSsoCallbackRedirectUrl(): string {
   });
 }
 
+/**
+ * Canonical native OAuth return URL for `useSSO` / openAuthSessionAsync.
+ * Prefer Clerk's auto-provisioned `clerk://…callback` outside Expo Go (see
+ * commit 622729c / cd0a218). Expo Go must use `exp://…/sso-callback`.
+ */
 export function clerkNativeSsoCallbackRedirectUrl(): string {
-  // Expo Go does not register the app's `clerk://…callback` intent/URL scheme.
-  // Using that scheme leaves the browser on a dead deep link instead of returning
-  // to Expo Go. `makeRedirectUri` yields `exp://…/--/sso-callback` which Expo Go owns.
   if (isRunningInExpoGo()) {
     return authSessionSsoCallbackRedirectUrl();
   }
@@ -41,6 +43,32 @@ export function clerkNativeSsoCallbackRedirectUrl(): string {
   const registered = clerkRegisteredNativeCallbackUrl();
   if (registered) return registered;
   return authSessionSsoCallbackRedirectUrl();
+}
+
+/**
+ * Ordered native redirect candidates for recovery retries only.
+ * Primary path uses `clerkNativeSsoCallbackRedirectUrl()` alone (known-good).
+ * Fallbacks cover production allowlist drift without replacing the primary flow.
+ */
+export function clerkNativeSsoCallbackRedirectUrls(): string[] {
+  if (isRunningInExpoGo()) {
+    return [authSessionSsoCallbackRedirectUrl()];
+  }
+
+  const urls: string[] = [];
+  const primary = clerkNativeSsoCallbackRedirectUrl();
+  urls.push(primary);
+
+  const appScheme = authSessionSsoCallbackRedirectUrl();
+  if (!urls.includes(appScheme)) urls.push(appScheme);
+
+  const androidPackage = Constants.expoConfig?.android?.package ?? FALLBACK_ANDROID_PACKAGE;
+  const iosBundle = Constants.expoConfig?.ios?.bundleIdentifier ?? FALLBACK_IOS_BUNDLE_IDENTIFIER;
+  const packageCallback =
+    Platform.OS === 'ios' ? `${iosBundle}://callback` : `${androidPackage}://callback`;
+  if (!urls.includes(packageCallback)) urls.push(packageCallback);
+
+  return urls;
 }
 
 /**
@@ -70,7 +98,15 @@ function isOAuthCallbackPath(path: string): boolean {
   try {
     const url = new URL(path, `${Linking.createURL('')}/`);
     const host = url.hostname.toLowerCase();
-    return host.endsWith('.callback') || host.includes('playbackfire.app');
+    const pathname = url.pathname.toLowerCase();
+    if (host.endsWith('.callback') || host.includes('playbackfire.app')) {
+      return true;
+    }
+    // `{package}://callback` production default from Clerk native docs
+    if (pathname === '/callback' || pathname === 'callback' || host === 'callback') {
+      return true;
+    }
+    return false;
   } catch {
     return lower.includes('callback');
   }

@@ -121,8 +121,9 @@ export function topicCardScreenPadding(
       ? TOPIC_NATIVE_COMPACT_GAP
       : TOPIC_NATIVE_GAP;
   const { paddingLeft: safeLeft, paddingRight: safeRight } = horizontalScreenPadding(insets);
-  // The topic list already sits inside the safe-area gutter and its own 24pt
-  // content inset. Page chrome must use that combined inset, not the safe area alone.
+  // Native: extra air past the safe-area gutter so header chrome and topic cards share
+  // one inset (PlayScaffold pads both). Do not re-bleed this on the list (Android FlatList
+  // rows do not stretch, so a negative margin left cards past the header).
   const topicInset = useWebLayout ? 0 : SPACING.xl;
   const paddingBaseLeft = safeLeft + topicInset;
   const paddingBaseRight = safeRight + topicInset;

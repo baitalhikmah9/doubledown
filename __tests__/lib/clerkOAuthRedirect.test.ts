@@ -7,6 +7,7 @@ import { __setExpoConstants, __resetExpoConstantsDouble } from '../doubles/expoC
 import { __resetExpoAuthSessionDouble } from '../doubles/expoAuthSession';
 import {
   clerkNativeSsoCallbackRedirectUrl,
+  clerkNativeSsoCallbackRedirectUrls,
   clerkOAuthRedirectUrl,
   rewriteNativeOAuthCallbackPath,
 } from '@/lib/auth/clerkOAuthRedirect';
@@ -17,6 +18,15 @@ describe('rewriteNativeOAuthCallbackPath', () => {
       rewriteNativeOAuthCallbackPath(
         'clerk://com.playbackfire.app.callback?rotating_token_nonce=abc',
         true
+      )
+    ).toBe('/sso-callback');
+  });
+
+  it('rewrites package://callback production default to sso-callback', () => {
+    expect(
+      rewriteNativeOAuthCallbackPath(
+        'com.playbackfire.app://callback?rotating_token_nonce=abc',
+        false
       )
     ).toBe('/sso-callback');
   });
@@ -110,6 +120,16 @@ describe('clerkNativeSsoCallbackRedirectUrl', () => {
     expect(clerkNativeSsoCallbackRedirectUrl()).toBe(
       'clerk://com.playbackfire.app.callback'
     );
+  });
+
+  it('lists clerk://, app scheme, and package://callback candidates on Android', () => {
+    __setIsRunningInExpoGo(false);
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
+
+    const urls = clerkNativeSsoCallbackRedirectUrls();
+    expect(urls[0]).toBe('clerk://com.playbackfire.app.callback');
+    expect(urls).toContain('exp://192.168.1.10:8081/--/sso-callback');
+    expect(urls).toContain('com.playbackfire.app://callback');
   });
 
   it('falls back to the hardcoded package when expoConfig is missing on Android', () => {

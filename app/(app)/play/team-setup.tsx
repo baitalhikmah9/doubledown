@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable } from '@/components/ui/Pressable';
 import { useRouter } from 'expo-router';
 import { Button } from '@/components/ui/Button';
-import { COLORS, FONT_SIZES, FONTS, SPACING } from '@/constants';
+import { COLORS, FONT_SIZES, FONTS, SPACING, getStandardChromeTopPadding } from '@/constants';
 import { SHOW_HOT_SEAT_UI } from '@/constants/featureFlags';
 import { PlayScaffold } from '@/features/play/components/PlayScaffold';
 import { WagerInfoModal } from '@/features/play/components/WagerInfoModal';
@@ -830,7 +830,10 @@ export default function TeamSetupScreen() {
       bodyScrollEnabled={false}
       bodyFrame={false}
       backgroundColor={T.canvas}
-      chromeColumnStyle={tightContinueStrip ? { paddingBottom: 0 } : undefined}
+      // Match banner top pad on the bottom edge (store / chrome symmetry), including Android.
+      chromeColumnStyle={{
+        paddingBottom: getStandardChromeTopPadding(Platform.OS === 'web'),
+      }}
       // Wide web: same max-width as the card row so back/token edges align with cards.
       contentMaxWidth={isWebLayout ? setupRowMaxWidth : undefined}
     >
@@ -1354,11 +1357,8 @@ const styles = StyleSheet.create({
   },
   floatingButtonWrapTight: {
     paddingTop: SPACING.xs,
-    /**
-     * Phone / narrow: SafeAreaView clears the home indicator. Keep a small extra
-     * dead zone so Continue is not flush against the bezel on zero-inset devices.
-     */
-    paddingBottom: SPACING.md,
+    // Bottom edge air comes from PlayScaffold chromeColumnStyle (matches banner top pad).
+    paddingBottom: 0,
   },
   footerInner: {
     width: '100%',

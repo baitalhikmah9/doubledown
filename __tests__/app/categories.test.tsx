@@ -508,7 +508,7 @@ describe('CategorySelectionScreen', () => {
       return (
         style?.flexDirection === 'row' &&
         style?.flexWrap === 'wrap' &&
-        Number.isFinite(style?.width)
+        (style?.width === '100%' || Number.isFinite(style?.width))
       );
     });
 

@@ -244,9 +244,8 @@ describe('TeamSetupScreen', () => {
     expect(flat.borderRadius).toBe(14);
   });
 
-  it('keeps a small dead zone under the rumble continue strip above the bezel', () => {
-    // SafeAreaView still clears the home indicator; strip adds modest pad so Continue
-    // is not flush to the edge on zero-inset / landscape devices.
+  it('matches banner top pad on the bottom chrome edge (including Android)', () => {
+    // Bottom edge uses getStandardChromeTopPadding so cream under Continue matches top chrome.
     usePlayStore.getState().setMode('rumble');
     __setWindowDimensions({
       width: 874,
@@ -257,10 +256,11 @@ describe('TeamSetupScreen', () => {
 
     render(<TeamSetupScreen />);
 
-    const strip = screen.getByTestId('team-setup-continue-strip');
-    const flat = StyleSheet.flatten(strip.props.style);
-    expect(flat.paddingBottom).toBeGreaterThanOrEqual(8);
-    expect(flat.paddingBottom).toBeLessThanOrEqual(16);
+    expect(screen.getByTestId('team-setup-continue-strip')).toBeTruthy();
+    const scaffold = screen.getByTestId('play-scaffold');
+    const flat = StyleSheet.flatten(scaffold.props.style);
+    // Native: SPACING.sm + SPACING.md = 20; web uses the same helper path in this double.
+    expect(flat.paddingBottom).toBeGreaterThanOrEqual(20);
   });
 
   it('pins classic landscape Continue to the team-card baseline instead of a lower strip', () => {

@@ -1,14 +1,17 @@
 import React from 'react';
-import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
+import { afterAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { Platform, Text } from 'react-native';
-import { render } from '@testing-library/react-native';
+import { render, act } from '@testing-library/react-native';
+import { deleteItemAsync } from 'expo-secure-store';
 import {
   __getClerkAuthenticateWithRedirect,
+  __getClerkReloadInitialResources,
   __getClerkStartSSOFlow,
   __resetClerkExpoDouble,
+  __setClerkClient,
 } from '../doubles/clerkExpo';
+import { __resetExpoWebBrowserDouble } from '../doubles/expoWebBrowser';
 import { useClerkOAuthFlow, isAppleCancelError } from '@/lib/hooks/useClerkOAuthFlow';
-
 
 function Harness({ onReady }: { onReady: (fn: (s: string) => Promise<void>) => void }) {
   const { signInWithOAuthStrategy } = useClerkOAuthFlow('/(app)/');
@@ -17,13 +20,15 @@ function Harness({ onReady }: { onReady: (fn: (s: string) => Promise<void>) => v
   return <Text>test</Text>;
 }
 
-describe('useClerkOAuthFlow web redirect', () => {
+describe('useClerkOAuthFlow', () => {
   const originalPlatform = Platform.OS;
   const mockAuthenticateWithRedirect = __getClerkAuthenticateWithRedirect();
   const mockStartSSOFlow = __getClerkStartSSOFlow();
+  const mockReload = __getClerkReloadInitialResources();
 
   beforeEach(() => {
     __resetClerkExpoDouble();
+    __resetExpoWebBrowserDouble();
   });
 
   afterAll(() => {
@@ -45,7 +50,9 @@ describe('useClerkOAuthFlow web redirect', () => {
     let strategy: ((s: string) => Promise<void>) | null = null;
     render(<Harness onReady={(fn) => { strategy = fn; }} />);
 
-    await strategy!('oauth_google');
+    await act(async () => {
+      await strategy!('oauth_google');
+    });
 
     expect(mockAuthenticateWithRedirect).toHaveBeenCalledTimes(1);
     expect(mockAuthenticateWithRedirect).toHaveBeenCalledWith({
@@ -66,10 +73,62 @@ describe('useClerkOAuthFlow web redirect', () => {
     let strategy: ((s: string) => Promise<void>) | null = null;
     render(<Harness onReady={(fn) => { strategy = fn; }} />);
 
-    await strategy!('oauth_google');
+    await act(async () => {
+      await strategy!('oauth_google');
+    });
 
     expect(mockStartSSOFlow).toHaveBeenCalledTimes(1);
+    expect(mockStartSSOFlow.mock.calls[0]?.[0]).toMatchObject({
+      strategy: 'oauth_google',
+    });
+    expect(typeof mockStartSSOFlow.mock.calls[0]?.[0]?.redirectUrl).toBe('string');
     expect(mockAuthenticateWithRedirect).not.toHaveBeenCalled();
+  });
+
+  it('retries startSSOFlow after missing-redirect by clearing stale client JWT', async () => {
+    // SAFETY: Controlled test fixture boundary cast.
+    (Platform as { OS: string }).OS = 'android';
+    mockStartSSOFlow.mockReset();
+    mockStartSSOFlow
+      .mockRejectedValueOnce(new Error('Missing external verification redirect URL for SSO flow'))
+      .mockResolvedValue({
+        createdSessionId: 'sess_retry',
+        setActive: jest.fn(async () => undefined),
+        authSessionResult: null,
+      });
+    mockReload.mockClear();
+    (deleteItemAsync as jest.Mock).mockClear();
+
+    let strategy: ((s: string) => Promise<void>) | null = null;
+    render(<Harness onReady={(fn) => { strategy = fn; }} />);
+
+    await act(async () => {
+      await strategy!('oauth_google');
+    });
+
+    expect(mockStartSSOFlow.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(deleteItemAsync).toHaveBeenCalledWith('__clerk_client_jwt');
+    expect(mockReload).toHaveBeenCalled();
+  });
+
+  it('refuses OAuth while Clerk is still on a dummy offline client, then proceeds after reload', async () => {
+    // SAFETY: Controlled test fixture boundary cast.
+    (Platform as { OS: string }).OS = 'android';
+    __setClerkClient({ id: 'client_DUMMY_ID' });
+    mockStartSSOFlow.mockClear();
+    mockReload.mockImplementation(async () => {
+      __setClerkClient({ id: 'client_live_after_reload' });
+    });
+
+    let strategy: ((s: string) => Promise<void>) | null = null;
+    render(<Harness onReady={(fn) => { strategy = fn; }} />);
+
+    await act(async () => {
+      await strategy!('oauth_google');
+    });
+
+    expect(mockReload).toHaveBeenCalled();
+    expect(mockStartSSOFlow).toHaveBeenCalled();
   });
 });
 

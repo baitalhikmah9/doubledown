@@ -18,6 +18,7 @@ module.exports = {
     '^expo-image$': '<rootDir>/__tests__/doubles/expoImage.tsx',
     '^expo-haptics$': '<rootDir>/__tests__/doubles/expoHaptics.ts',
     '^expo-secure-store$': '<rootDir>/__tests__/doubles/expoSecureStore.ts',
+    '^expo-web-browser$': '<rootDir>/__tests__/doubles/expoWebBrowser.ts',
     '^expo-constants$': '<rootDir>/__tests__/doubles/expoConstants.ts',
     '^expo-auth-session$': '<rootDir>/__tests__/doubles/expoAuthSession.ts',
     '^expo$': '<rootDir>/__tests__/doubles/expoModule.ts',

@@ -36,6 +36,7 @@ export function PlayScaffold({
   footer,
   footerAboveBody,
   testID,
+  chromeColumnStyle,
 }: PlayScaffoldProps) {
   const header =
     customHeader ??
@@ -64,7 +65,7 @@ export function PlayScaffold({
 
   return React.createElement(
     View,
-    { testID: testID ?? 'play-scaffold' },
+    { testID: testID ?? 'play-scaffold', style: chromeColumnStyle },
     header,
     footerAboveBody ? footer : null,
     children,

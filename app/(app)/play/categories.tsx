@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   FlatList,
   useWindowDimensions,
   Platform,
+  type LayoutChangeEvent,
   type ListRenderItem,
 } from 'react-native';
 import { Pressable } from '@/components/ui/Pressable';
@@ -93,7 +94,7 @@ type CategoryListData = {
 function buildCategoryListData(
   sections: CategorySection[],
   cols: number,
-  cardW: number,
+  rowWidth: number,
   cardH: number,
   gridGap: number,
   sectionTitleHeight: number
@@ -107,8 +108,9 @@ function buildCategoryListData(
     // Clear break between sections (General Knowledge → History, etc.).
     // This is larger than the in-section row gap so groups don't read as one list.
     const marginTop = sectionIndex > 0 ? gridGap * 2 + SPACING.xxl : 0;
-    const sectionCols = Math.min(cols, section.categories.length);
-    const sectionWidth = cardW * sectionCols + gridGap * Math.max(0, sectionCols - 1);
+    // Full column width so header chrome and card rows share one left/right edge
+    // (Android FlatList rows do not stretch to the parent on their own).
+    const sectionWidth = rowWidth;
 
     const headerLength = marginTop + sectionTitleHeight + SPACING.sm;
     rows.push({
@@ -372,8 +374,20 @@ export default function CategorySelectionScreen() {
     isWeb
   );
   const gridGap = topicLayout.gap;
-  const innerW = topicLayout.contentWidth;
-  const cardW = topicLayout.cardW;
+  // Fallback until onLayout reports the real padded column width. Android's
+  // layout width can disagree with useWindowDimensions (nav bar / insets).
+  const [colW, setColW] = useState(topicLayout.contentWidth);
+  useEffect(() => {
+    setColW(topicLayout.contentWidth);
+  }, [topicLayout.contentWidth]);
+  const onColLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = Math.round(event.nativeEvent.layout.width);
+    if (next > 0) {
+      setColW((prev) => (Math.abs(prev - next) > 1 ? next : prev));
+    }
+  }, []);
+  const innerW = colW;
+  const cardW = Math.max(1, Math.floor((colW - gridGap * (COLS - 1)) / COLS));
 
   const baseCardH = useWebLayout
     ? WEB_CARD_HEIGHT
@@ -495,7 +509,7 @@ export default function CategorySelectionScreen() {
     const { rows, layouts, slugToIndex } = buildCategoryListData(
       categorySections,
       COLS,
-      cardW,
+      innerW,
       cardH,
       gridGap,
       sectionTitleHeight
@@ -506,7 +520,7 @@ export default function CategorySelectionScreen() {
       categoryItemLayouts: layouts,
       categorySlugToIndex: slugToIndex,
     };
-  }, [cardH, cardW, categorySections, gridGap, sectionTitleHeight]);
+  }, [cardH, categorySections, gridGap, innerW, sectionTitleHeight]);
 
   const selectedCategoryIds = useMemo(
     () => session?.selectedCategoryIds ?? [],
@@ -544,7 +558,6 @@ export default function CategorySelectionScreen() {
               {
                 marginTop: item.marginTop,
                 paddingBottom: item.paddingBottom,
-                width: item.sectionWidth,
               },
             ]}
           >
@@ -555,7 +568,6 @@ export default function CategorySelectionScreen() {
                   color: textPrimary,
                   fontSize: sectionTitleSize,
                   height: sectionTitleHeight,
-                  width: item.sectionWidth,
                 },
               ]}
             >
@@ -569,10 +581,10 @@ export default function CategorySelectionScreen() {
         <View
           style={[
             styles.listItemWrap,
-            { marginBottom: item.marginBottom, width: item.sectionWidth },
+            { marginBottom: item.marginBottom },
           ]}
         >
-          <View style={[styles.sectionGrid, { gap: gridGap, width: item.sectionWidth }]}>
+          <View style={[styles.sectionGrid, { gap: gridGap }]}>
             {item.categories.map((category) => {
               const selected = selectedCategoryIds.includes(category.slug);
               const disabled = !selected && selectedCount >= required;
@@ -644,6 +656,7 @@ export default function CategorySelectionScreen() {
       customHeader={
         isLoading ? null : (
           <View
+            onLayout={onColLayout}
             style={[
               styles.headerWrap,
               compactHeader && styles.headerWrapCompact,
@@ -791,7 +804,7 @@ export default function CategorySelectionScreen() {
           <Text style={{ color: textPrimary }}>{t('common.loading')}</Text>
         </View>
       ) : (
-        <View style={[styles.contentRoot, styles.topicGridBleed]}>
+        <View style={styles.contentRoot} onLayout={onColLayout}>
           {/* Selected topics strip - above the grid */}
           {selectedCategories.length > 0 && (
             <View style={styles.selectedStrip}>
@@ -1184,10 +1197,6 @@ const styles = StyleSheet.create({
     minHeight: 0,
     minWidth: 0,
   },
-  // Keep the established topic-card position. The shared outer inset is for chrome.
-  topicGridBleed: {
-    marginHorizontal: -SPACING.xl,
-  },
   loadingWrap: {
     flex: 1,
     alignItems: 'center',
@@ -1208,19 +1217,22 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   listItemWrap: {
-    alignSelf: 'center',
+    width: '100%',
+    alignSelf: 'stretch',
   },
   sectionTitle: {
-    alignSelf: 'center',
+    alignSelf: 'stretch',
     fontFamily: FONTS.uiBold,
     letterSpacing: 1.1,
     textTransform: 'uppercase',
     paddingHorizontal: 2,
   },
   sectionGrid: {
-    alignSelf: 'center',
+    width: '100%',
+    alignSelf: 'stretch',
     flexDirection: 'row',
     flexWrap: 'wrap',
+    // Full rows fill the column; short final rows stay centered in that same width.
     justifyContent: 'center',
   },
   // ── Topic card ───────────────────────────────────────────────────────
